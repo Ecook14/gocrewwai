@@ -134,9 +134,9 @@ But Crew-GO features an **Elite Real-time Dashboard**.
 To use it, you can programmatically start the server in your `main.go`, OR use the CLI.
 
 ### Option A: Using the CLI (Recommended)
-If you built your project using the `crew-go create` scaffolding tool, simply run:
+If you built your project using the `crewai create` scaffolding tool, simply run:
 ```bash
-crew-go kickoff --ui
+crewai kickoff --ui
 ```
 
 ### Option B: Programmatically in Code

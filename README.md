@@ -30,7 +30,7 @@ Experience unmatched observability with our **Premium Glassmorphic UI**.
 - **Live Execution Trace**: Watch every reasoning step, tool invocation, and task completion in real-time.
 - **Agent Status Visualization**: Real-time cards showing current agent activity (Idle, Thinking, Working) and system metrics.
 - **WebSocket Streaming**: Powered by a high-performance Go backend event bus for zero-latency updates.
-- **CLI Integration**: Simply append `--ui` to your `crew-go run` command to instantly launch the dashboard.
+- **CLI Integration**: Simply append `--ui` to your `crewai kickoff` command to instantly launch the dashboard.
 
 ### 🧰 3. Industrial Tool Arsenal (24+ Native Tools)
 Equip your agents with a massive suite of capabilities out-of-the-box:
@@ -69,19 +69,19 @@ Crew-GO is built on a **Durable Graph State Machine**, enabling unimaginably com
 ### 2. Install the Core Library & CLI
 ```bash
 go get github.com/Ecook14/crewai-go
-go install github.com/Ecook14/crewai-go/cmd/crew-go@latest
+go install github.com/Ecook14/crewai-go/cmd/crewai@latest
 ```
 
 ### 3. Scaffold a New Project
 ```bash
-crew-go create my-ops-crew
+crewai create my-ops-crew
 cd my-ops-crew
 ```
 
 ### 4. Run your Crew with the Live UI
 ```bash
 export OPENAI_API_KEY=your_key
-crew-go kickoff --ui
+crewai kickoff --ui
 ```
 *Navigate to `http://localhost:8080/web-ui` to watch your agents think!*
 

@@ -3,10 +3,7 @@ package crew
 import (
 	"encoding/json"
 	"os"
-
-	"github.com/Ecook14/crewai-go/pkg/tasks"
 )
-
 // CrewState represents the serialized state of a crew for checkpointing.
 type CrewState struct {
 	CurrentTaskIndex int                      `json:"current_task_index"`

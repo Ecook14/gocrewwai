@@ -20,7 +20,6 @@ func NewGitHubTool(token string) *GitHubTool {
 	if token == "" {
 		return nil
 	}
-	tc := context.Background()
 	client := github.NewClient(nil).WithAuthToken(token)
 	return &GitHubTool{client: client}
 }

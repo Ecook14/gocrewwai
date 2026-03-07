@@ -6,13 +6,14 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
-	"time"
-
+	
 	"github.com/Ecook14/crewai-go/pkg/agents"
+	"github.com/Ecook14/crewai-go/pkg/delegation"
 	crewErrors "github.com/Ecook14/crewai-go/pkg/errors"
 	"github.com/Ecook14/crewai-go/pkg/llm"
 	"github.com/Ecook14/crewai-go/pkg/tasks"
 	"github.com/Ecook14/crewai-go/pkg/telemetry"
+	"os"
 )
 
 var defaultLogger = slog.Default()
@@ -145,9 +146,11 @@ func (c *Crew) Kickoff(ctx context.Context) (string, error) { // Changed return 
 
 	switch c.Process {
 	case Sequential:
-		return c.executeSequential(ctx)
+		res, err := c.executeSequential(ctx)
+		return fmt.Sprintf("%v", res), err
 	case Hierarchical:
-		return c.executeHierarchical(ctx)
+		res, err := c.executeHierarchical(ctx)
+		return fmt.Sprintf("%v", res), err
 	case Consensual:
 		return c.executeConsensual(ctx)
 	case Graph:
@@ -228,14 +231,16 @@ func (c *Crew) executeHierarchical(ctx context.Context) (interface{}, error) {
 	}
 
 	// Construct or use the provided manager agent
-	manager := c.ManagerAgent
-	if manager == nil {
+	var orchestrator *agents.ManagerAgent
+	if c.ManagerAgent != nil {
+		orchestrator = &agents.ManagerAgent{Agent: *c.ManagerAgent, ManagedAgents: c.Agents}
+	} else {
 		model := c.ManagerLLM
 		if model == nil && len(c.Agents) > 0 {
 			model = c.Agents[0].LLM
 		}
-		manager = agents.NewManagerAgent(model, c.Agents)
-		manager.Verbose = c.Verbose
+		orchestrator = agents.NewManagerAgent(model, c.Agents)
+		orchestrator.Verbose = c.Verbose
 	}
 
 	var wg sync.WaitGroup
@@ -256,7 +261,7 @@ func (c *Crew) executeHierarchical(ctx context.Context) (interface{}, error) {
 			}
 
 			// Dynamic Delegation: The manager selects the best agent for this task
-			assignedAgent, err := manager.DelegateTask(ctx, task.Description)
+			assignedAgent, err := orchestrator.DelegateTask(ctx, task.Description)
 			if err != nil {
 				// Fallback to pre-assigned agent if delegation fails or manager is not available
 				if task.Agent == nil {
@@ -323,7 +328,7 @@ func (c *Crew) executeHierarchical(ctx context.Context) (interface{}, error) {
 	replanPrompt := planContext + "\n\nAs the Manager, should we add any new tasks or modify the existing plan based on current results? " +
 		"If yes, describe the new tasks. If no, respond with 'PLAN_STABLE'."
 	
-	decision, err := manager.Execute(ctx, replanPrompt, nil)
+	decision, err := orchestrator.Execute(ctx, replanPrompt, nil)
 	if err == nil {
 		decisionStr := fmt.Sprintf("%v", decision)
 		if !strings.Contains(strings.ToUpper(decisionStr), "PLAN_STABLE") {
@@ -334,7 +339,7 @@ func (c *Crew) executeHierarchical(ctx context.Context) (interface{}, error) {
 			// Adds the manager's refinement decision as a prioritized follow-up task.
 			newTask := &tasks.Task{
 				Description: "Finalize the re-planned goals: " + decisionStr,
-				Agent:       manager,
+				Agent:       &orchestrator.Agent,
 			}
 			c.Tasks = append(c.Tasks, newTask)
 			// Return a special message or continue? 
@@ -359,14 +364,14 @@ func (c *Crew) executeHierarchical(ctx context.Context) (interface{}, error) {
 	}
 
 	// Manager synthesis
-	if manager.LLM != nil {
+	if orchestrator.LLM != nil {
 		var sb fmt.Stringer = &resultAggregator{results: results, tasks: c.Tasks}
 		synthesisInput := fmt.Sprintf(
 			"You are aggregating results from %d parallel worker tasks. "+
 				"Please provide a coherent, well-structured final summary.\n\n%s",
 			len(results), sb)
 
-		synthesized, err := manager.Execute(ctx, synthesisInput, nil)
+		synthesized, err := orchestrator.Execute(ctx, synthesisInput, nil)
 		if err != nil {
 			if c.Verbose {
 				defaultLogger.Warn("Manager synthesis failed, returning raw results", slog.String("error", err.Error()))
@@ -375,7 +380,7 @@ func (c *Crew) executeHierarchical(ctx context.Context) (interface{}, error) {
 		}
 
 		// Sync manager metrics too
-		for k, v := range manager.UsageMetrics {
+		for k, v := range orchestrator.UsageMetrics {
 			c.UsageMetrics[k] += v
 		}
 
@@ -448,13 +453,15 @@ func (c *Crew) executeConsensual(ctx context.Context) (string, error) {
 	}
 
 	// Consolidate into a manager synthesis prompt
-	manager := c.ManagerAgent
-	if manager == nil {
+	var orchestrator *agents.ManagerAgent
+	if c.ManagerAgent != nil {
+		orchestrator = &agents.ManagerAgent{Agent: *c.ManagerAgent, ManagedAgents: c.Agents}
+	} else {
 		model := c.ManagerLLM
 		if model == nil && len(c.Agents) > 0 {
 			model = c.Agents[0].LLM
 		}
-		manager = agents.NewManagerAgent(model, c.Agents)
+		orchestrator = agents.NewManagerAgent(model, c.Agents)
 	}
 
 	synthesisPrompt := "You are a Consensus Manager. Below are results from multiple agents on the same task. " +
@@ -463,7 +470,7 @@ func (c *Crew) executeConsensual(ctx context.Context) (string, error) {
 		synthesisPrompt += res + "\n\n"
 	}
 
-	finalAnswer, err := manager.Execute(ctx, synthesisPrompt, nil)
+	finalAnswer, err := orchestrator.Execute(ctx, synthesisPrompt, nil)
 	
 	// Update Metrics (Aggressively sync even if synthesis failed partially)
 	if c.UsageMetrics == nil {
@@ -474,8 +481,8 @@ func (c *Crew) executeConsensual(ctx context.Context) (string, error) {
 			c.UsageMetrics[k] += v
 		}
 	}
-	if manager != nil {
-		for k, v := range manager.UsageMetrics {
+	if orchestrator != nil {
+		for k, v := range orchestrator.UsageMetrics {
 			c.UsageMetrics[k] += v
 		}
 	}
@@ -587,13 +594,15 @@ func (c *Crew) executeGraph(ctx context.Context) (string, error) {
 func (c *Crew) executeReflective(ctx context.Context) (string, error) {
 	var finalResult string
 	
-	manager := c.ManagerAgent
-	if manager == nil {
+	var orchestrator *agents.ManagerAgent
+	if c.ManagerAgent != nil {
+		orchestrator = &agents.ManagerAgent{Agent: *c.ManagerAgent, ManagedAgents: c.Agents}
+	} else {
 		model := c.ManagerLLM
 		if model == nil && len(c.Agents) > 0 {
 			model = c.Agents[0].LLM
 		}
-		manager = agents.NewManagerAgent(model, c.Agents)
+		orchestrator = agents.NewManagerAgent(model, c.Agents)
 	}
 
 	for i, task := range c.Tasks {
@@ -611,7 +620,7 @@ func (c *Crew) executeReflective(ctx context.Context) (string, error) {
 		
 		maxReviewRetries := 2
 		for j := 0; j < maxReviewRetries; j++ {
-			review, err := manager.Execute(ctx, reviewPrompt, nil)
+			review, err := orchestrator.Execute(ctx, reviewPrompt, nil) // Corrected to use orchestrator and reviewPrompt, and capture err
 			if err != nil {
 				return "", fmt.Errorf("manager review failed: %w", err)
 			}
