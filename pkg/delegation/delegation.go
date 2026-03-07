@@ -40,6 +40,8 @@ func (t *DelegateWorkTool) Description() string {
 	)
 }
 
+func (t *DelegateWorkTool) RequiresReview() bool { return false }
+
 func (t *DelegateWorkTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	coworkerRaw, ok := input["coworker"]
 	if !ok {
@@ -122,6 +124,8 @@ func (t *AskQuestionTool) Description() string {
 		strings.Join(roles, ", "),
 	)
 }
+
+func (t *AskQuestionTool) RequiresReview() bool { return false }
 
 func (t *AskQuestionTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	coworkerRaw, ok := input["coworker"]

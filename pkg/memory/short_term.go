@@ -2,7 +2,6 @@ package memory
 
 import (
 	"context"
-	"fmt"
 )
 
 // ShortTermMemory handles contextual, task-specific memory.

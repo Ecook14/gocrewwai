@@ -3,15 +3,11 @@ package llm
 import (
 	"bytes"
 	"context"
-	"crypto/md5"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/sashabaranov/go-openai"
@@ -91,22 +87,12 @@ func (c *OpenAIClient) Generate(ctx context.Context, messages []Message, options
 		Messages: oaiMessages,
 	}
 
-	// MD5 LLM Response Caching (includes images in hash via oaiMessages)
-	hashStr := getCacheHash(oaiMessages, model)
-	cacheFile := filepath.Join(os.TempDir(), "crew_cache_"+hashStr+".txt")
-	if cached, err := os.ReadFile(cacheFile); err == nil {
-		return string(cached), nil 
-	}
-
 	resp, err := c.client.CreateChatCompletion(ctx, req)
 	if err != nil {
 		return "", fmt.Errorf("ChatCompletion error: %v", err)
 	}
 
-	result := resp.Choices[0].Message.Content
-	_ = os.WriteFile(cacheFile, []byte(result), 0644) 
-
-	return result, nil
+	return resp.Choices[0].Message.Content, nil
 }
 
 // GenerateStructured implements generation with structured JSON schema outputs.
@@ -140,23 +126,13 @@ func (c *OpenAIClient) GenerateStructured(ctx context.Context, messages []Messag
 		ResponseFormat: &openai.ChatCompletionResponseFormat{Type: openai.ChatCompletionResponseFormatTypeJSONObject},
 	}
 
-	// Phase 18: MD5 Structured LLM Caching
-	hashStr := getCacheHash(oaiMessages, model+"_structured")
-	cacheFile := filepath.Join(os.TempDir(), "crew_cache_"+hashStr+".json")
-	var rawJSON string
-
-	if cached, err := os.ReadFile(cacheFile); err == nil {
-		rawJSON = string(cached)
-	} else {
-		resp, err := c.client.CreateChatCompletion(ctx, req)
-		if err != nil {
-			return nil, fmt.Errorf("ChatCompletion unstructured error: %v", err)
-		}
-		rawJSON = resp.Choices[0].Message.Content
-		_ = os.WriteFile(cacheFile, []byte(rawJSON), 0644)
+	resp, err := c.client.CreateChatCompletion(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("ChatCompletion unstructured error: %v", err)
 	}
+	rawJSON := resp.Choices[0].Message.Content
 	
-	err := json.Unmarshal([]byte(rawJSON), schema)
+	err = json.Unmarshal([]byte(rawJSON), schema)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract schema: %w\nRaw Output: %s", err, rawJSON)
 	}
@@ -213,24 +189,7 @@ func (c *OpenAIClient) StreamGenerate(ctx context.Context, messages []Message, o
 	return ch, nil
 }
 
-	hash := md5.Sum(data)
-	return hex.EncodeToString(hash[:])
-}
 
-// GenerateEmbedding converts text into a numerical vector.
-func (c *OpenAIClient) GenerateEmbedding(ctx context.Context, text string) ([]float32, error) {
-	req := openai.EmbeddingRequest{
-		Input: []string{text},
-		Model: openai.AdaEmbeddingV2,
-	}
-
-	resp, err := c.client.CreateEmbeddings(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-
-	return resp.Data[0].Embedding, nil
-}
 
 // GenerateSpeech converts text to audio using OpenAI's TTS.
 func (c *OpenAIClient) GenerateSpeech(ctx context.Context, text string, options map[string]interface{}) ([]byte, error) {

@@ -8,8 +8,9 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/sdk/resource"
-	"go.opentelemetry.io/otel/sdk/trace"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var (
@@ -18,16 +19,16 @@ var (
 )
 
 // InitTelemetry initializes a basic OpenTelemetry provider.
-func InitTelemetry(w io.Writer) (*trace.TracerProvider, error) {
+func InitTelemetry(w io.Writer) (*sdktrace.TracerProvider, error) {
 	Enabled = true
 	exporter, err := stdouttrace.New(stdouttrace.WithWriter(w))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create stdout exporter: %w", err)
 	}
 
-	tp := trace.NewTracerProvider(
-		trace.WithBatcher(exporter),
-		trace.WithResource(resource.NewWithAttributes(
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exporter),
+		sdktrace.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
 			semconv.ServiceNameKey.String("crew-go-app"),
 		)),

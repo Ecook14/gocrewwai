@@ -3,7 +3,6 @@ package tools
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"time"
 

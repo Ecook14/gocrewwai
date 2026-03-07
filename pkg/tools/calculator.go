@@ -3,7 +3,6 @@ package tools
 import (
 	"context"
 	"fmt"
-	"strconv"
 )
 
 // CalculatorTool provides basic mathematical operations.

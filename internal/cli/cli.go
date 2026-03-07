@@ -17,8 +17,8 @@ import (
 func printHelp() {
 	fmt.Println("Crew-GO CLI")
 	fmt.Println("Usage:")
-	fmt.Println("  crew-go create [project_name]   - Scaffold a new standard Go AI project")
-	fmt.Println("  crew-go kickoff                 - Execute the crew pipeline (original demo)") // Kept kickoff for existing demo
+	fmt.Println("  crewai create [project_name]   - Scaffold a new standard Go AI project")
+	fmt.Println("  crewai kickoff                 - Execute the crew pipeline (original demo)") // Kept kickoff for existing demo
 }
 
 // Run is the main entrypoint executing standard CLI behavior.
@@ -32,7 +32,7 @@ func Run(args []string) error {
 	switch command {
 	case "create":
 		if len(args) < 3 {
-			fmt.Println("Usage: crew-go create [project_name]")
+			fmt.Println("Usage: crewai create [project_name]")
 			os.Exit(1)
 		}
 		projectName := args[2]
