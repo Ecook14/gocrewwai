@@ -24,8 +24,8 @@ go mod init my-first-crew
 go get github.com/Ecook14/gocrewwai
 ```
 
-*(If you ever want to scaffold a project automatically, we also have a CLI you can install via `go install github.com/Ecook14/gocrewwai/cmd/gocrewwai@latest`!)*
-
+*(If you ever want to scaffold a project automatically, we also have a CLI you can install via `go install github.com/Ecook14/gocrewwai/cmd/gocrew@latest`!)*
+积累
 ---
 
 ## Phase 2: Writing the Code
@@ -46,11 +46,11 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/Ecook14/gocrew/pkg/agents"
-	"github.com/Ecook14/gocrew/pkg/crew"
-	"github.com/Ecook14/gocrew/pkg/llm"
-	"github.com/Ecook14/gocrew/pkg/tasks"
-	"github.com/Ecook14/gocrew/pkg/tools"
+	"github.com/Ecook14/gocrewwai/pkg/agents"
+	"github.com/Ecook14/gocrewwai/pkg/crew"
+	"github.com/Ecook14/gocrewwai/pkg/llm"
+	"github.com/Ecook14/gocrewwai/pkg/tasks"
+	"github.com/Ecook14/gocrewwai/pkg/tools"
 )
 
 func main() {
@@ -152,8 +152,8 @@ Watching terminal logs is fun, but observing your agents think in a real-time we
 
 Simply import our server package into your `main.go`:
 ```go
-import "github.com/Ecook14/gocrew/pkg/dashboard"
-```
+import "github.com/Ecook14/gocrewwai/pkg/dashboard"
+积累```
 And add this line right before you call `techCrew.Kickoff(...)`:
 ```go
 // Start the real-time websocket dashboard on port 8080!

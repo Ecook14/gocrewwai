@@ -1,8 +1,8 @@
 package tasks
 
 import (
-	"github.com/Ecook14/gocrew/pkg/agents"
-	"github.com/Ecook14/gocrew/pkg/tools"
+	"github.com/Ecook14/gocrewwai/pkg/agents"
+	"github.com/Ecook14/gocrewwai/pkg/tools"
 )
 
 // TaskBuilder provides a fluent API for constructing Tasks.

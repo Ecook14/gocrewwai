@@ -2,7 +2,7 @@
 
 ```
 Crew-GO/
-├── cmd/crewai/           # CLI entrypoint
+├── cmd/gocrew/           # CLI entrypoint
 │   └── main.go
 ├── internal/cli/         # CLI implementation (not importable by external packages)
 │   ├── cli.go
@@ -32,7 +32,7 @@ Crew-GO/
 
 ```mermaid
 graph TD
-    A[cmd/crewai] --> B[internal/cli]
+    A[cmd/gocrew] --> B[internal/cli]
     B --> C[pkg/crew]
     C --> D[pkg/agents]
     C --> E[pkg/tasks]

@@ -87,7 +87,7 @@ go get github.com/Ecook14/gocrewwai
 **🛠️ For Dynamic Operators (Global CLI)**
 Install the `gocrew` command-line tool globally to scaffold projects and launch the Dashboard from anywhere:
 ```bash
-go install github.com/Ecook14/gocrewwai/cmd/gocrewwai@latest
+go install github.com/Ecook14/gocrewwai/cmd/gocrew@latest
 ```
 *Note: Ensure your `$GOPATH/bin` (usually `~/go/bin`) is in your system's `PATH`!*
 
@@ -117,7 +117,7 @@ func main() {
 ### 3. Rapid Scaffolding (CLI)
 If you prefer starting with a template, our CLI provides instant elite-tier scaffolding:
 ```bash
-~/go/bin/crewai create my-first-crew
+~/go/bin/gocrew create my-first-crew
 cd my-first-crew
 ```
 
@@ -138,8 +138,8 @@ Because we aggressively utilize Go 1.16+ `//go:embed` directives, the **entire G
 To compile a production-ready binary for your specific operating system:
 
 ```bash
-# Build the CrewAI scaffolding CLI for Windows
-GOOS=windows GOARCH=amd64 go build -o crewai-cli.exe ./cmd/crewai
+# Build the gocrew scaffolding CLI for Windows
+GOOS=windows GOARCH=amd64 go build -o gocrew-cli.exe ./cmd/gocrew
 
 # Build a standalone standalone Dashboard app (from our examples) for Mac 
 GOOS=darwin GOARCH=arm64 go build -o my-app ./examples/dashboard_demo

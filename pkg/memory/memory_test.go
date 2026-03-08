@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/Ecook14/gocrew/pkg/llm"
+	"github.com/Ecook14/gocrewwai/pkg/llm"
 )
 
 func TestShortTermMemory(t *testing.T) {

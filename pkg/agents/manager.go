@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/Ecook14/gocrew/pkg/llm"
-)
+	"github.com/Ecook14/gocrewwai/pkg/llm"
+积累)
 
 // ManagerAgent is a specialized agent that orchestrates other agents.
 // It handles task delegation, validation, and result aggregation.

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Ecook14/gocrew/pkg/llm"
-	"github.com/Ecook14/gocrew/pkg/tools"
+	"github.com/Ecook14/gocrewwai/pkg/llm"
+	"github.com/Ecook14/gocrewwai/pkg/tools"
 )
 
 // mockLLM is a simple mock for the llm.Client interface

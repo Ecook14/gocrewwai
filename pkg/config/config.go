@@ -43,7 +43,7 @@ type CrewConfig struct {
 // Expanded Configuration — Environment-Aware, Validatable
 // ---------------------------------------------------------------------------
 
-// Config holds all Gocrew runtime settings with env override support.
+// Config holds all Crew-GO runtime settings with env override support.
 type Config struct {
 	mu sync.RWMutex
 

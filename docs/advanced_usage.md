@@ -123,7 +123,7 @@ If a `crew.Crew` is a tiny microservice of agents, `flow.Flow` is the Kubernetes
 
 ### Creating a Flow
 ```go
-import "github.com/Ecook14/gocrew/pkg/flow"
+import "github.com/Ecook14/gocrewwai/pkg/flow"
 
 // Initial State Dictionary
 initialState := flow.State{"company": "OpenAI", "ticker": "MSFT"}

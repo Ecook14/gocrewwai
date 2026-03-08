@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Ecook14/gocrew/pkg/llm"
-	"github.com/Ecook14/gocrew/pkg/memory"
+	"github.com/Ecook14/gocrewwai/pkg/llm"
+	"github.com/Ecook14/gocrewwai/pkg/memory"
 )
 
 // KnowledgeSearchTool allows agents to search specifically within the ingested knowledge base.

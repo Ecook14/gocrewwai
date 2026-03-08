@@ -6,10 +6,10 @@ import (
 	"log"
 	"os"
 
-	"github.com/Ecook14/gocrew/pkg/agents"
-	"github.com/Ecook14/gocrew/pkg/crew"
-	"github.com/Ecook14/gocrew/pkg/llm"
-	"github.com/Ecook14/gocrew/pkg/tasks"
+	"github.com/Ecook14/gocrewwai/pkg/agents"
+	"github.com/Ecook14/gocrewwai/pkg/crew"
+	"github.com/Ecook14/gocrewwai/pkg/llm"
+	"github.com/Ecook14/gocrewwai/pkg/tasks"
 )
 
 func main() {

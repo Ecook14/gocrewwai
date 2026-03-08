@@ -6,14 +6,14 @@ import (
 	"log"
 	"os"
 
-	"github.com/Ecook14/gocrew/pkg/dashboard"
-	"github.com/Ecook14/gocrew/pkg/agents"
-	"github.com/Ecook14/gocrew/pkg/crew"
-	"github.com/Ecook14/gocrew/pkg/llm"
-	"github.com/Ecook14/gocrew/pkg/memory"
-	"github.com/Ecook14/gocrew/pkg/tasks"
-	"github.com/Ecook14/gocrew/pkg/telemetry"
-	"github.com/Ecook14/gocrew/pkg/tools"
+	"github.com/Ecook14/gocrewwai/pkg/dashboard"
+	"github.com/Ecook14/gocrewwai/pkg/agents"
+	"github.com/Ecook14/gocrewwai/pkg/crew"
+	"github.com/Ecook14/gocrewwai/pkg/llm"
+	"github.com/Ecook14/gocrewwai/pkg/memory"
+	"github.com/Ecook14/gocrewwai/pkg/tasks"
+	"github.com/Ecook14/gocrewwai/pkg/telemetry"
+	"github.com/Ecook14/gocrewwai/pkg/tools"
 )
 
 func main() {

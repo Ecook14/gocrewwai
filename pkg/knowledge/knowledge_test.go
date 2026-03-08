@@ -5,8 +5,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Ecook14/gocrew/pkg/llm"
-	"github.com/Ecook14/gocrew/pkg/memory"
+	"github.com/Ecook14/gocrewwai/pkg/llm"
+	"github.com/Ecook14/gocrewwai/pkg/memory"
 	"strings"
 )
 

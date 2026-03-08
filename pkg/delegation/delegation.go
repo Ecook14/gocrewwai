@@ -1,4 +1,4 @@
-// Package delegation provides the inter-agent task delegation engine for Gocrew.
+// Package delegation provides the inter-agent task delegation engine for Crew-GO.
 // This enables agents to delegate sub-tasks to other agents within the same crew,
 // mirroring Python CrewAI's agent delegation capabilities.
 package delegation

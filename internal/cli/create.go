@@ -9,7 +9,7 @@ import (
 )
 
 // GenerateScaffolding creates a standard boilerplate Gocrew project in the current directory.
-// Mirrors `crewai create crew [name]`
+// Mirrors `gocrew create [name]`
 func GenerateScaffolding(projectName string) error {
 	baseDir := filepath.Join(".", projectName)
 
@@ -115,7 +115,7 @@ func main() {
 	// 4. Start the Dashboard (Background)
 	dashboard.Start("8080")
 
-	slog.Info("Starting Boilerplate Gocrew...")
+	slog.Info("Starting Boilerplate Crew-GO...")
 	res, err := myCrew.Kickoff(context.Background())
 	if err != nil {
 		slog.Error("Crew execution failed", slog.Any("error", err))

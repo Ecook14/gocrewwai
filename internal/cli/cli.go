@@ -18,10 +18,10 @@ import (
 
 // printHelp prints the usage instructions
 func printHelp() {
-	fmt.Println("Gocrew CLI")
+	fmt.Println("gocrew CLI (Official: Gocrewwai)")
 	fmt.Println("Usage:")
-	fmt.Println("  gocrewwai create [project_name]   - Scaffold a new standard Go AI project")
-	fmt.Println("  gocrewwai kickoff                 - Execute the crew pipeline (original demo)") // Kept kickoff for existing demo
+	fmt.Println("  gocrew create [project_name]   - Scaffold a new standard Go AI project")
+	fmt.Println("  gocrew kickoff                 - Execute the crew pipeline (original demo)") // Kept kickoff for existing demo
 }
 
 // Run is the main entrypoint executing standard CLI behavior.
@@ -35,7 +35,7 @@ func Run(args []string) error {
 	switch command {
 	case "create":
 		if len(args) < 3 {
-			fmt.Println("Usage: gocrewwai create [project_name]")
+			fmt.Println("Usage: gocrew create [project_name]")
 			os.Exit(1)
 		}
 		projectName := args[2]
@@ -68,7 +68,7 @@ func handleKickoff(showUI bool) error {
 		telemetry.GlobalExecutionController.Pause()
 	}
 
-	slog.Info("🚀 Kicking off the Gocrew Go Demo...")
+	slog.Info("🚀 Kicking off the Crew-GO Demo...")
 
 	agent := &agents.Agent{
 		Role:      "Architect",
