@@ -1,6 +1,8 @@
 package telemetry
 
 import (
+	"context"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -74,4 +76,115 @@ func (b *EventBus) Publish(e Event) {
 		default:
 		}
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Human-In-The-Loop (HITL) Global Review Manager
+// ---------------------------------------------------------------------------
+
+type ReviewManager struct {
+	Pending map[string]chan bool
+	mu      sync.Mutex
+}
+
+var GlobalReviewManager = &ReviewManager{
+	Pending: make(map[string]chan bool),
+}
+
+// RequestReview blocks until the UI or manual API approves or rejects the execution.
+func (r *ReviewManager) RequestReview(id string, agentRole, toolName string, input interface{}) bool {
+	ch := make(chan bool)
+	r.mu.Lock()
+	r.Pending[id] = ch
+	r.mu.Unlock()
+
+	// Broadcast an event so the UI knows a review is pending
+	GlobalBus.Publish(Event{
+		Type:      "review_requested",
+		AgentRole: agentRole,
+		Payload: map[string]interface{}{
+			"review_id": id,
+			"tool_name": toolName,
+			"input":     input,
+		},
+	})
+
+	// Block until UI responds via API
+	decision := <-ch
+
+	r.mu.Lock()
+	delete(r.Pending, id)
+	r.mu.Unlock()
+
+	return decision
+}
+
+// SubmitReview resolves a pending review.
+func (r *ReviewManager) SubmitReview(id string, approved bool) {
+	r.mu.Lock()
+	ch, ok := r.Pending[id]
+	r.mu.Unlock()
+	if ok {
+		ch <- approved
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Dynamic Execution Control
+// ---------------------------------------------------------------------------
+
+type ExecutionController struct {
+	mu        sync.Mutex
+	StartFunc func() error
+	StopFunc  context.CancelFunc
+	IsRunning bool
+}
+
+var GlobalExecutionController = &ExecutionController{}
+
+// Register configures the engine's start and stop references for UI control.
+func (c *ExecutionController) Register(start func() error, stop context.CancelFunc) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.StartFunc = start
+	c.StopFunc = stop
+}
+
+// Start triggers the registered start callback if not already running.
+func (c *ExecutionController) Start() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.IsRunning {
+		return fmt.Errorf("execution is already running")
+	}
+	if c.StartFunc == nil {
+		return fmt.Errorf("no start function registered")
+	}
+	c.IsRunning = true
+	
+	// Execute async so we don't block the API call
+	go func() {
+		defer func() {
+			c.mu.Lock()
+			c.IsRunning = false
+			c.mu.Unlock()
+		}()
+		_ = c.StartFunc()
+	}()
+	return nil
+}
+
+// Stop triggers the registered cancel function.
+func (c *ExecutionController) Stop() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if !c.IsRunning {
+		return fmt.Errorf("execution is not currently running")
+	}
+	if c.StopFunc == nil {
+		return fmt.Errorf("no stop function registered")
+	}
+	c.StopFunc()
+	c.IsRunning = false
+	return nil
 }

@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"time"
 
 	crewErrors "github.com/Ecook14/crewai-go/pkg/errors"
 	"github.com/Ecook14/crewai-go/pkg/guardrails"
@@ -363,11 +364,20 @@ Once you have gathered all necessary information and are ready to provide the fi
 				})
 
 				// HITL Check
-				if activeTool.RequiresReview() && a.StepReview != nil {
+				if activeTool.RequiresReview() {
 					if a.Verbose {
-						defaultLogger.Info("⏳ Agent waiting for human approval", slog.String("agent", a.Role), slog.String("tool", toolReq.Tool))
+						defaultLogger.Info("⏳ Agent tool execution pending human approval", slog.String("agent", a.Role), slog.String("tool", toolReq.Tool))
 					}
-					if !a.StepReview(toolReq.Tool, toolReq.Input) {
+
+					var approved bool
+					if a.StepReview != nil {
+						approved = a.StepReview(toolReq.Tool, toolReq.Input)
+					} else {
+						reviewID := fmt.Sprintf("%s-%d", strings.ReplaceAll(a.Role, " ", "-"), time.Now().UnixNano())
+						approved = telemetry.GlobalReviewManager.RequestReview(reviewID, a.Role, toolReq.Tool, toolReq.Input)
+					}
+
+					if !approved {
 						observation := "Tool Execution Denied by human."
 						messages = append(messages, llm.Message{Role: "assistant", Content: responseText})
 						messages = append(messages, llm.Message{Role: "user", Content: observation})
@@ -507,16 +517,18 @@ func (a *Agent) recallMemory(ctx context.Context, taskInput string) string {
 
 	// 1. Vector Search (Short-Term/Long-Term)
 	if a.Memory != nil {
-		vector, err := a.LLM.GenerateEmbedding(ctx, taskInput)
-		if err == nil {
-			items, _ := a.Memory.Search(ctx, vector, 2)
-			if len(items) > 0 {
-				if !hasContext {
-					sb.WriteString("RELEVANT PAST CONTEXT:\n")
-					hasContext = true
-				}
-				for i, item := range items {
-					sb.WriteString(fmt.Sprintf("--- Historical Memory %d ---\n%s\n", i+1, item.Text))
+		if embedder, ok := a.LLM.(llm.Embedder); ok {
+			vector, err := embedder.GenerateEmbedding(ctx, taskInput)
+			if err == nil {
+				items, _ := a.Memory.Search(ctx, vector, 2)
+				if len(items) > 0 {
+					if !hasContext {
+						sb.WriteString("RELEVANT PAST CONTEXT:\n")
+						hasContext = true
+					}
+					for i, item := range items {
+						sb.WriteString(fmt.Sprintf("--- Historical Memory %d ---\n%s\n", i+1, item.Text))
+					}
 				}
 			}
 		}
@@ -551,7 +563,15 @@ func (a *Agent) saveMemory(ctx context.Context, taskInput, result string) {
 	content := fmt.Sprintf("Task: %s\nResult: %s", taskInput, result)
 
 	// Generate embedding for storage
-	vector, err := a.LLM.GenerateEmbedding(ctx, content)
+	embedder, ok := a.LLM.(llm.Embedder)
+	if !ok {
+		if a.Verbose {
+			defaultLogger.Warn("Memory save skipped: LLM does not support text embeddings")
+		}
+		return
+	}
+
+	vector, err := embedder.GenerateEmbedding(ctx, content)
 	if err != nil {
 		if a.Verbose {
 			defaultLogger.Warn("Memory save: embedding generation failed", slog.String("error", err.Error()))

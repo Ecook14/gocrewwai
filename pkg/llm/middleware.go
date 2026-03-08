@@ -130,26 +130,6 @@ func (mc *MiddlewareClient) GenerateStructured(ctx context.Context, messages []M
 	return result, err
 }
 
-func (mc *MiddlewareClient) GenerateEmbedding(ctx context.Context, text string) ([]float32, error) {
-	ctx = mc.applyTimeout(ctx)
-	if err := mc.waitRateLimit(ctx); err != nil {
-		return nil, err
-	}
-
-	start := time.Now()
-	result, err := mc.inner.GenerateEmbedding(ctx, text)
-	if mc.logger != nil {
-		mc.logger.Info("LLM call",
-			slog.String("method", "GenerateEmbedding"),
-			slog.Int("input_len", len(text)),
-			slog.Int("output_dims", len(result)),
-			slog.Duration("latency", time.Since(start)),
-			slog.Bool("error", err != nil),
-		)
-	}
-	return result, err
-}
-
 func (mc *MiddlewareClient) StreamGenerate(ctx context.Context, messages []Message, options map[string]interface{}) (<-chan string, error) {
 	ctx = mc.applyTimeout(ctx)
 	if err := mc.waitRateLimit(ctx); err != nil {
@@ -167,46 +147,6 @@ func (mc *MiddlewareClient) StreamGenerate(ctx context.Context, messages []Messa
 		)
 	}
 	return ch, err
-}
-
-func (mc *MiddlewareClient) GenerateSpeech(ctx context.Context, text string, options map[string]interface{}) ([]byte, error) {
-	ctx = mc.applyTimeout(ctx)
-	if err := mc.waitRateLimit(ctx); err != nil {
-		return nil, err
-	}
-
-	start := time.Now()
-	result, err := mc.inner.GenerateSpeech(ctx, text, options)
-	if mc.logger != nil {
-		mc.logger.Info("LLM call",
-			slog.String("method", "GenerateSpeech"),
-			slog.Int("input_len", len(text)),
-			slog.Int("output_bytes", len(result)),
-			slog.Duration("latency", time.Since(start)),
-			slog.Bool("error", err != nil),
-		)
-	}
-	return result, err
-}
-
-func (mc *MiddlewareClient) TranscribeSpeech(ctx context.Context, audio []byte, options map[string]interface{}) (string, error) {
-	ctx = mc.applyTimeout(ctx)
-	if err := mc.waitRateLimit(ctx); err != nil {
-		return "", err
-	}
-
-	start := time.Now()
-	result, err := mc.inner.TranscribeSpeech(ctx, audio, options)
-	if mc.logger != nil {
-		mc.logger.Info("LLM call",
-			slog.String("method", "TranscribeSpeech"),
-			slog.Int("audio_bytes", len(audio)),
-			slog.Int("output_len", len(result)),
-			slog.Duration("latency", time.Since(start)),
-			slog.Bool("error", err != nil),
-		)
-	}
-	return result, err
 }
 
 // ---------------------------------------------------------------------------

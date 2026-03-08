@@ -58,7 +58,53 @@ function handleEvent(event) {
         case 'task_finished':
             addLog('system', `Task Completed successfully.`, 'success');
             break;
+        case 'review_requested':
+            updateAgent(agent_role, 'Awaiting Review');
+            addLog('system', `Agent [${agent_role}] requested human review for tool: ${payload.tool_name}`, 'thinking');
+            showReviewModal(payload.review_id, agent_role, payload.tool_name, payload.input);
+            break;
     }
+}
+
+function showReviewModal(reviewId, agentRole, toolName, input) {
+    // Generate a modal dynamically for HITL
+    const modal = document.createElement('div');
+    modal.className = 'review-modal';
+    modal.innerHTML = `
+        <div class="review-content glass-card">
+            <h3>Human Review Required</h3>
+            <p><strong>Agent:</strong> ${agentRole}</p>
+            <p><strong>Tool:</strong> ${toolName}</p>
+            <div class="input-preview">${JSON.stringify(input, null, 2)}</div>
+            <div class="review-actions">
+                <button class="btn approve" onclick="submitReview('${reviewId}', true, this)">Approve</button>
+                <button class="btn reject" onclick="submitReview('${reviewId}', false, this)">Reject</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+function submitReview(reviewId, approved, buttonEl) {
+    const modal = buttonEl.closest('.review-modal');
+
+    fetch('/api/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            review_id: reviewId,
+            approved: approved
+        })
+    }).then(res => {
+        if (res.ok) {
+            modal.remove();
+            addLog('system', `Human review submitted: ${approved ? 'APPROVED' : 'REJECTED'}`, approved ? 'success' : 'system');
+        } else {
+            console.error('Failed to submit review');
+        }
+    }).catch(err => {
+        console.error('Network error returning review:', err);
+    });
 }
 
 function updateAgent(role, status, goal = '') {
@@ -84,7 +130,7 @@ function updateAgent(role, status, goal = '') {
 function addLog(type, message, category = '') {
     const entry = document.createElement('div');
     entry.className = `log-entry type-${category || type}`;
-    
+
     const timeSpan = document.createElement('span');
     timeSpan.className = 'log-time';
     timeSpan.innerText = new Date().toLocaleTimeString();
@@ -104,6 +150,19 @@ function addLog(type, message, category = '') {
     if (terminal.childElementCount > 100) {
         terminal.removeChild(terminal.firstChild);
     }
+}
+
+function toggleExecution(start) {
+    const endpoint = start ? '/api/start' : '/api/stop';
+    fetch(endpoint, { method: 'POST' })
+        .then(res => {
+            if (!res.ok) {
+                res.text().then(text => addLog('system', `Failed to ${start ? 'start' : 'stop'} execution: ${text}`, 'system'));
+            } else {
+                addLog('system', `Execution ${start ? 'STARTED' : 'STOPPED'} via Dashboard request.`, 'success');
+            }
+        })
+        .catch(err => addLog('system', `Network request error: ${err}`, 'system'));
 }
 
 connect();

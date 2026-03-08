@@ -32,7 +32,12 @@ func (t *KnowledgeSearchTool) Execute(ctx context.Context, input map[string]inte
 	}
 
 	// Generate embedding for the query
-	vector, err := t.LLM.GenerateEmbedding(ctx, query)
+	embedder, ok := t.LLM.(llm.Embedder)
+	if !ok {
+		return "", fmt.Errorf("configured LLM does not support text embeddings")
+	}
+
+	vector, err := embedder.GenerateEmbedding(ctx, query)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate embedding for knowledge search: %w", err)
 	}

@@ -21,13 +21,18 @@ type Client interface {
 	// GenerateStructured pulls responses explicitly as populated JSON mapped into `schema`
 	GenerateStructured(ctx context.Context, messages []Message, schema interface{}, options map[string]interface{}) (interface{}, error)
 
-	// GenerateEmbedding forces the text snippet into an ML dimensional vector representations
-	GenerateEmbedding(ctx context.Context, text string) ([]float32, error)
-
 	// StreamGenerate provides real-time token output via a channel
 	StreamGenerate(ctx context.Context, messages []Message, options map[string]interface{}) (<-chan string, error)
+}
 
-	// Elite Tier: Multimodal Speech
+// Embedder represents models capable of generating embeddings.
+type Embedder interface {
+	// GenerateEmbedding forces the text snippet into an ML dimensional vector representations
+	GenerateEmbedding(ctx context.Context, text string) ([]float32, error)
+}
+
+// AudioGenerator represents models capable of dealing with audio.
+type AudioGenerator interface {
 	// GenerateSpeech converts text to audio bytes (TTS).
 	GenerateSpeech(ctx context.Context, text string, options map[string]interface{}) ([]byte, error)
 

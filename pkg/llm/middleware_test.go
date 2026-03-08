@@ -42,23 +42,11 @@ func (tc *testClient) GenerateStructured(ctx context.Context, messages []Message
 	return tc.Generate(ctx, messages, options)
 }
 
-func (tc *testClient) GenerateEmbedding(ctx context.Context, text string) ([]float32, error) {
-	return []float32{0.1, 0.2}, tc.err
-}
-
 func (tc *testClient) StreamGenerate(ctx context.Context, messages []Message, options map[string]interface{}) (<-chan string, error) {
 	ch := make(chan string, 1)
 	ch <- tc.response
 	close(ch)
 	return ch, tc.err
-}
-
-func (tc *testClient) GenerateSpeech(ctx context.Context, text string, options map[string]interface{}) ([]byte, error) {
-	return []byte("audio"), tc.err
-}
-
-func (tc *testClient) TranscribeSpeech(ctx context.Context, audio []byte, options map[string]interface{}) (string, error) {
-	return tc.response, tc.err
 }
 
 func (tc *testClient) callCount() int {
@@ -217,17 +205,8 @@ func TestMiddleware_AllMethods(t *testing.T) {
 	if _, err := client.GenerateStructured(ctx, nil, nil, nil); err != nil {
 		t.Errorf("GenerateStructured failed: %v", err)
 	}
-	if _, err := client.GenerateEmbedding(ctx, "test"); err != nil {
-		t.Errorf("GenerateEmbedding failed: %v", err)
-	}
 	if _, err := client.StreamGenerate(ctx, nil, nil); err != nil {
 		t.Errorf("StreamGenerate failed: %v", err)
-	}
-	if _, err := client.GenerateSpeech(ctx, "test", nil); err != nil {
-		t.Errorf("GenerateSpeech failed: %v", err)
-	}
-	if _, err := client.TranscribeSpeech(ctx, nil, nil); err != nil {
-		t.Errorf("TranscribeSpeech failed: %v", err)
 	}
 }
 

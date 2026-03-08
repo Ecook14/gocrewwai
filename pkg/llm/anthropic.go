@@ -220,11 +220,6 @@ func (c *AnthropicClient) GenerateStructured(ctx context.Context, messages []Mes
 	return schema, nil
 }
 
-// GenerateEmbedding (Stub)
-func (c *AnthropicClient) GenerateEmbedding(ctx context.Context, text string) ([]float32, error) {
-	return nil, fmt.Errorf("anthropic native embeddings not supported; use voyage or openai")
-}
-
 // StreamGenerate handles real-time token output.
 func (c *AnthropicClient) StreamGenerate(ctx context.Context, messages []Message, options map[string]interface{}) (<-chan string, error) {
 	// For simplicity, implement synchronous fallback or a simplified SSE stream in the future.
@@ -237,12 +232,4 @@ func (c *AnthropicClient) StreamGenerate(ctx context.Context, messages []Message
 		}
 	}()
 	return ch, nil
-}
-
-// Multi-modal stubs for interface compliance
-func (c *AnthropicClient) GenerateSpeech(ctx context.Context, text string, options map[string]interface{}) ([]byte, error) {
-	return nil, fmt.Errorf("anthropic does not support TTS")
-}
-func (c *AnthropicClient) TranscribeSpeech(ctx context.Context, audio []byte, options map[string]interface{}) (string, error) {
-	return "", fmt.Errorf("anthropic does not support STT")
 }
