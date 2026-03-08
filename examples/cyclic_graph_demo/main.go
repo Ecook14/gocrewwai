@@ -6,10 +6,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Ecook14/crewai-go/pkg/agents"
-	"github.com/Ecook14/crewai-go/pkg/crew"
-	"github.com/Ecook14/crewai-go/pkg/llm"
-	"github.com/Ecook14/crewai-go/pkg/tasks"
+	"github.com/Ecook14/gocrew/pkg/agents"
+	"github.com/Ecook14/gocrew/pkg/crew"
+	"github.com/Ecook14/gocrew/pkg/llm"
+	"github.com/Ecook14/gocrew/pkg/tasks"
 )
 
 func main() {

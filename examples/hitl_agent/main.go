@@ -7,11 +7,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/Ecook14/crewai-go/pkg/dashboard"
-	"github.com/Ecook14/crewai-go/pkg/agents"
-	"github.com/Ecook14/crewai-go/pkg/guardrails"
-	"github.com/Ecook14/crewai-go/pkg/llm"
-	"github.com/Ecook14/crewai-go/pkg/tools"
+	"github.com/Ecook14/gocrew/pkg/dashboard"
+	"github.com/Ecook14/gocrew/pkg/agents"
+	"github.com/Ecook14/gocrew/pkg/guardrails"
+	"github.com/Ecook14/gocrew/pkg/llm"
+	"github.com/Ecook14/gocrew/pkg/tools"
 )
 
 // ReviewableFileWriteTool is a wrapper that requires human approval.

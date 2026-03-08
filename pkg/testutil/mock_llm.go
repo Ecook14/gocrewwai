@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/Ecook14/crewai-go/pkg/llm"
+	"github.com/Ecook14/gocrew/pkg/llm"
 )
 
 // MockCall records a single invocation to any method on MockClient.

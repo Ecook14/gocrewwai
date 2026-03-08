@@ -4,7 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"github.com/Ecook14/crewai-go/pkg/telemetry"
+	"github.com/Ecook14/gocrew/pkg/telemetry"
 )
 
 // generateReviewID generates a random 16-byte hex string.

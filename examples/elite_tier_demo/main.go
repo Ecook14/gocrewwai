@@ -6,13 +6,13 @@ import (
 	"log"
 	"os"
 
-	"github.com/Ecook14/crewai-go/pkg/agents"
-	"github.com/Ecook14/crewai-go/pkg/crew"
-	"github.com/Ecook14/crewai-go/pkg/flow"
-	"github.com/Ecook14/crewai-go/pkg/llm"
-	"github.com/Ecook14/crewai-go/pkg/memory"
-	"github.com/Ecook14/crewai-go/pkg/tasks"
-	"github.com/Ecook14/crewai-go/pkg/tools"
+	"github.com/Ecook14/gocrew/pkg/agents"
+	"github.com/Ecook14/gocrew/pkg/crew"
+	"github.com/Ecook14/gocrew/pkg/flow"
+	"github.com/Ecook14/gocrew/pkg/llm"
+	"github.com/Ecook14/gocrew/pkg/memory"
+	"github.com/Ecook14/gocrew/pkg/tasks"
+	"github.com/Ecook14/gocrew/pkg/tools"
 	"strings"
 )
 

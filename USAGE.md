@@ -1,14 +1,68 @@
-# How to Use Crew-GO (The Deep Dive) 📖
+# How to Use Gocrew (The Deep Dive) 📖
 
-Crew-GO is built for two types of users:
+Gocrew is built for two types of users:
 1. **Dynamic Operators**: Non-technical users who want to use the **Web UI Dashboard** to stage and monitor agents.
 2. **Elite Architects**: Go developers building production-grade AI products using our strictly-typed library and modular orchestration engine.
 
 This guide focuses on the **Hybrid Workflow**—how to build the foundation in code and control the execution from the UI. Let's get to work!
 
+## 1. Library-First Architecture (The Go Way)
+
+While the Python version of CrewAI relies on dynamic dictionaries and loose typing, **Crew-GO** is built for architects who want the safety and performance of Go.
+
+Importing the library into your project is as simple as:
+```bash
+go get github.com/Ecook14/gocrew
+```
+
+### Building a Crew in Pure Go
+Here is how you can build a fully functional team entirely in your code, with full autocompletion and type-safety:
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/Ecook14/gocrew/pkg/agents"
+    "github.com/Ecook14/gocrew/pkg/tasks"
+    "github.com/Ecook14/gocrew/pkg/crew"
+    "github.com/Ecook14/gocrew/pkg/llm"
+)
+
+func main() {
+    // 1. Initialize your LLM Provider
+    provider := llm.NewOpenAIClient("your-key")
+
+    // 2. Create your Agents (Idiomatic Go Builders)
+    researcher := agents.NewAgent(
+        "Researcher",
+        "Find the latest Go 1.24 features",
+        "Expert Go developer and technical writer",
+        provider,
+    )
+
+    // 3. Create your Tasks
+    task := tasks.NewTask(
+        "Explain Go 1.24 Generic Type Aliases",
+        researcher,
+    )
+
+    // 4. Assemble and Kickoff!
+    myCrew := crew.NewCrew(
+        []*agents.Agent{researcher},
+        []*tasks.Task{task},
+        crew.WithProcess(crew.Sequential),
+    )
+
+    result, _ := myCrew.Kickoff(context.Background())
+    fmt.Println(result)
+}
+```
+
 ---
 
-## 1. Giving Your Agents Superpowers (The Native Tool Arsenal)
+## 2. Giving Your Agents Superpowers (The Native Tool Arsenal)
 
 In Crew-GO, your agents aren't just stuck generating text—they can interact with the physical world, databases, and APIs using `Tools`. Every tool implements the simple `tools.Tool` interface. While I've built over 24 native tools for us to use, building your own is incredibly simple!
 
@@ -53,7 +107,7 @@ knowledgeStore.ExtractDir(ctx, "/path/to/my/corporate/documents")
 
 ---
 
-## 2. Setting Up Your Crew Using YAML (Separating Logic & Prompts)
+## 3. Setting Up Your Crew Using YAML (Separating Logic & Prompts)
 
 Instead of hardcoding huge strings of prompts directly in our Go files, I find it so much cleaner and easier to use simple `.yaml` configuration files. This means prompt engineers or product managers can tweak the AI's personality, while you focus on writing the strict Go orchestration engine!
 
@@ -172,10 +226,10 @@ In production, your "Tech" team defines the core architecture, and your "Product
 
 ```go
 import (
-    "github.com/Ecook14/crewai-go/pkg/agents"
-    "github.com/Ecook14/crewai-go/pkg/crew"
-    "github.com/Ecook14/crewai-go/pkg/tasks"
-    "github.com/Ecook14/crewai-go/pkg/dashboard" // Use the exported dashboard package!
+    "github.com/Ecook14/gocrew/pkg/agents"
+    "github.com/Ecook14/gocrew/pkg/crew"
+    "github.com/Ecook14/gocrew/pkg/tasks"
+    "github.com/Ecook14/gocrew/pkg/dashboard" // Use the exported dashboard package!
 )
 
 func main() {

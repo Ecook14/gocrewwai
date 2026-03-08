@@ -67,12 +67,12 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/Ecook14/crewai-go/pkg/agents"
-	"github.com/Ecook14/crewai-go/pkg/config"
-	"github.com/Ecook14/crewai-go/pkg/crew"
-	"github.com/Ecook14/crewai-go/pkg/llm"
-	"github.com/Ecook14/crewai-go/pkg/tasks"
-	"github.com/Ecook14/crewai-go/pkg/dashboard"
+	"github.com/Ecook14/gocrew/pkg/agents"
+	"github.com/Ecook14/gocrew/pkg/config"
+	"github.com/Ecook14/gocrew/pkg/crew"
+	"github.com/Ecook14/gocrew/pkg/llm"
+	"github.com/Ecook14/gocrew/pkg/tasks"
+	"github.com/Ecook14/gocrew/pkg/dashboard"
 )
 
 func main() {
@@ -115,7 +115,7 @@ func main() {
 	// 4. Start the Dashboard (Background)
 	dashboard.Start("8080")
 
-	slog.Info("Starting Boilerplate Crew...")
+	slog.Info("Starting Boilerplate Gocrew...")
 	res, err := myCrew.Kickoff(context.Background())
 	if err != nil {
 		slog.Error("Crew execution failed", slog.Any("error", err))

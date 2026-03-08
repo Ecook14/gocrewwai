@@ -4,17 +4,19 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"os"
 	"sync"
+	"strings"
 
-	"github.com/Ecook14/crewai-go/pkg/agents"
-	"github.com/Ecook14/crewai-go/pkg/llm"
-	"github.com/Ecook14/crewai-go/pkg/memory"
-	"github.com/Ecook14/crewai-go/pkg/protocols"
-	"github.com/Ecook14/crewai-go/pkg/tasks"
-	"github.com/Ecook14/crewai-go/pkg/telemetry"
-	"github.com/Ecook14/crewai-go/pkg/tools"
+	"github.com/Ecook14/gocrew/pkg/agents"
+	"github.com/Ecook14/gocrew/pkg/llm"
+	"github.com/Ecook14/gocrew/pkg/memory"
+	"github.com/Ecook14/gocrew/pkg/protocols"
+	"github.com/Ecook14/gocrew/pkg/tasks"
+	"github.com/Ecook14/gocrew/pkg/telemetry"
+	"github.com/Ecook14/gocrew/pkg/tools"
 	"github.com/gorilla/websocket"
-	"github.com/Ecook14/crewai-go/web-ui"
+	"github.com/Ecook14/gocrew/web-ui"
 	"runtime"
 	"time"
 )
@@ -158,6 +160,7 @@ func (s *WSServer) handleCreateAgent(w http.ResponseWriter, r *http.Request) {
 		Provider     string `json:"provider"`
 		LLMModel     string `json:"llm_model"`
 		APIKey       string `json:"api_key"`
+		MaxRPM       int    `json:"max_rpm"`
 		Memory       string `json:"memory"`
 		MemoryConfig struct {
 			ConnectionString string `json:"connection_string"`
@@ -173,29 +176,50 @@ func (s *WSServer) handleCreateAgent(w http.ResponseWriter, r *http.Request) {
 
 	// Dynamic Creation Logic
 	var client llm.Client
-	if req.APIKey != "" {
-		switch req.Provider {
-		case "OpenAI":
-			client = llm.NewOpenAIClient(req.APIKey)
-		case "Anthropic":
-			client = llm.NewAnthropicClient(req.APIKey, req.LLMModel)
-		case "Google Gemini":
-			client = llm.NewGeminiClient(req.APIKey, req.LLMModel)
-		case "OpenRouter":
-			client = llm.NewOpenRouterClient(req.APIKey, req.LLMModel)
-		case "Groq":
-			client = llm.NewGroqClient(req.APIKey, req.LLMModel)
-		default:
-			// Default to OpenAI for backward compatibility or if not specified
-			client = llm.NewOpenAIClient(req.APIKey)
+	apiKey := req.APIKey
+	
+	switch strings.ToLower(req.Provider) {
+	case "openai":
+		if apiKey == "" {
+			apiKey = os.Getenv("OPENAI_API_KEY")
 		}
+		client = llm.NewOpenAIClient(apiKey)
+	case "anthropic":
+		if apiKey == "" {
+			apiKey = os.Getenv("ANTHROPIC_API_KEY")
+		}
+		client = llm.NewAnthropicClient(apiKey, req.LLMModel)
+	case "google_gemini", "google gemini", "gemini":
+		if apiKey == "" {
+			apiKey = os.Getenv("GEMINI_API_KEY")
+		}
+		client = llm.NewGeminiClient(apiKey, req.LLMModel)
+	case "openrouter":
+		if apiKey == "" {
+			apiKey = os.Getenv("OPENROUTER_API_KEY")
+		}
+		client = llm.NewOpenRouterClient(apiKey, req.LLMModel)
+	case "groq":
+		if apiKey == "" {
+			apiKey = os.Getenv("GROQ_API_KEY")
+		}
+		client = llm.NewGroqClient(apiKey, req.LLMModel)
+	default:
+		// Default to OpenAI for backward compatibility or if not specified
+		if apiKey == "" {
+			apiKey = os.Getenv("OPENAI_API_KEY")
+		}
+		client = llm.NewOpenAIClient(apiKey)
 	}
 
 	agent := &agents.Agent{
 		Role:      req.Role,
 		Goal:      req.Goal,
 		Backstory: req.Backstory,
+		Provider:  req.Provider,
+		LLMModel:  req.LLMModel,
 		LLM:       client,
+		MaxRPM:    req.MaxRPM,
 		Verbose:   true,
 	}
 
@@ -366,16 +390,13 @@ func (s *WSServer) handleListAll(w http.ResponseWriter, r *http.Request) {
 
 	slog.Info("Syncing Dashboard Entities", slog.Int("agents", agentsCount), slog.Int("tasks", tasksCount))
 	
-	b, err := json.Marshal(data)
-	if err != nil {
-		slog.Error("Failed to marshal entity list", slog.Any("error", err))
-		http.Error(w, "Failed to encode entities", http.StatusInternalServerError)
-		return
-	}
-
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write(b)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		slog.Error("Failed to encode entity list", slog.Any("error", err))
+		// Note: Header and Status are already sent, so we can't send http.Error here.
+		// But this is still better than Marshal failing beforehand.
+	}
 }
 
 func (s *WSServer) handleDeleteEntity(w http.ResponseWriter, r *http.Request) {

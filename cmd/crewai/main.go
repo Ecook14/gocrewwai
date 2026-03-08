@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Ecook14/crewai-go/internal/cli"
+	"github.com/Ecook14/gocrew/internal/cli"
 )
 
 func main() {

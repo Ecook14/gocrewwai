@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/Ecook14/crewai-go/pkg/agents"
-	"github.com/Ecook14/crewai-go/pkg/llm"
+	"github.com/Ecook14/gocrew/pkg/agents"
+	"github.com/Ecook14/gocrew/pkg/llm"
 )
 
 func main() {

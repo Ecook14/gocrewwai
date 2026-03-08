@@ -32,7 +32,7 @@ func NewGroqClient(apiKey, model string) *GroqClient {
 	config.BaseURL = "https://api.groq.com/openai/v1"
 
 	httpClient := &http.Client{
-		Timeout: 60 * time.Second,
+		Timeout: 300 * time.Second,
 		Transport: &retryRoundTripper{
 			next:       http.DefaultTransport,
 			maxRetries: 3,

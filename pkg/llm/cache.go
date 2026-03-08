@@ -24,7 +24,7 @@ type FileCache struct {
 func NewFileCache(dir string) *FileCache {
 	if dir == "" {
 		home, _ := os.UserHomeDir()
-		dir = filepath.Join(home, ".crewai-go", "cache")
+		dir = filepath.Join(home, ".gocrew", "cache")
 	}
 	_ = os.MkdirAll(dir, 0755)
 	return &FileCache{Dir: dir}

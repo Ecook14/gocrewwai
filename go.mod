@@ -1,4 +1,4 @@
-module github.com/Ecook14/crewai-go
+module github.com/Ecook14/gocrew
 
 go 1.24.0
 

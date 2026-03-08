@@ -3,7 +3,7 @@ package tools
 import (
 	"context"
 
-	"github.com/Ecook14/crewai-go/pkg/protocols"
+	"github.com/Ecook14/gocrew/pkg/protocols"
 )
 
 // ---------------------------------------------------------------------------

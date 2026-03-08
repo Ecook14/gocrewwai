@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Ecook14/crewai-go/pkg/guardrails"
+	"github.com/Ecook14/gocrew/pkg/guardrails"
 )
 
 // ---------------------------------------------------------------------------
