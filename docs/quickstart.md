@@ -152,15 +152,15 @@ Watching terminal logs is fun, but observing your agents think in a real-time we
 
 Simply import our server package into your `main.go`:
 ```go
-import "github.com/Ecook14/crewai-go/internal/server"
+import "github.com/Ecook14/crewai-go/pkg/dashboard"
 ```
 And add this line right before you call `techCrew.Kickoff(...)`:
 ```go
 // Start the real-time websocket dashboard on port 8080!
-go server.StartDashboardServer("8080")
+dashboard.Start("8080")
 ```
 
-Then, pop open your browser to `http://localhost:8080/web-ui` and watch your agents collaborate live!
+Then, pop open your browser to `http://localhost:8080/web-ui`. You can even **Stop and Start** the engine live or create entire new agents from the **Creator Studio** without restarting your Go process!
 
 ---
 

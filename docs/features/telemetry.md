@@ -41,7 +41,7 @@ go func() {
 
 ### 2. The Live Glassmorphic Dashboard
 
-Using the `--ui` terminal flag bridges this internal Event Bus directly to a WebSocket server (`internal/server/ws.go`). It pushes those exact OTEL traces and Event payloads to a beautiful, real-time React/VanillaJS dashboard out-of-the-box! No polling, just pure WebSocket speed.
+Using the `--ui` terminal flag bridges this internal Event Bus directly to a WebSocket server (`pkg/dashboard/dashboard.go`). It pushes those exact OTEL traces and Event payloads to a beautiful, real-time React/VanillaJS dashboard out-of-the-box! No polling, just pure WebSocket speed.
 
 ---
 

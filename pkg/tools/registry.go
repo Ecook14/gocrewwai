@@ -158,3 +158,23 @@ func CreateTool(name string, config map[string]interface{}) (Tool, error) {
 		return nil, fmt.Errorf("unsupported tool for dynamic creation: %s", name)
 	}
 }
+func (r *ToolRegistry) ListNames() []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	names := make([]string, 0, len(r.tools))
+	for name := range r.tools {
+		names = append(names, name)
+	}
+	return names
+}
+
+func InitDefaultRegistry() {
+	GlobalRegistry.Register(NewArxivTool())
+	GlobalRegistry.Register(NewWikipediaTool())
+	GlobalRegistry.Register(NewCalculatorTool())
+	GlobalRegistry.Register(NewSearchWebTool())
+	GlobalRegistry.Register(NewBrowserTool())
+	GlobalRegistry.Register(NewShellTool())
+	GlobalRegistry.Register(NewFileReadTool())
+	GlobalRegistry.Register(NewFileWriteTool())
+}

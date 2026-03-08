@@ -64,16 +64,16 @@ type MCPContent struct {
 // MCPClient connects to an MCP server to list and invoke tools.
 type MCPClient struct {
 	mu         sync.RWMutex
-	serverURL  string
+	ServerURL  string                `json:"server_url"`
 	httpClient *http.Client
-	tools      []MCPToolDefinition
-	resources  []MCPResourceDefinition
+	Tools      []MCPToolDefinition   `json:"tools"`
+	Resources  []MCPResourceDefinition `json:"resources"`
 }
 
 // NewMCPClient creates a client for an MCP server.
 func NewMCPClient(serverURL string) *MCPClient {
 	return &MCPClient{
-		serverURL:  serverURL,
+		ServerURL:  serverURL,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 	}
 }
@@ -87,24 +87,28 @@ func (c *MCPClient) Initialize(ctx context.Context) error {
 	}
 
 	c.mu.Lock()
-	c.tools = tools
+	c.Tools = tools
 	c.mu.Unlock()
 
 	// List resources (optional, may not be supported)
 	resources, _ := c.listResources(ctx)
 	c.mu.Lock()
-	c.resources = resources
+	c.Resources = resources
 	c.mu.Unlock()
 
 	return nil
+}
+
+func (c *MCPClient) URL() string {
+	return c.ServerURL
 }
 
 // ListTools returns the discovered tool definitions.
 func (c *MCPClient) ListTools() []MCPToolDefinition {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	result := make([]MCPToolDefinition, len(c.tools))
-	copy(result, c.tools)
+	result := make([]MCPToolDefinition, len(c.Tools))
+	copy(result, c.Tools)
 	return result
 }
 
@@ -112,8 +116,8 @@ func (c *MCPClient) ListTools() []MCPToolDefinition {
 func (c *MCPClient) ListResources() []MCPResourceDefinition {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	result := make([]MCPResourceDefinition, len(c.resources))
-	copy(result, c.resources)
+	result := make([]MCPResourceDefinition, len(c.Resources))
+	copy(result, c.Resources)
 	return result
 }
 
@@ -130,7 +134,7 @@ func (c *MCPClient) CallTool(ctx context.Context, call MCPToolCall) (*MCPToolRes
 	}
 
 	data, _ := json.Marshal(reqBody)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.serverURL, bytes.NewBuffer(data))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.ServerURL, bytes.NewBuffer(data))
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +175,7 @@ func (c *MCPClient) listTools(ctx context.Context) ([]MCPToolDefinition, error) 
 	}
 
 	data, _ := json.Marshal(reqBody)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.serverURL, bytes.NewBuffer(data))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.ServerURL, bytes.NewBuffer(data))
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +208,7 @@ func (c *MCPClient) listResources(ctx context.Context) ([]MCPResourceDefinition,
 	}
 
 	data, _ := json.Marshal(reqBody)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.serverURL, bytes.NewBuffer(data))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.ServerURL, bytes.NewBuffer(data))
 	if err != nil {
 		return nil, err
 	}

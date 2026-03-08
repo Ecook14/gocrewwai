@@ -22,6 +22,9 @@ import (
 // A2A Protocol — Agent-to-Agent Communication
 // ---------------------------------------------------------------------------
 
+// Register is a global registry for Agent-to-Agent discovery.
+var GlobalA2ARegistry = NewAgentRegistry()
+
 // AgentCard declares an agent's identity, capabilities, and endpoint.
 // This is the core discovery object in the A2A protocol.
 type AgentCard struct {

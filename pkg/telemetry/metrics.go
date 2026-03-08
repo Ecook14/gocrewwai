@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 	"fmt"
+	"runtime"
 )
 
 // ---------------------------------------------------------------------------
@@ -177,6 +178,11 @@ type MetricsSnapshot struct {
 	ToolCallsTotal        map[string]int64
 	ActiveAgents          int64
 	AgentsCreated         int64
+
+	// System Stats
+	CPUUsage     float64
+	MemoryUsage  uint64 // In MB
+	Goroutines   int
 }
 
 // Snapshot returns a thread-safe copy of current metrics.
@@ -273,8 +279,35 @@ var (
 func GlobalMetrics() *Metrics {
 	globalMetricsOnce.Do(func() {
 		globalMetrics = NewMetrics()
+		go globalMetrics.startSystemMonitoring()
 	})
 	return globalMetrics
+}
+
+func (m *Metrics) startSystemMonitoring() {
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		var ms runtime.MemStats
+		runtime.ReadMemStats(&ms)
+
+		// Simple CPU usage approximation or just metrics reporting
+		// For a real dashboard, we care about Memory and Goroutines mostly
+		snap := m.Snapshot()
+		snap.MemoryUsage = ms.Alloc / 1024 / 1024
+		snap.Goroutines = runtime.NumGoroutine()
+
+		GlobalBus.Publish(Event{
+			Type: EventSystemMetrics,
+			Payload: map[string]interface{}{
+				"memory_mb":   snap.MemoryUsage,
+				"goroutines":  snap.Goroutines,
+				"uptime_secs": snap.UptimeSeconds,
+				"cpu_usage":   0.0, // Placeholder as real CPU tracking requires OS-specific calls or libraries
+			},
+		})
+	}
 }
 
 // ---------------------------------------------------------------------------

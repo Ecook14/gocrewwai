@@ -19,6 +19,7 @@ const (
 	EventTaskStarted    EventType = "task_started"
 	EventTaskFinished   EventType = "task_finished"
 	EventSystemLog      EventType = "system_log"
+	EventSystemMetrics  EventType = "system_metrics"
 )
 
 // Event represents a single unit of telemetry data pushed to the dashboard.
@@ -183,4 +184,197 @@ func (c *ExecutionController) WaitIfPaused(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+// ---------------------------------------------------------------------------
+// Dynamic Entity Registry
+// ---------------------------------------------------------------------------
+
+type DynamicRegistry struct {
+	Agents         []interface{}
+	Tasks          []interface{}
+	MCPClients     []interface{}
+	A2ABridges     []interface{}
+	
+	// Internal pending queues for the engine to consume
+	pendingAgents  []interface{}
+	pendingTasks   []interface{}
+	pendingMCP     []interface{}
+	pendingA2A     []interface{}
+
+	mu sync.RWMutex
+}
+
+var GlobalDynamicRegistry = &DynamicRegistry{
+	Agents:     make([]interface{}, 0),
+	Tasks:      make([]interface{}, 0),
+	MCPClients: make([]interface{}, 0),
+	A2ABridges: make([]interface{}, 0),
+}
+
+func (r *DynamicRegistry) AddAgent(agent interface{}, pending bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.Agents = append(r.Agents, agent)
+	if pending {
+		r.pendingAgents = append(r.pendingAgents, agent)
+	}
+}
+
+func (r *DynamicRegistry) AddTask(task interface{}, pending bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.Tasks = append(r.Tasks, task)
+	if pending {
+		r.pendingTasks = append(r.pendingTasks, task)
+	}
+}
+
+func (r *DynamicRegistry) AddMCPClient(client interface{}, pending bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.MCPClients = append(r.MCPClients, client)
+	if pending {
+		r.pendingMCP = append(r.pendingMCP, client)
+	}
+}
+
+func (r *DynamicRegistry) AddA2ABridge(bridge interface{}, pending bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.A2ABridges = append(r.A2ABridges, bridge)
+	if pending {
+		r.pendingA2A = append(r.pendingA2A, bridge)
+	}
+}
+
+func (r *DynamicRegistry) DeleteAgent(index int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if index >= 0 && index < len(r.Agents) {
+		agent := r.Agents[index]
+		r.Agents = append(r.Agents[:index], r.Agents[index+1:]...)
+		// Also remove from pending if present
+		for i, p := range r.pendingAgents {
+			if p == agent {
+				r.pendingAgents = append(r.pendingAgents[:i], r.pendingAgents[i+1:]...)
+				break
+			}
+		}
+	}
+}
+
+func (r *DynamicRegistry) DeleteTask(index int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if index >= 0 && index < len(r.Tasks) {
+		task := r.Tasks[index]
+		r.Tasks = append(r.Tasks[:index], r.Tasks[index+1:]...)
+		for i, p := range r.pendingTasks {
+			if p == task {
+				r.pendingTasks = append(r.pendingTasks[:i], r.pendingTasks[i+1:]...)
+				break
+			}
+		}
+	}
+}
+
+func (r *DynamicRegistry) DeleteMCP(index int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if index >= 0 && index < len(r.MCPClients) {
+		client := r.MCPClients[index]
+		r.MCPClients = append(r.MCPClients[:index], r.MCPClients[index+1:]...)
+		for i, p := range r.pendingMCP {
+			if p == client {
+				r.pendingMCP = append(r.pendingMCP[:i], r.pendingMCP[i+1:]...)
+				break
+			}
+		}
+	}
+}
+
+func (r *DynamicRegistry) DeleteA2A(index int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if index >= 0 && index < len(r.A2ABridges) {
+		bridge := r.A2ABridges[index]
+		r.A2ABridges = append(r.A2ABridges[:index], r.A2ABridges[index+1:]...)
+		for i, p := range r.pendingA2A {
+			if p == bridge {
+				r.pendingA2A = append(r.pendingA2A[:i], r.pendingA2A[i+1:]...)
+				break
+			}
+		}
+	}
+}
+
+func (r *DynamicRegistry) UpdateAgent(index int, agent interface{}) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if index >= 0 && index < len(r.Agents) {
+		r.Agents[index] = agent
+		r.pendingAgents = append(r.pendingAgents, agent)
+	}
+}
+
+func (r *DynamicRegistry) UpdateTask(index int, task interface{}) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if index >= 0 && index < len(r.Tasks) {
+		r.Tasks[index] = task
+		r.pendingTasks = append(r.pendingTasks, task)
+	}
+}
+
+func (r *DynamicRegistry) UpdateMCP(index int, client interface{}) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if index >= 0 && index < len(r.MCPClients) {
+		r.MCPClients[index] = client
+		r.pendingMCP = append(r.pendingMCP, client)
+	}
+}
+
+func (r *DynamicRegistry) UpdateA2A(index int, bridge interface{}) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if index >= 0 && index < len(r.A2ABridges) {
+		r.A2ABridges[index] = bridge
+		r.pendingA2A = append(r.pendingA2A, bridge)
+	}
+}
+
+func (r *DynamicRegistry) ListAll() map[string]interface{} {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return map[string]interface{}{
+		"agents": r.Agents,
+		"tasks":  r.Tasks,
+		"mcp":    r.MCPClients,
+		"a2a":    r.A2ABridges,
+	}
+}
+
+func (r *DynamicRegistry) PullTasks() []interface{} {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	t := r.pendingTasks
+	r.pendingTasks = make([]interface{}, 0)
+	return t
+}
+
+func (r *DynamicRegistry) PullAgents() []interface{} {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	a := r.pendingAgents
+	r.pendingAgents = make([]interface{}, 0)
+	return a
+}
+
+func (r *DynamicRegistry) PullMCPClients() []interface{} {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	c := r.pendingMCP
+	r.pendingMCP = make([]interface{}, 0)
+	return c
 }

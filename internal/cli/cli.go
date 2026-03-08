@@ -7,10 +7,12 @@ import (
 	//"os"
 	"os" // Added os import
 
+	"github.com/Ecook14/crewai-go/pkg/dashboard"
 	"github.com/Ecook14/crewai-go/pkg/agents"
 	"github.com/Ecook14/crewai-go/pkg/crew"
 	"github.com/Ecook14/crewai-go/pkg/tasks"
-	"github.com/Ecook14/crewai-go/internal/server"
+	"github.com/Ecook14/crewai-go/pkg/telemetry"
+	//"time"
 )
 
 // printHelp prints the usage instructions
@@ -59,8 +61,10 @@ func Run(args []string) error {
 // handleKickoff initializes a basic sample crew to prove the architecture compiles
 func handleKickoff(showUI bool) error {
 	if showUI {
-		go server.StartDashboardServer("8080")
+		dashboard.Start("8080")
 		slog.Info("🖥️  Dashboard available at http://localhost:8080/web-ui")
+		slog.Info("⏸️  Execution paused. Please open the dashboard and click 'START' to begin!")
+		telemetry.GlobalExecutionController.Pause()
 	}
 
 	slog.Info("🚀 Kicking off the CrewAI Go Demo...")
@@ -93,5 +97,10 @@ func handleKickoff(showUI bool) error {
 	}
 
 	slog.Info("✨ Final Output", slog.Any("result", result))
+	
+	if showUI {
+		return c.RunCreatorMode(ctx)
+	}
+	
 	return nil
 }
