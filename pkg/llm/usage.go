@@ -162,10 +162,11 @@ var builtinPricing = map[string]ModelPricing{
 //	cache := llm.NewPriceCache(llm.PriceCacheConfig{})
 //	cost := cache.CalculateCost(usage) // fetches on first call, cached after
 type PriceCache struct {
-	mu        sync.RWMutex
-	prices    map[string]ModelPricing
-	lastFetch time.Time
-	config    PriceCacheConfig
+	mu            sync.RWMutex
+	prices        map[string]ModelPricing
+	dynamicPrices map[string]ModelPricing
+	lastFetch     time.Time
+	config        PriceCacheConfig
 }
 
 // PriceCacheConfig configures the price cache behavior.
@@ -208,8 +209,9 @@ func NewPriceCache(cfg PriceCacheConfig) *PriceCache {
 	}
 
 	return &PriceCache{
-		prices: prices,
-		config: cfg,
+		prices:        prices,
+		dynamicPrices: make(map[string]ModelPricing),
+		config:        cfg,
 	}
 }
 
@@ -239,6 +241,10 @@ func (pc *PriceCache) SetPricing(model string, pricing ModelPricing) {
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
 	pc.prices[model] = pricing
+	if pc.dynamicPrices == nil {
+		pc.dynamicPrices = make(map[string]ModelPricing)
+	}
+	pc.dynamicPrices[model] = pricing
 }
 
 // ModelCount returns the number of models with known pricing.
@@ -345,6 +351,9 @@ func (pc *PriceCache) fetchPrices() error {
 	}
 
 	pc.mu.Lock()
+	for k, v := range pc.dynamicPrices {
+		newPrices[k] = v
+	}
 	pc.prices = newPrices
 	pc.lastFetch = time.Now()
 	pc.mu.Unlock()
