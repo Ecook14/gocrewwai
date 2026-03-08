@@ -32,7 +32,7 @@ func (t *ScraperTool) Execute(ctx context.Context, input map[string]interface{})
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
-	req.Header.Set("User-Agent", "Crew-GO Agent/1.0 (WebScraper)")
+	req.Header.Set("User-Agent", "Gocrew Agent/1.0 (WebScraper)")
 
 	client := &http.Client{
 		Timeout: 30 * time.Second,

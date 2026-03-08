@@ -1,6 +1,6 @@
 # Feature Deep Dive: Model Context Protocol (MCP) 🌐
 
-Hey there! Let's talk about one of the most bleeding-edge, enterprise-tier features we've built into Crew-GO: native support for the **Model Context Protocol (MCP)**.
+Hey there! Let's talk about one of the most bleeding-edge, enterprise-tier features we've built into Gocrew: native support for the **Model Context Protocol (MCP)**.
 
 If you haven't heard of it yet, MCP is a massive new open-source standard created by Anthropic. Think of it like a "USB-C port for AI applications." 
 
@@ -10,7 +10,7 @@ Instead of writing custom Go code to wrap every single API in the world (like wr
 
 ## 🔌 Why did we build this into Crew-GO?
 
-By adopting WebMCP and native MCP natively in `pkg/protocols/mcp.go`, **Crew-GO transitions from being an isolated "script" to a fully integrated Service Mesh for AI.**
+By adopting WebMCP and native MCP natively in `pkg/protocols/mcp.go`, **Gocrew transitions from being an isolated "script" to a fully integrated Service Mesh for AI.**
 
 We've implemented this protocol in BOTH directions!
 
@@ -45,7 +45,7 @@ server := protocols.NewMCPServer()
 tools.RegisterAllToolsOnMCPServer(server, myToolRegistry)
 
 // Start listening for standard JSON-RPC HTTP requests
-log.Println("Crew-GO MCP Server listening on :8080")
+log.Println("Gocrew MCP Server listening on :8080")
 http.ListenAndServe(":8080", server.Handler())
 ```
 

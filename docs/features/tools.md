@@ -1,10 +1,10 @@
 # Feature Deep Dive: Tool Arsenal & Sandboxing 🧰
 
-Hey there! Let's talk about how Crew-GO agents actually interact with the real world. 
+Hey there! Let's talk about how Gocrew agents actually interact with the real world. 
 
 An LLM that can only generate text is just a fancy chatbot. To build autonomous agents that hold real value, we have to give them `Tools`. 
 
-Crew-GO breaks the mold of minimal-tool frameworks by providing **over 24 native integrations** right out of the box inside `pkg/tools`. These are completely type-safe Go implementations engineered for speed, safety, and reliability.
+Gocrew breaks the mold of minimal-tool frameworks by providing **over 24 native integrations** right out of the box inside `pkg/tools`. These are completely type-safe Go implementations engineered for speed, safety, and reliability.
 
 ---
 
@@ -12,7 +12,7 @@ Crew-GO breaks the mold of minimal-tool frameworks by providing **over 24 native
 
 The most powerful capability you can give an AI is the ability to write and execute its own code (e.g., using the `CodeInterpreterTool`). However, running untrusted, AI-generated scripts using Go's `os/exec` natively on your production server is an enormous security risk.
 
-Crew-GO solves this by providing tiered, highly-controlled sandboxing environments.
+Gocrew solves this by providing tiered, highly-controlled sandboxing environments.
 
 ### 1. The Docker Ephemeral Engine
 This is the gold standard for heavy code execution.
@@ -52,7 +52,7 @@ Want your agents to do more than write code? Here is a taste of the native tools
 
 APIs fail. HTML layouts change. SQL syntax gets mistyped. In legacy scripts, this crashes the program.
 
-In Crew-GO, tools are **Self-Healing**. 
+In Gocrew, tools are **Self-Healing**. 
 If a tool encounters an error (e.g., the agent writes a bad SQL query with a syntax error):
 1. The Go error is securely captured by the engine.
 2. It is appended to the Agent's context explicitly: *"Fatal Tool Error: syntax error at or near 'SELECTT'. Please correct your parameters and try again."*
@@ -62,7 +62,7 @@ If a tool encounters an error (e.g., the agent writes a bad SQL query with a syn
 
 ## 🤝 Let's Build More Tools Together!
 
-The best part about Crew-GO is how easy it is to add new capabilities. A tool just needs to satisfy the `tools.Tool` Go interface (provide a Name, Description, and an `Execute` method).
+The best part about Gocrew is how easy it is to add new capabilities. A tool just needs to satisfy the `tools.Tool` Go interface (provide a Name, Description, and an `Execute` method).
 
 Are you integrating with a specific SaaS product at work like Jira, Salesforce, or Datadog? 
 **Please consider writing a Tool for it and submitting a Pull Request!** 

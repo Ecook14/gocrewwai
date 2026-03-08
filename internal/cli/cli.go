@@ -7,20 +7,21 @@ import (
 	//"os"
 	"os" // Added os import
 
-	"github.com/Ecook14/gocrew/pkg/dashboard"
-	"github.com/Ecook14/gocrew/pkg/agents"
-	"github.com/Ecook14/gocrew/pkg/crew"
-	"github.com/Ecook14/gocrew/pkg/tasks"
-	"github.com/Ecook14/gocrew/pkg/telemetry"
+	"github.com/Ecook14/gocrewwai/pkg/dashboard"
+	"github.com/Ecook14/gocrewwai/pkg/agents"
+	"github.com/Ecook14/gocrewwai/pkg/crew"
+	"github.com/Ecook14/gocrewwai/pkg/llm"
+	"github.com/Ecook14/gocrewwai/pkg/tasks"
+	"github.com/Ecook14/gocrewwai/pkg/telemetry"
 	//"time"
 )
 
 // printHelp prints the usage instructions
 func printHelp() {
-	fmt.Println("Crew-GO CLI")
+	fmt.Println("Gocrew CLI")
 	fmt.Println("Usage:")
-	fmt.Println("  crewai create [project_name]   - Scaffold a new standard Go AI project")
-	fmt.Println("  crewai kickoff                 - Execute the crew pipeline (original demo)") // Kept kickoff for existing demo
+	fmt.Println("  gocrewwai create [project_name]   - Scaffold a new standard Go AI project")
+	fmt.Println("  gocrewwai kickoff                 - Execute the crew pipeline (original demo)") // Kept kickoff for existing demo
 }
 
 // Run is the main entrypoint executing standard CLI behavior.
@@ -34,7 +35,7 @@ func Run(args []string) error {
 	switch command {
 	case "create":
 		if len(args) < 3 {
-			fmt.Println("Usage: crewai create [project_name]")
+			fmt.Println("Usage: gocrewwai create [project_name]")
 			os.Exit(1)
 		}
 		projectName := args[2]
@@ -67,7 +68,7 @@ func handleKickoff(showUI bool) error {
 		telemetry.GlobalExecutionController.Pause()
 	}
 
-	slog.Info("🚀 Kicking off the CrewAI Go Demo...")
+	slog.Info("🚀 Kicking off the Gocrew Go Demo...")
 
 	agent := &agents.Agent{
 		Role:      "Architect",

@@ -58,7 +58,7 @@ func (c *WebMCPClient) DiscoverTools(ctx context.Context, targetURL string) ([]W
 		return nil, fmt.Errorf("webmcp: invalid url: %w", err)
 	}
 
-	req.Header.Set("User-Agent", "Crew-GO/1.0 WebMCP Discoverer")
+	req.Header.Set("User-Agent", "Gocrew/1.0 WebMCP Discoverer")
 	req.Header.Set("Accept", "text/html,application/xhtml+xml")
 
 	resp, err := c.httpClient.Do(req)
@@ -139,7 +139,7 @@ func (c *WebMCPClient) ExecuteTool(ctx context.Context, tool WebMCPToolDeclarati
 		return nil, fmt.Errorf("webmcp: failed to construct tool request: %w", err)
 	}
 
-	req.Header.Set("User-Agent", "Crew-GO/1.0 WebMCP Executor")
+	req.Header.Set("User-Agent", "Gocrew/1.0 WebMCP Executor")
 	if bodyReader != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}

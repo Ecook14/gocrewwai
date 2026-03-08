@@ -9,12 +9,12 @@ import (
 	"strings"
 	"time"
 
-	crewErrors "github.com/Ecook14/gocrew/pkg/errors"
-	"github.com/Ecook14/gocrew/pkg/guardrails"
-	"github.com/Ecook14/gocrew/pkg/llm"
-	"github.com/Ecook14/gocrew/pkg/memory"
-	"github.com/Ecook14/gocrew/pkg/telemetry"
-	"github.com/Ecook14/gocrew/pkg/tools"
+	crewErrors "github.com/Ecook14/gocrewwai/pkg/errors"
+	"github.com/Ecook14/gocrewwai/pkg/guardrails"
+	"github.com/Ecook14/gocrewwai/pkg/llm"
+	"github.com/Ecook14/gocrewwai/pkg/memory"
+	"github.com/Ecook14/gocrewwai/pkg/telemetry"
+	"github.com/Ecook14/gocrewwai/pkg/tools"
 	"go.opentelemetry.io/otel/attribute"
 )
 

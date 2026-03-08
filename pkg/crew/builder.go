@@ -1,8 +1,8 @@
 package crew
 
 import (
-	"github.com/Ecook14/gocrew/pkg/agents"
-	"github.com/Ecook14/gocrew/pkg/tasks"
+	"github.com/Ecook14/gocrewwai/pkg/agents"
+	"github.com/Ecook14/gocrewwai/pkg/tasks"
 )
 
 // CrewBuilder provides a fluent API for constructing Crews.

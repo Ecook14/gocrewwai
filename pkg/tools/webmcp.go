@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/Ecook14/gocrew/pkg/protocols"
+	"github.com/Ecook14/gocrewwai/pkg/protocols"
 )
 
 // WebMCPTool discovers and dynamically executes tools hosted via WebMCP.

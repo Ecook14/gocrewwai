@@ -9,6 +9,11 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/Ecook14/gocrewwai/pkg/agents"
+	"github.com/Ecook14/gocrewwai/pkg/tasks"
+	"github.com/Ecook14/gocrewwai/pkg/telemetry"
+	"github.com/Ecook14/gocrewwai/pkg/tools"
 )
 
 // ---------------------------------------------------------------------------
@@ -16,7 +21,7 @@ import (
 // ---------------------------------------------------------------------------
 //
 // MCP enables agents to discover and invoke tools hosted on external servers,
-// and expose Crew-GO tools as MCP-compatible resources.
+// and expose Gocrew tools as MCP-compatible resources.
 //
 // Spec reference: https://modelcontextprotocol.io
 
@@ -322,7 +327,7 @@ func (s *MCPServer) handleInitialize(w http.ResponseWriter, id interface{}) {
 			"resources": map[string]bool{"listChanged": true},
 		},
 		"serverInfo": map[string]string{
-			"name":    "crew-go-mcp",
+			"name":    "gocrew-mcp",
 			"version": "1.0.0",
 		},
 	})

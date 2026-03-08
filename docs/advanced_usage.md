@@ -82,7 +82,7 @@ If `testTask` fails, the Engine natively rewinds the state, marks `codeTask` as 
 
 ## 3. Structural JSON Output Extraction (Go Generics!)
 
-CrewAI in Python utilizes `Pydantic` heavily to coerce LLMs into outputting JSON schemas. I wanted to achieve this entirely natively using Go compilation structs, without messy `interface{}` casting.
+Gocrew achieves this entirely natively using Go compilation structs, without messy `interface{}` casting.
 
 ### How it works
 You pass a pointer of a strict Go Struct to a `Task`. Crew-GO dynamically reads your `json` tags via reflection, builds a vast JSON-Schema definition, injects it into the LLM system prompt, forces the LLM into strict `JSON Mode`, and unmarshals the response back into your pointer safely!

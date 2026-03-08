@@ -8,11 +8,11 @@ import (
 	"os"
 	"strings"
 	"encoding/json"
-	"github.com/Ecook14/gocrew/pkg/agents"
-	crewErrors "github.com/Ecook14/gocrew/pkg/errors"
-	"github.com/Ecook14/gocrew/pkg/guardrails"
-	"github.com/Ecook14/gocrew/pkg/telemetry"
-	"github.com/Ecook14/gocrew/pkg/tools"
+	"github.com/Ecook14/gocrewwai/pkg/agents"
+	crewErrors "github.com/Ecook14/gocrewwai/pkg/errors"
+	"github.com/Ecook14/gocrewwai/pkg/guardrails"
+	"github.com/Ecook14/gocrewwai/pkg/telemetry"
+	"github.com/Ecook14/gocrewwai/pkg/tools"
 )
 
 // Task translates the `class Task` python abstraction into idiomatic Go.

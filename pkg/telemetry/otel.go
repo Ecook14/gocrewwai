@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	Tracer  = otel.Tracer("crew-go")
+	tracer  = otel.Tracer("gocrewwai")
 	Enabled bool // Toggleable by developer
 )
 
@@ -30,7 +30,7 @@ func InitTelemetry(w io.Writer) (*sdktrace.TracerProvider, error) {
 		sdktrace.WithBatcher(exporter),
 		sdktrace.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
-			semconv.ServiceNameKey.String("crew-go-app"),
+			semconv.ServiceNameKey.String("gocrew-app"),
 		)),
 	)
 

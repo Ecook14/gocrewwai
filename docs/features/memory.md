@@ -6,7 +6,7 @@ If you've played with basic AI chatbots, you know their biggest flaw: they suffe
 
 For enterprise-grade autonomous agents, that's unacceptable. If our agents are doing research or writing code, they need to recall past lessons, remember user preferences, and reference previous task outputs. 
 
-Crew-GO solves this natively through a highly robust set of interfaces inside `pkg/memory`.
+Gocrew solves this natively through a highly robust set of interfaces inside `pkg/memory`.
 
 ---
 
@@ -31,7 +31,7 @@ We've built a three-tiered memory architecture to give our Go agents total recal
 
 ## 💾 Supported Memory Databases Out-Of-The-Box
 
-Crew-GO provides native Go adapters for the most popular vector and KV stores in the world.
+Gocrew provides native Go adapters for the most popular vector and KV stores in the world.
 
 - **In-Memory** (`NewInMemCosineStore`): Perfect for fast local testing and development.
 - **SQLite** (`NewSQLiteStore`): Amazing for single-binary persistent deployments that you don't want to spin up Docker for!

@@ -59,8 +59,8 @@ type openRouterHeaderRoundTripper struct {
 }
 
 func (r *openRouterHeaderRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	req.Header.Set("HTTP-Referer", "https://github.com/Ecook14/gocrew")
-	req.Header.Set("X-OpenRouter-Title", "Crew-GO Framework")
+	req.Header.Set("HTTP-Referer", "https://gocrewwai.com")
+	req.Header.Set("X-OpenRouter-Title", "Gocrewwai Framework")
 	return r.next.RoundTrip(req)
 }
 

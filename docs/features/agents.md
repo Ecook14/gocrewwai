@@ -1,6 +1,6 @@
 # Feature Deep Dive: Autonomous Agents 🤖
 
-Hey! Let's talk about the absolute core of the Crew-GO framework: **The Agent**. 
+Hey! Let's talk about the absolute core of the Gocrewwai framework: **The Agent**. 
 
 If you are coming from simpler AI wrappers or basic chatbot scripts, you might be used to an agent just being a function that sends a string to OpenAI and returns the result. 
 

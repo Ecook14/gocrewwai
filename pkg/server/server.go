@@ -149,7 +149,7 @@ func (s *Server) registerRoutes() {
 	// Info endpoint
 	s.mux.HandleFunc("/info", func(w http.ResponseWriter, r *http.Request) {
 		info := map[string]interface{}{
-			"service": "crew-go",
+			"service": "gocrew",
 			"version": "1.0.0",
 			"go":      "1.22+",
 		}

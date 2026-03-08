@@ -254,7 +254,7 @@ func (ie *IngestionEngine) IngestURL(ctx context.Context, url string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
-	req.Header.Set("User-Agent", "Crew-GO/1.0 Knowledge Ingestion")
+	req.Header.Set("User-Agent", "Gocrew/1.0 Knowledge Ingestion")
 
 	resp, err := client.Do(req)
 	if err != nil {

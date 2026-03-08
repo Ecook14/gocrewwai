@@ -2,7 +2,7 @@ package main
 
 import (
 	"os"
-	"github.com/Ecook14/gocrew/internal/cli"
+	"github.com/Ecook14/gocrewwai/internal/cli"
 )
 
 func main() {

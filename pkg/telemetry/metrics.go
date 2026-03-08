@@ -24,7 +24,7 @@ import (
 //	metrics.RecordTaskExecution("research", 2*time.Second, nil)
 //	http.Handle("/metrics", metrics.Handler())
 
-// Metrics collects operational data for Crew-GO agents.
+// Metrics collects operational data for Gocrew agents.
 type Metrics struct {
 	mu sync.RWMutex
 

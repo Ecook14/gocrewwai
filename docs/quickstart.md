@@ -21,10 +21,10 @@ Let's pull the Crew-GO library into a fresh Go module:
 mkdir my-first-crew
 cd my-first-crew
 go mod init my-first-crew
-go get github.com/Ecook14/gocrew
+go get github.com/Ecook14/gocrewwai
 ```
 
-*(If you ever want to scaffold a project automatically, we also have a CLI you can install via `go install github.com/Ecook14/gocrew/cmd/crewai@latest`!)*
+*(If you ever want to scaffold a project automatically, we also have a CLI you can install via `go install github.com/Ecook14/gocrewwai/cmd/gocrewwai@latest`!)*
 
 ---
 

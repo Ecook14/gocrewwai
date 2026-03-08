@@ -4,7 +4,7 @@ Hey! Let's talk about knowing what your AI is actually doing.
 
 In standard Python scripts, analyzing what an AI is thinking usually involves staring at a chaotic stream of `print()` statements in a black terminal window. If an agent takes 45 seconds to answer a question, you have no idea if it's stuck in a loop, waiting on a slow API, or doing deep math.
 
-For enterprise software, that is completely unacceptable. That's why Crew-GO is instrumented natively with a **Global Async Event Bus** and **OpenTelemetry (OTEL)**.
+For enterprise software, that is completely unacceptable. That's why Gocrew is instrumented natively with a **Global Async Event Bus** and **OpenTelemetry (OTEL)**.
 
 ---
 
@@ -71,4 +71,4 @@ If you are an SRE or DevOps engineer who loves observability, **I desperately wa
 - Could we natively export these traces to **Datadog, Jaeger, or Honeycomb** using standard OTEL OTLP exporters?
 - Should we add Prometheus metrics scraping for active Goroutine task counts?
 
-If you want to help make Crew-GO the most strictly monitored AI framework on the planet, hop into `pkg/telemetry/events.go` and submit a Pull Request! Let's build it together.
+If you want to help make Gocrew the most strictly monitored AI framework on the planet, hop into `pkg/telemetry/events.go` and submit a Pull Request! Let's build it together.

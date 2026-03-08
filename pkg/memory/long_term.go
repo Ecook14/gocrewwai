@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"hash/fnv"
 
-	"github.com/Ecook14/gocrew/pkg/llm"
+	"github.com/Ecook14/gocrewwai/pkg/llm"
 )
 
 // LongTermMemory handles cross-execution persistent memory.

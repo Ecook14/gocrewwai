@@ -3,7 +3,7 @@ package tools
 import (
 	"context"
 
-	"github.com/Ecook14/gocrew/pkg/protocols"
+	"github.com/Ecook14/gocrewwai/pkg/protocols"
 )
 
 // ---------------------------------------------------------------------------
@@ -43,8 +43,8 @@ func WrapToolForMCP(tool Tool) (protocols.MCPToolDefinition, protocols.MCPToolHa
 	return def, handler
 }
 
-// WrapMCPToolForCrewGo wraps an MCP tool (via client) as a Crew-GO Tool interface.
-// This allows remote MCP tools to be used by Crew-GO agents.
+// WrapMCPToolForGocrew wraps an MCP tool (via client) as a Gocrew Tool interface.
+// This allows remote MCP tools to be used by Gocrew agents.
 func WrapMCPToolForCrewGo(client *protocols.MCPClient, toolDef protocols.MCPToolDefinition) Tool {
 	return &mcpToolAdapter{
 		client: client,
@@ -80,7 +80,7 @@ func (t *mcpToolAdapter) Execute(ctx context.Context, input map[string]interface
 	return text, nil
 }
 
-// RegisterAllToolsOnMCPServer registers all Crew-GO tools from a registry onto an MCP server.
+// RegisterAllToolsOnMCPServer registers all Gocrew tools from a registry onto an MCP server.
 func RegisterAllToolsOnMCPServer(mcpServer *protocols.MCPServer, registry *ToolRegistry) {
 	for _, tool := range registry.List() {
 		def, handler := WrapToolForMCP(tool)

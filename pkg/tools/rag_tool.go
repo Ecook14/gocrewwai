@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/Ecook14/gocrew/pkg/memory"
+	"github.com/Ecook14/gocrewwai/pkg/memory"
 )
 
 // NativeRAGTool provides Retrieval-Augmented Generation capabilities.

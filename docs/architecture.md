@@ -1,14 +1,14 @@
-# Crew-GO Architecture (Under the Hood) 🏗️
+# Gocrewwai Architecture (Under the Hood) 🏗️
 
-Welcome to the engine room! If you're a Go developer who wants to understand exactly how Crew-GO differs from other frameworks, or if you're looking to contribute to the codebase, this is the document for you. 
+Welcome to the engine room! If you're a Go developer who wants to understand exactly how Gocrew differs from other frameworks, or if you're looking to contribute to the codebase, this is the document for you. 
 
-I've engineered Crew-GO to take massive advantage of Go's built-in concurrency model, strict typing, and high-performance routing. Let's break down exactly how it works.
+I've engineered Gocrew to take massive advantage of Go's built-in concurrency model, strict typing, and high-performance routing. Let's break down exactly how it works.
 
 ---
 
 ## The Agent Reasoning Protocol (ReAct Loop)
 
-Crew-GO Agents do not just predictably "call an LLM and return the text." They utilize the **ReAct (Reason + Act)** pattern to create infinite, autonomous reasoning loops.
+Gocrew Agents do not just predictably "call an LLM and return the text." They utilize the **ReAct (Reason + Act)** pattern to create infinite, autonomous reasoning loops.
 
 If you look at `pkg/agents/agent.go`, you'll see the core execution loop. When a Task is given to an Agent:
 
@@ -26,7 +26,7 @@ If you look at `pkg/agents/agent.go`, you'll see the core execution loop. When a
 
 ## The Go-Native Orchestration Engine (`pkg/crew/crew.go`)
 
-Most Python frameworks rely on fake asynchronous loops (`asyncio`) tightly bound by the Global Interpreter Lock (GIL). Crew-GO utilizes true native hardware threads (`goroutines`). 
+Most Python frameworks rely on fake asynchronous loops (`asyncio`) tightly bound by the Global Interpreter Lock (GIL). Gocrewwai utilizes true native hardware threads (`goroutines`). 
 
 This gets incredibly exciting when we look at **Hierarchical Processing**.
 
@@ -47,7 +47,7 @@ This allows us to effortlessly perform tasks like scraping 50 websites at the ex
 
 ## Global Telemetry & Observability Bus (`pkg/telemetry`)
 
-We hate it when AI frameworks act like black boxes where you can't see why it took 45 seconds to answer a simple question. Crew-GO fixes this entirely with a Global Go Channel Event Bus.
+We hate it when AI frameworks act like black boxes where you can't see why it took 45 seconds to answer a simple question. Gocrewwai fixes this entirely with a Global Go Channel Event Bus.
 
 ### Event Propagation
 The `telemetry.EventBus` is an internal Pub/Sub broker wrapped in a strict `sync.RWMutex`.
@@ -72,7 +72,7 @@ When you launch the UI Dashboard (using `--ui` or `dashboard.Start`), the system
 
 ## Bi-Directional Execution Control (`pkg/telemetry/events.go`)
 
-Telemetry in Crew-GO is not just for watching—it's for **control**. Using Go's `sync.Cond` and the `GlobalExecutionController`, the Dashboard sends signals back to the engine:
+Telemetry in Gocrewwai is not just for watching—it's for **control**. Using Go's `sync.Cond` and the `GlobalExecutionController`, the Dashboard sends signals back to the engine:
 1. **Pause/Resume**: Blocks worker goroutines until a signal is received, prevents CPU spinning while execution is "Idle".
 2. **HITL Reviews**: The engine identifies sensitive tool calls, fires a `review_requested` event, and parks the goroutine until the dashboard sends an approval via the `/api/review` endpoint.
 

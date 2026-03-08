@@ -1,4 +1,4 @@
-// Package errors provides sentinel errors and typed error wrappers for the Crew-GO framework.
+// Package errors provides sentinel errors and typed error wrappers for the Gocrew framework.
 // Centralizing errors improves debuggability and allows callers to use errors.Is/As.
 package errors
 

@@ -1,4 +1,4 @@
-// Package protocols implements interoperability protocols for Crew-GO agents.
+// Package protocols implements interoperability protocols for Gocrew agents.
 //
 // This package provides two major protocol implementations:
 //
@@ -6,7 +6,7 @@
 //     and delegate tasks to other agents across process and network boundaries.
 //
 //   - MCP (Model Context Protocol): Enables agents to discover and invoke
-//     tools hosted on MCP-compatible servers, and expose Crew-GO tools as
+//     tools hosted on MCP-compatible servers, and expose Gocrew tools as
 //     MCP resources.
 package protocols
 

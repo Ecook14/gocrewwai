@@ -12,7 +12,7 @@ While the Python version of CrewAI relies on dynamic dictionaries and loose typi
 
 Importing the library into your project is as simple as:
 ```bash
-go get github.com/Ecook14/gocrew
+go get github.com/Ecook14/gocrewwai
 ```
 
 ### Building a Crew in Pure Go
@@ -24,10 +24,10 @@ package main
 import (
     "context"
     "fmt"
-    "github.com/Ecook14/gocrew/pkg/agents"
-    "github.com/Ecook14/gocrew/pkg/tasks"
-    "github.com/Ecook14/gocrew/pkg/crew"
-    "github.com/Ecook14/gocrew/pkg/llm"
+    "github.com/Ecook14/gocrewwai/pkg/agents"
+    "github.com/Ecook14/gocrewwai/pkg/tasks"
+    "github.com/Ecook14/gocrewwai/pkg/crew"
+    "github.com/Ecook14/gocrewwai/pkg/llm"
 )
 
 func main() {
@@ -226,10 +226,10 @@ In production, your "Tech" team defines the core architecture, and your "Product
 
 ```go
 import (
-    "github.com/Ecook14/gocrew/pkg/agents"
-    "github.com/Ecook14/gocrew/pkg/crew"
-    "github.com/Ecook14/gocrew/pkg/tasks"
-    "github.com/Ecook14/gocrew/pkg/dashboard" // Use the exported dashboard package!
+    "github.com/Ecook14/gocrewwai/pkg/agents"
+    "github.com/Ecook14/gocrewwai/pkg/crew"
+    "github.com/Ecook14/gocrewwai/pkg/tasks"
+    "github.com/Ecook14/gocrewwai/pkg/dashboard" // Use the exported dashboard package!
 )
 
 func main() {

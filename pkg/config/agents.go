@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/Ecook14/gocrew/pkg/agents"
-	"github.com/Ecook14/gocrew/pkg/tools"
+	"github.com/Ecook14/gocrewwai/pkg/agents"
+	"github.com/Ecook14/gocrewwai/pkg/tools"
 	"gopkg.in/yaml.v3"
 )
 

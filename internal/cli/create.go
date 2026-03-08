@@ -8,12 +8,12 @@ import (
 	"path/filepath"
 )
 
-// GenerateScaffolding creates a standard boilerplate Crew-GO project in the current directory.
+// GenerateScaffolding creates a standard boilerplate Gocrew project in the current directory.
 // Mirrors `crewai create crew [name]`
 func GenerateScaffolding(projectName string) error {
 	baseDir := filepath.Join(".", projectName)
 
-	slog.Info("Scaffolding new Crew-GO project...", slog.String("name", projectName))
+	slog.Info("Scaffolding new Gocrew project...", slog.String("name", projectName))
 
 	dirs := []string{
 		filepath.Join(baseDir, "src"),
@@ -67,12 +67,12 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/Ecook14/gocrew/pkg/agents"
-	"github.com/Ecook14/gocrew/pkg/config"
-	"github.com/Ecook14/gocrew/pkg/crew"
-	"github.com/Ecook14/gocrew/pkg/llm"
-	"github.com/Ecook14/gocrew/pkg/tasks"
-	"github.com/Ecook14/gocrew/pkg/dashboard"
+	"github.com/Ecook14/gocrewwai/pkg/agents"
+	"github.com/Ecook14/gocrewwai/pkg/config"
+	"github.com/Ecook14/gocrewwai/pkg/crew"
+	"github.com/Ecook14/gocrewwai/pkg/llm"
+	"github.com/Ecook14/gocrewwai/pkg/tasks"
+	"github.com/Ecook14/gocrewwai/pkg/dashboard"
 )
 
 func main() {

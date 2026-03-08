@@ -81,13 +81,13 @@ Are you ready to see this magic in action? It takes exactly 5 minutes.
 **📦 For Elite Architects (Library Usage)**
 Import the core orchestration engine directly into your Go projects:
 ```bash
-go get github.com/Ecook14/gocrew
+go get github.com/Ecook14/gocrewwai
 ```
 
 **🛠️ For Dynamic Operators (Global CLI)**
 Install the `gocrew` command-line tool globally to scaffold projects and launch the Dashboard from anywhere:
 ```bash
-go install github.com/Ecook14/gocrew/cmd/gocrew@latest
+go install github.com/Ecook14/gocrewwai/cmd/gocrewwai@latest
 ```
 *Note: Ensure your `$GOPATH/bin` (usually `~/go/bin`) is in your system's `PATH`!*
 
@@ -96,9 +96,9 @@ Building a crew in code is highly idiomatic and strictly typed:
 
 ```go
 import (
-    "github.com/Ecook14/gocrew/pkg/agents"
-    "github.com/Ecook14/gocrew/pkg/crew"
-    "github.com/Ecook14/gocrew/pkg/tasks"
+    "github.com/Ecook14/gocrewwai/pkg/agents"
+    "github.com/Ecook14/gocrewwai/pkg/crew"
+    "github.com/Ecook14/gocrewwai/pkg/tasks"
 )
 
 func main() {
