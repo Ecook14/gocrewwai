@@ -1,13 +1,15 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
-	"strings"
+	"time"
 
+	"github.com/Ecook14/crewai-go/internal/server"
 	"github.com/Ecook14/crewai-go/pkg/agents"
+	"github.com/Ecook14/crewai-go/pkg/guardrails"
 	"github.com/Ecook14/crewai-go/pkg/llm"
 	"github.com/Ecook14/crewai-go/pkg/tools"
 )
@@ -20,6 +22,12 @@ type ReviewableFileWriteTool struct {
 func (t *ReviewableFileWriteTool) RequiresReview() bool { return true }
 
 func main() {
+	// 1. Initialise the Dashboard Server in the background
+	go server.StartDashboardServer("8081") // Using 8081 to avoid conflict if 8080 is used
+	slog.Info("🖥️  Dashboard active at http://localhost:8081/web-ui")
+	slog.Info("Please open the dashboard in your browser to approve the file write!")
+	time.Sleep(3 * time.Second)
+
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
 		fmt.Println("Please set OPENAI_API_KEY")
@@ -33,22 +41,16 @@ func main() {
 		FileWriteTool: tools.FileWriteTool{},
 	}
 
-	// 2. Create an agent with a StepReview callback
+	// 2. Create an agent with the UI-driven HITL Guardrail
 	agent := &agents.Agent{
 		Role:      "Legal Clerk",
-		Goal:      "Draft and save a legal document. ALWAYS ask for approval before saving.",
+		Goal:      "Draft and save a legal document.",
 		Backstory: "You are a meticulous clerk who understands the importance of human oversight.",
 		LLM:       model,
 		Tools:     []tools.Tool{fileTool},
 		Verbose:   true,
-		StepReview: func(toolName string, input interface{}) bool {
-			fmt.Printf("\n[HUMAN-IN-THE-LOOP] Agent wants to use tool: %s\n", toolName)
-			fmt.Printf("Input: %v\n", input)
-			fmt.Print("Do you approve? (y/n): ")
-			
-			reader := bufio.NewReader(os.Stdin)
-			resp, _ := reader.ReadString('\n')
-			return strings.TrimSpace(strings.ToLower(resp)) == "y"
+		Guardrails: []guardrails.Guardrail{
+			guardrails.NewHumanReviewGuardrail("Legal Clerk", "ReviewableFileWriteTool"),
 		},
 	}
 
@@ -63,4 +65,7 @@ func main() {
 	}
 
 	fmt.Printf("\n## Final Result ##\n%v\n", result)
+	
+	slog.Info("✅ Demo finished. Keep the dashboard open to review the logs!")
+	select {} // Keep running so user can see dashboard logs
 }

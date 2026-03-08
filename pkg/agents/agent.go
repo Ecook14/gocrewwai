@@ -268,6 +268,11 @@ Once you have gathered all necessary information and are ready to provide the fi
 		default:
 		}
 
+		// Dynamic UI Control Check (HITL Pause)
+		if err := telemetry.GlobalExecutionController.WaitIfPaused(ctx); err != nil {
+			return nil, err
+		}
+
 		if a.StepCallback != nil {
 			a.StepCallback(map[string]interface{}{"role": a.Role, "phase": "thinking", "iteration": i + 1})
 		}

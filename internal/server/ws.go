@@ -103,10 +103,7 @@ func (s *WSServer) handleStart(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if err := telemetry.GlobalExecutionController.Start(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+	telemetry.GlobalExecutionController.Resume()
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"started"}`))
 }
@@ -116,10 +113,7 @@ func (s *WSServer) handleStop(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if err := telemetry.GlobalExecutionController.Stop(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+	telemetry.GlobalExecutionController.Pause()
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"stopped"}`))
 }

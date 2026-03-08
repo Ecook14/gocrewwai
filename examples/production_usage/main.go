@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/Ecook14/crewai-go/internal/server"
 	"github.com/Ecook14/crewai-go/pkg/agents"
 	"github.com/Ecook14/crewai-go/pkg/crew"
 	"github.com/Ecook14/crewai-go/pkg/llm"
@@ -87,10 +88,16 @@ func main() {
 		Verbose: true,
 	}
 
+	go server.StartDashboardServer("8081")
+	fmt.Println("🖥️  Dashboard active at http://localhost:8081/web-ui - Watch production execution!")
+
 	result, err := prodCrew.Kickoff(context.Background())
 	if err != nil {
 		log.Fatalf("Execution failed: %v", err)
 	}
 
 	fmt.Printf("\n--- PRODUCTION CREW FINAL CONSENSUS ---\n%s\n", result)
+	
+	fmt.Println("✅ Demo finished. Keep the dashboard open to review the logs!")
+	select {}
 }

@@ -2,7 +2,7 @@ package telemetry
 
 import (
 	"context"
-	"fmt"
+	//"fmt"
 	"sync"
 	"time"
 )
@@ -134,57 +134,53 @@ func (r *ReviewManager) SubmitReview(id string, approved bool) {
 // ---------------------------------------------------------------------------
 
 type ExecutionController struct {
-	mu        sync.Mutex
-	StartFunc func() error
-	StopFunc  context.CancelFunc
-	IsRunning bool
+	mu     sync.Mutex
+	cond   *sync.Cond
+	paused bool
 }
 
+// GlobalExecutionController allows the Web UI dashboard to pause the entire ReAct loop.
 var GlobalExecutionController = &ExecutionController{}
 
-// Register configures the engine's start and stop references for UI control.
-func (c *ExecutionController) Register(start func() error, stop context.CancelFunc) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.StartFunc = start
-	c.StopFunc = stop
+func init() {
+	GlobalExecutionController.cond = sync.NewCond(&GlobalExecutionController.mu)
 }
 
-// Start triggers the registered start callback if not already running.
-func (c *ExecutionController) Start() error {
+// Pause flags the execution engine to halt before the next Tool invocation.
+func (c *ExecutionController) Pause() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.IsRunning {
-		return fmt.Errorf("execution is already running")
-	}
-	if c.StartFunc == nil {
-		return fmt.Errorf("no start function registered")
-	}
-	c.IsRunning = true
+	c.paused = true
+}
+
+// Resume unblocks all waiting Agent routines.
+func (c *ExecutionController) Resume() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.paused = false
+	c.cond.Broadcast()
+}
+
+// WaitIfPaused blocks the calling goroutine until the dashboard resumes execution.
+func (c *ExecutionController) WaitIfPaused(ctx context.Context) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	
-	// Execute async so we don't block the API call
-	go func() {
-		defer func() {
-			c.mu.Lock()
-			c.IsRunning = false
-			c.mu.Unlock()
+	for c.paused {
+		// Periodically wake up to check context cancellation while paused
+		done := make(chan struct{})
+		go func() {
+			c.cond.Wait()
+			close(done)
 		}()
-		_ = c.StartFunc()
-	}()
-	return nil
-}
 
-// Stop triggers the registered cancel function.
-func (c *ExecutionController) Stop() error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if !c.IsRunning {
-		return fmt.Errorf("execution is not currently running")
+		select {
+		case <-ctx.Done():
+			c.cond.Broadcast() // free the waiter goroutine
+			return ctx.Err()
+		case <-done:
+			// Woken up by Broadcast, re-check c.paused
+		}
 	}
-	if c.StopFunc == nil {
-		return fmt.Errorf("no stop function registered")
-	}
-	c.StopFunc()
-	c.IsRunning = false
 	return nil
 }

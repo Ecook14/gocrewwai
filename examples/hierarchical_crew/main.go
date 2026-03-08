@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/Ecook14/crewai-go/internal/server"
 	"github.com/Ecook14/crewai-go/pkg/agents"
 	"github.com/Ecook14/crewai-go/pkg/crew"
 	"github.com/Ecook14/crewai-go/pkg/llm"
@@ -59,6 +60,10 @@ func main() {
 
 	// 4. Kickoff
 	fmt.Println("## Starting Hierarchical Crew Execution ##")
+	
+	go server.StartDashboardServer("8081")
+	fmt.Println("🖥️  Dashboard active at http://localhost:8081/web-ui - Watch the manager orchestrate!")
+
 	result, err := myCrew.Kickoff(context.Background())
 	if err != nil {
 		fmt.Printf("Execution failed: %v\n", err)
@@ -66,4 +71,7 @@ func main() {
 	}
 
 	fmt.Printf("\n## Final Result ##\n%v\n", result)
+	
+	fmt.Println("✅ Demo finished. Keep the dashboard open to review the logs!")
+	select {}
 }

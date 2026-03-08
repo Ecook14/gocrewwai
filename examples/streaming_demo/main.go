@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/Ecook14/crewai-go/internal/server"
 	"github.com/Ecook14/crewai-go/pkg/agents"
 	"github.com/Ecook14/crewai-go/pkg/crew"
 	"github.com/Ecook14/crewai-go/pkg/llm"
@@ -40,9 +41,14 @@ func main() {
 	)
 
 	fmt.Println("🚀 Starting Streaming Demo (Tokens should appear one by one):")
+	
+	go server.StartDashboardServer("8081")
+	fmt.Println("🖥️  Dashboard active at http://localhost:8081/web-ui - Watch the tokens stream!")
+
 	_, err := myCrew.Kickoff(context.Background())
 	if err != nil {
 		fmt.Printf("\nError: %v\n", err)
 	}
-	fmt.Println("\n\n✅ Done.")
+	fmt.Println("\n\n✅ Done. Keep the dashboard open to review the logs!")
+	select {}
 }

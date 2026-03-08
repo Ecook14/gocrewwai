@@ -6,11 +6,12 @@ import (
 	"os"
 	"time"
 
+	"github.com/Ecook14/crewai-go/internal/server"
 	"github.com/Ecook14/crewai-go/pkg/agents"
 	"github.com/Ecook14/crewai-go/pkg/crew"
+	"github.com/Ecook14/crewai-go/pkg/guardrails"
 	"github.com/Ecook14/crewai-go/pkg/llm"
 	"github.com/Ecook14/crewai-go/pkg/tasks"
-	"github.com/Ecook14/crewai-go/internal/server"
 	"github.com/Ecook14/crewai-go/pkg/tools"
 )
 
@@ -41,6 +42,12 @@ func main() {
 		"You are a professional tech blogger.",
 		client,
 	)
+	
+	// Inject the new HITL Guardrail
+	// The Go thread will synchronously Pause until the user clicks "Approve" in the Dashboard
+	writer.Guardrails = []guardrails.Guardrail{
+		guardrails.NewHumanReviewGuardrail("Writer", "Final Draft Publisher"),
+	}
 
 	task1 := &tasks.Task{
 		Description: "Search for Go 1.24 release notes and key features.",

@@ -139,6 +139,11 @@ func (c *Crew) Kickoff(ctx context.Context) (interface{}, error) {
 		slog.Info("Starting Crew Execution", slog.String("process", string(c.Process)))
 	}
 
+	// Dynamic UI Control Check
+	if err := telemetry.GlobalExecutionController.WaitIfPaused(ctx); err != nil {
+		return nil, err
+	}
+
 	// Phase 2: Advanced Planning
 	if c.Planning {
 		if err := c.runPlanningPhase(ctx); err != nil {
@@ -202,6 +207,11 @@ func (c *Crew) executeSequential(ctx context.Context) (interface{}, error) {
 
 		if c.Verbose {
 			defaultLogger.Info("Executing Task", slog.Int("index", i+1), slog.String("description", task.Description))
+		}
+
+		// Dynamic UI Control Check before task
+		if err := telemetry.GlobalExecutionController.WaitIfPaused(ctx); err != nil {
+			return finalResult, err
 		}
 
 		// Pipe previous task output into current task's context
