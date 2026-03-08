@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	tracer  = otel.Tracer("gocrewwai")
+	Tracer  = otel.Tracer("gocrewwai")
 	Enabled bool // Toggleable by developer
 )
 

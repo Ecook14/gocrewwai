@@ -8,7 +8,7 @@ import (
 	"sync"
 	
 	"github.com/Ecook14/gocrewwai/pkg/agents"
-	"github.com/Ecook14/gocrewwai/pkg/dashboard"
+	//"github.com/Ecook14/gocrewwai/pkg/dashboard"
 	"github.com/Ecook14/gocrewwai/pkg/delegation"
 	crewErrors "github.com/Ecook14/gocrewwai/pkg/errors"
 	"github.com/Ecook14/gocrewwai/pkg/llm"

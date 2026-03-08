@@ -10,7 +10,7 @@ import (
 	"github.com/Ecook14/gocrewwai/pkg/crew"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/tasks"
-积累)
+)
 
 type StockInfo struct {
 	Symbol      string  `json:"symbol"`

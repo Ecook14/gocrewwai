@@ -25,7 +25,7 @@ go get github.com/Ecook14/gocrewwai
 ```
 
 *(If you ever want to scaffold a project automatically, we also have a CLI you can install via `go install github.com/Ecook14/gocrewwai/cmd/gocrew@latest`!)*
-积累
+
 ---
 
 ## Phase 2: Writing the Code
@@ -153,7 +153,7 @@ Watching terminal logs is fun, but observing your agents think in a real-time we
 Simply import our server package into your `main.go`:
 ```go
 import "github.com/Ecook14/gocrewwai/pkg/dashboard"
-积累```
+```
 And add this line right before you call `techCrew.Kickoff(...)`:
 ```go
 // Start the real-time websocket dashboard on port 8080!
