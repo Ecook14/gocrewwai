@@ -17,11 +17,12 @@ import (
 
 // Task translates the `class Task` python abstraction into idiomatic Go.
 type Task struct {
-	Description    string
-	ExpectedOutput string
-	Agent          *agents.Agent
-	Tools          []tools.Tool
-	AsyncExecution bool
+	Description    string `json:"description"`
+	ExpectedOutput string `json:"expected_output"`
+	Agent          *agents.Agent `json:"-"`
+	AgentRole      string `json:"agent_role"` // For late binding, especially from UI
+	Tools          []tools.Tool `json:"-"`
+	AsyncExecution bool `json:"-"`
 	OutputFile     string      // Path to save the final task output (.md, .json, etc.)
 
 	// Output Formatting
@@ -35,24 +36,24 @@ type Task struct {
 	Output    interface{}
 
 	// Advanced Quality-of-Life Mappings
-	Context    []*Task // Strict outputs to pipe into this task's prompt
-	HumanInput bool    // Blocks CLI execution for mid-flight approval/feedback
+	Context    []*Task `json:"-"` // Strict outputs to pipe into this task's prompt
+	HumanInput bool    `json:"-"` // Blocks CLI execution for mid-flight approval/feedback
 
 	// Guardrails validate task output before marking it as complete.
 	Guardrails []guardrails.Guardrail
 
 	// CallbackOnComplete fires after the task completes successfully.
-	CallbackOnComplete func(result interface{})
+	CallbackOnComplete func(result interface{}) `json:"-"`
 
 	// Dependencies define explicit graph edges for DAG orchestration.
-	Dependencies []*Task
+	Dependencies []*Task `json:"-"`
 
 	// Elite Tier: State Machine & Cyclic Logic
 	// OutputCondition returns a key used to select the next task from NextPaths.
-	OutputCondition func(result interface{}) string 
+	OutputCondition func(result interface{}) string  `json:"-"`
 	
 	// NextPaths maps condition keys to the successor tasks.
-	NextPaths map[string]*Task
+	NextPaths map[string]*Task `json:"-"`
 
 	// MaxCycles limits how many times this task can be re-executed in a cycle.
 	MaxCycles int

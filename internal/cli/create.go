@@ -72,6 +72,7 @@ import (
 	"github.com/Ecook14/crewai-go/pkg/crew"
 	"github.com/Ecook14/crewai-go/pkg/llm"
 	"github.com/Ecook14/crewai-go/pkg/tasks"
+	"github.com/Ecook14/crewai-go/pkg/dashboard"
 )
 
 func main() {
@@ -93,7 +94,7 @@ func main() {
 		a.LLM = llm.NewOpenAIClient(apiKey)
 	}
 
-	// 3. Assemble tasks into slice
+	// 3. Assemble tasks and agents
 	var taskList []*tasks.Task
 	for _, t := range tasksMap {
 		taskList = append(taskList, t)
@@ -110,6 +111,9 @@ func main() {
 		Process: crew.Sequential,
 		Verbose: true,
 	}
+
+	// 4. Start the Dashboard (Background)
+	dashboard.Start("8080")
 
 	slog.Info("Starting Boilerplate Crew...")
 	res, err := myCrew.Kickoff(context.Background())

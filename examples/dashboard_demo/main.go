@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/Ecook14/crewai-go/internal/server"
+	"github.com/Ecook14/crewai-go/pkg/dashboard"
 	"github.com/Ecook14/crewai-go/pkg/agents"
 	"github.com/Ecook14/crewai-go/pkg/crew"
 	"github.com/Ecook14/crewai-go/pkg/guardrails"
@@ -17,7 +17,7 @@ import (
 
 func main() {
 	// 1. Initialise the Dashboard Server in the background
-	go server.StartDashboardServer("8080")
+	dashboard.Start("8080")
 	slog.Info("🖥️  Dashboard active at http://localhost:8080/web-ui")
 	slog.Info("Please open the dashboard in your browser before the crew starts!")
 	

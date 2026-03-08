@@ -163,6 +163,22 @@
             color: var(--text-secondary);
         }
 
+        .delete-btn {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.4rem;
+            cursor: pointer;
+            font-size: 0.7rem;
+            transition: all 0.2s;
+        }
+
+        .delete-btn:hover {
+            background: #ef4444;
+            color: #fff;
+        }
+
         .terminal-container {
             display: flex;
             flex-direction: column;
@@ -337,14 +353,69 @@
                 opacity: 1;
             }
         }
+
+        .form-group {
+            margin-bottom: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .form-group label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .form-input {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--glass-border);
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            color: #fff;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .hidden {
+            display: none !important;
+        }
     </style>
 </head>
 
 <body>
     <header>
         <div class="logo">CREW-GO ENGINE</div>
+        <div id="system-stats"
+            style="display: flex; gap: 0.75rem; background: rgba(0,0,0,0.2); padding: 0.25rem 0.75rem; border-radius: 2rem; border: 1px solid var(--glass-border); font-size: 0.7rem; font-family: 'JetBrains Mono', monospace; margin-left: 1rem;">
+            <span style="color: #94a3b8;">RAM: <span id="stat-ram" style="color: #34d399;">0 MB</span></span>
+            <span style="color: #94a3b8;">GO: <span id="stat-go" style="color: #60a5fa;">0</span></span>
+            <span style="color: #94a3b8;">UPTIME: <span id="stat-uptime" style="color: #fbbf24;">0s</span></span>
+        </div>
         <div class="status-badge" style="padding-left: 0.5rem;">
-            <button id="btn-start" class="btn approve" style="padding: 0.25rem 1rem; font-size: 0.75rem;"
+            <button id="btn-create-agent" class="btn"
+                style="padding: 0.25rem 1rem; font-size: 0.75rem; background: #4f46e5; color: white;"
+                onclick="resetForm('agent'); document.getElementById('modal-create-agent').classList.remove('hidden')">CREATE
+                AGENT</button>
+            <button id="btn-create-task" class="btn"
+                style="padding: 0.25rem 1rem; font-size: 0.75rem; background: #a855f7; color: white;"
+                onclick="resetForm('task'); document.getElementById('modal-create-task').classList.remove('hidden')">CREATE
+                TASK</button>
+            <button id="btn-create-mcp" class="btn"
+                style="padding: 0.25rem 1rem; font-size: 0.75rem; background: #f59e0b; color: white;"
+                onclick="resetForm('mcp'); document.getElementById('modal-create-mcp').classList.remove('hidden')">CONNECT
+                MCP</button>
+            <button id="btn-create-a2a" class="btn"
+                style="padding: 0.25rem 1rem; font-size: 0.75rem; background: #10b981; color: white;"
+                onclick="resetForm('a2a'); document.getElementById('modal-create-a2a').classList.remove('hidden')">A2A
+                BRIDGE</button>
+            <button id="btn-start" class="btn approve"
+                style="margin-left: 1rem; padding: 0.25rem 1rem; font-size: 0.75rem;"
                 onclick="toggleExecution(true)">START</button>
             <button id="btn-stop" class="btn reject" style="padding: 0.25rem 1rem; font-size: 0.75rem;"
                 onclick="toggleExecution(false)">STOP</button>
@@ -359,9 +430,9 @@
     <main>
         <div class="sidebar">
             <div class="glass-card">
-                <div class="card-title">Active Agents</div>
+                <div class="card-title">Agents & Entities</div>
                 <div id="agent-list" class="agent-list">
-                    <!-- Agents will be injected here -->
+                    <!-- Agents, Tasks, MCP, A2A listing -->
                 </div>
             </div>
             <div class="glass-card" style="flex: 1;">
@@ -392,6 +463,144 @@
             </div>
         </div>
     </main>
+
+    <!-- Create Agent Modal -->
+    <div id="modal-create-agent" class="review-modal hidden">
+        <div class="review-content glass-card">
+            <h3>Create New Agent</h3>
+            <div class="form-group">
+                <label>Role</label>
+                <input type="text" id="agent-role" class="form-input" placeholder="e.g. Senior Data Scientist">
+            </div>
+            <div class="form-group">
+                <label>Goal</label>
+                <input type="text" id="agent-goal" class="form-input"
+                    placeholder="e.g. Analyze data and provide insights">
+            </div>
+            <div class="form-group">
+                <label>Backstory</label>
+                <textarea id="agent-backstory" class="form-input" rows="2"
+                    placeholder="e.g. You are an expert data analyst..."></textarea>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>LLM Provider</label>
+                    <select id="agent-provider" class="form-input">
+                        <option value="openai">OpenAI</option>
+                        <option value="anthropic">Anthropic</option>
+                        <option value="gemini">Google Gemini</option>
+                        <option value="openrouter">OpenRouter</option>
+                        <option value="ollama">Local (Ollama)</option>
+                        <option value="custom">Custom Endpoint</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Model Name</label>
+                    <input type="text" id="agent-model" class="form-input" placeholder="e.g. gpt-4o">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>API Key (Optional, overrides env)</label>
+                <input type="password" id="agent-apikey" class="form-input" placeholder="sk-...">
+            </div>
+            <div class="form-group" style="margin-top: 0.5rem;">
+                <label>Tools (Select multiple)</label>
+                <div id="agent-tools-list"
+                    style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; background: rgba(0,0,0,0.2); padding: 0.75rem; border-radius: 0.5rem; max-height: 120px; overflow-y: auto;">
+                    <!-- Tools checkboxes will be injected here -->
+                </div>
+            </div>
+            <div class="form-group" style="margin-top: 0.5rem;">
+                <label>Memory Store</label>
+                <select id="agent-memory" class="form-input" onchange="toggleRemoteMemoryField()">
+                    <option value="none">None</option>
+                    <!-- Memory options will be injected here -->
+                </select>
+            </div>
+            <div id="remote-memory-group" class="form-group hidden" style="margin-top: 0.5rem;">
+                <label>Remote Connection String</label>
+                <input type="text" id="agent-remote-conn" class="form-input"
+                    placeholder="e.g. https://api.pinecone.io or localhost:50051">
+            </div>
+            <div class="review-actions" style="margin-top: 1rem;">
+                <button class="btn approve" onclick="submitCreateAgent()">Create</button>
+                <button class="btn"
+                    onclick="document.getElementById('modal-create-agent').classList.add('hidden')">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Task Modal -->
+    <div id="modal-create-task" class="review-modal hidden">
+        <div class="review-content glass-card">
+            <h3>Create New Task</h3>
+            <div class="form-group">
+                <label>Description</label>
+                <textarea id="task-desc" class="form-input" rows="3"
+                    placeholder="e.g. Write a comprehensive report on Q3 earnings"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Assigned Agent Role</label>
+                <select id="task-agent" class="form-input">
+                    <option value="">Select an Agent...</option>
+                </select>
+            </div>
+            <div class="review-actions" style="margin-top: 1rem;">
+                <button class="btn approve" onclick="submitCreateTask()">Create</button>
+                <button class="btn"
+                    onclick="document.getElementById('modal-create-task').classList.add('hidden')">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create MCP Modal -->
+    <div id="modal-create-mcp" class="review-modal hidden">
+        <div class="review-content glass-card">
+            <h3>Connect MCP Server</h3>
+            <div class="form-group">
+                <label>Server Name</label>
+                <input type="text" id="mcp-name" class="form-input" placeholder="e.g. Local File System">
+            </div>
+            <div class="form-group">
+                <label>Command</label>
+                <input type="text" id="mcp-command" class="form-input" placeholder="e.g. npx">
+            </div>
+            <div class="form-group">
+                <label>Arguments (comma separated)</label>
+                <input type="text" id="mcp-args" class="form-input"
+                    placeholder="e.g. -y, @modelcontextprotocol/server-filesystem, /Users">
+            </div>
+            <div class="review-actions" style="margin-top: 1rem;">
+                <button class="btn approve" onclick="submitCreateMCP()">Connect</button>
+                <button class="btn"
+                    onclick="document.getElementById('modal-create-mcp').classList.add('hidden')">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create A2A Modal -->
+    <div id="modal-create-a2a" class="review-modal hidden">
+        <div class="review-content glass-card">
+            <h3>Connect Agents (A2A Bridge)</h3>
+            <div class="form-group">
+                <label>Sender Agent (Role Name)</label>
+                <input type="text" id="a2a-sender" class="form-input" placeholder="e.g. Research Analyst">
+            </div>
+            <div class="form-group">
+                <label>Receiver Agent (Role Name)</label>
+                <input type="text" id="a2a-receiver" class="form-input" placeholder="e.g. Lead Writer">
+            </div>
+            <div class="form-group">
+                <label>Protocol / Model</label>
+                <input type="text" id="a2a-model" class="form-input" placeholder="e.g. gpt-4o (Reasoning layer)">
+            </div>
+            <div class="review-actions" style="margin-top: 1rem;">
+                <button class="btn approve" onclick="submitCreateA2A()">Establish Bridge</button>
+                <button class="btn"
+                    onclick="document.getElementById('modal-create-a2a').classList.add('hidden')">Cancel</button>
+            </div>
+        </div>
+    </div>
 
     <script src="app.js"></script>
 </body>

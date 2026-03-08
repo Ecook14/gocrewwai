@@ -13,7 +13,10 @@ import (
 	"github.com/Ecook14/crewai-go/pkg/llm"
 	"github.com/Ecook14/crewai-go/pkg/tasks"
 	"github.com/Ecook14/crewai-go/pkg/telemetry"
+	"github.com/Ecook14/crewai-go/pkg/protocols"
+	"github.com/Ecook14/crewai-go/pkg/tools"
 	"os"
+	"time"
 )
 
 var defaultLogger = slog.Default()
@@ -104,6 +107,8 @@ type Crew struct {
 
 	// Execution Tracking
 	UsageMetrics map[string]int
+
+	staticSyncDone bool
 }
 
 // Kickoff starts the execution process based on the process type.
@@ -115,6 +120,17 @@ func (c *Crew) Kickoff(ctx context.Context) (interface{}, error) {
 		slog.String("process_type", string(c.Process)),
 		slog.Int("num_tasks", len(c.Tasks)),
 		slog.Int("num_agents", len(c.Agents)))
+
+	// Register existing entities with DynamicRegistry for Dashboard visibility (ONLY ONCE)
+	if !c.staticSyncDone {
+		for _, a := range c.Agents {
+			telemetry.GlobalDynamicRegistry.AddAgent(a, false)
+		}
+		for _, t := range c.Tasks {
+			telemetry.GlobalDynamicRegistry.AddTask(t, false)
+		}
+		c.staticSyncDone = true
+	}
 
 	if len(c.Tasks) == 0 {
 		return "", crewErrors.ErrNoTasks // Changed return value
@@ -190,6 +206,68 @@ func (c *Crew) Kickoff(ctx context.Context) (interface{}, error) {
 	}
 }
 
+func (c *Crew) syncDynamicEntities() {
+	// Pull Agents
+	newAgents := telemetry.GlobalDynamicRegistry.PullAgents()
+	for _, a := range newAgents {
+		if agent, ok := a.(*agents.Agent); ok {
+			c.Agents = append(c.Agents, agent)
+			
+			if c.Verbose {
+				defaultLogger.Info("Dynamic Agent injected", slog.String("role", agent.Role))
+			}
+
+			// Register for A2A discovery
+			protocols.GlobalA2ARegistry.Register(&protocols.AgentCard{
+				ID:   agent.Role,
+				Name: agent.Role,
+				Role: agent.Role,
+			})
+		}
+	}
+
+	// Pull MCP Clients
+	newMCPs := telemetry.GlobalDynamicRegistry.PullMCPClients()
+	for _, m := range newMCPs {
+		if client, ok := m.(*protocols.MCPClient); ok {
+			// Handshake to discover tools
+			if err := client.Initialize(context.Background()); err == nil {
+				// Wrap discovered tools and inject into all agents
+				for _, tDef := range client.ListTools() {
+					tool := tools.WrapMCPToolForCrewGo(client, tDef)
+					for _, agent := range c.Agents {
+						agent.Tools = append(agent.Tools, tool)
+					}
+				}
+				if c.Verbose {
+					defaultLogger.Info("MCP Remote Tools injected into all agents", slog.String("mcp_server", client.URL()))
+				}
+			}
+		}
+	}
+
+	// Pull Tasks
+	newTasks := telemetry.GlobalDynamicRegistry.PullTasks()
+	for _, t := range newTasks {
+		if task, ok := t.(*tasks.Task); ok {
+			// Late bind agent by role if needed
+			if task.Agent == nil && task.AgentRole != "" {
+				for _, a := range c.Agents {
+					if strings.EqualFold(a.Role, task.AgentRole) {
+						task.Agent = a
+						break
+					}
+				}
+			}
+			c.Tasks = append(c.Tasks, task)
+			if c.Verbose {
+				defaultLogger.Info("Dynamic Task injected", slog.String("description", task.Description))
+			}
+		}
+	}
+}
+
+
 // executeSequential executes tasks one by one in order, piping context between them.
 // Tasks marked with AsyncExecution=true are dispatched in the background via TaskFuture
 // and their results are collected after all sequential tasks complete.
@@ -197,7 +275,14 @@ func (c *Crew) executeSequential(ctx context.Context) (interface{}, error) {
 	var finalResult interface{}
 	var asyncFutures []*asyncEntry
 
-	for i, task := range c.Tasks {
+	for i := 0; i < len(c.Tasks); i++ {
+		c.syncDynamicEntities()
+		task := c.Tasks[i]
+		// Skip if already processed
+		if task.Processed {
+			continue
+		}
+
 		// Context check before task execution
 		select {
 		case <-ctx.Done():
@@ -328,6 +413,7 @@ func (c *Crew) executeHierarchical(ctx context.Context) (interface{}, error) {
 	replanCount := 0
 
 	for {
+		c.syncDynamicEntities()
 		var wg sync.WaitGroup
 		var pendingTasks []*tasks.Task
 		var pendingIndices []int
@@ -906,4 +992,74 @@ func (c *Crew) runPlanningPhase(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// RunCreatorMode enters a continuous polling loop, executing any new tasks staged via the UI.
+// This is an Elite Tier developer feature for building long-running AI orchestration services.
+func (c *Crew) RunCreatorMode(ctx context.Context) error {
+	slog.Info("✅ Engine is now in 'Creator Mode'. Active polling for UI-staged entities...")
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			// Check for new tasks every 2 seconds
+			newTasks := telemetry.GlobalDynamicRegistry.PullTasks()
+			newAgents := telemetry.GlobalDynamicRegistry.PullAgents()
+
+			if len(newTasks) > 0 || len(newAgents) > 0 {
+				slog.Info("📥 Dynamic changes detected! Injecting into live engine loop...")
+				
+				// Inject Agents first so tasks can bind to them
+				for _, a := range newAgents {
+					if agent, ok := a.(*agents.Agent); ok {
+						c.Agents = append(c.Agents, agent)
+					}
+				}
+
+				// Inject Tasks
+				for _, t := range newTasks {
+					if task, ok := t.(*tasks.Task); ok {
+						// Late bind agent if needed
+						if task.Agent == nil {
+							// Try to match by role
+							if task.AgentRole != "" {
+								for _, a := range c.Agents {
+									if strings.EqualFold(a.Role, task.AgentRole) {
+										task.Agent = a
+										break
+									}
+								}
+							}
+							
+							// Fallback: If still nil, assign to the first available agent
+							if task.Agent == nil && len(c.Agents) > 0 {
+								slog.Warn("⚠️ No agent match found for task. Falling back to first available agent.", 
+									slog.String("task", task.Description), 
+									slog.String("requested_role", task.AgentRole),
+									slog.String("assigned_role", c.Agents[0].Role))
+								task.Agent = c.Agents[0]
+							}
+						}
+
+						if task.Agent == nil {
+							slog.Error("❌ Task Injection Failed: No agents available to assign", slog.String("task", task.Description))
+							continue
+						}
+
+						slog.Info("📥 Dynamic Task injected", 
+							slog.String("description", task.Description),
+							slog.String("assigned_agent", task.Agent.Role))
+						c.Tasks = append(c.Tasks, task)
+					}
+				}
+				
+				// Re-run the crew logic
+				if _, err := c.Kickoff(ctx); err != nil {
+					slog.Error("Dynamic Execution Error", slog.Any("error", err))
+				}
+			}
+			time.Sleep(2 * time.Second)
+		}
+	}
 }

@@ -1,8 +1,10 @@
 # How to Use Crew-GO (The Deep Dive) 📖
 
-Hey again! I'm so glad you're here to dive deeper. This guide is designed to walk you through exactly how you and I can leverage the awesome, highly-technical tools and capabilities we’ve built into Crew-GO.
+Crew-GO is built for two types of users:
+1. **Dynamic Operators**: Non-technical users who want to use the **Web UI Dashboard** to stage and monitor agents.
+2. **Elite Architects**: Go developers building production-grade AI products using our strictly-typed library and modular orchestration engine.
 
-I've kept things conversational because we're in this together, but I haven't held back on the technical specifics. If you're a Go developer looking to build production systems or collaborate on the architecture, you'll feel right at home with the code snippets below. Let's get to work!
+This guide focuses on the **Hybrid Workflow**—how to build the foundation in code and control the execution from the UI. Let's get to work!
 
 ---
 
@@ -141,6 +143,58 @@ if err != nil {
 }
 fmt.Printf("Team Quality Score: %d\n", result.Score)
 ```
+
+### B. Human-in-the-Loop (HITL) Orchestration
+
+Sometimes an agent needs to perform a high-stakes action—like executing a shell command or sending an email. You can force the agent to pause for human approval via the dashboard.
+
+```go
+// Add a Human Review guardrail to any sensitive tool!
+agent.Guardrails = append(agent.Guardrails, guardrails.NewHumanReview())
+```
+
+When this guardrail triggers:
+1. The execution pauses on the backend using Go's `sync.Cond`.
+2. A `review_requested` event is broadcast to the Dashboard.
+3. You review the action in the UI and click **[APPROVE]** or **[REJECT]**.
+4. The Go engine unblocks and proceeds based on your decision.
+
+### C. The Creator Studio (Non-Tech Operator Mode)
+
+If you run with `--ui`, you don't even need to write Go code for every agent.
+1. Click **[CREATE AGENT]** in the header.
+2. Select your **Model Provider** (OpenAI, Gemini, Ollama, etc.).
+3. Pick your **Tools** from the searchable checkbox list (populated via metadata APIs).
+4. Click **[CREATE]**.
+
+### D. The Hybrid Loop (The "Power User" Flow)
+In production, your "Tech" team defines the core architecture, and your "Product" team extends it live.
+
+```go
+import (
+    "github.com/Ecook14/crewai-go/pkg/agents"
+    "github.com/Ecook14/crewai-go/pkg/crew"
+    "github.com/Ecook14/crewai-go/pkg/tasks"
+    "github.com/Ecook14/crewai-go/pkg/dashboard" // Use the exported dashboard package!
+)
+
+func main() {
+    // 1. Tech Team: Define Core Foundation
+    researcher := agents.NewAgent("Researcher", "Find tech trends", "...", llm)
+    task := tasks.NewTask("Research the latest Go 1.24 features", researcher)
+    
+    myCrew := crew.NewCrew([]*agents.Agent{researcher}, []*tasks.Task{task})
+    
+    // 2. Enable Control Plane for Non-Tech Stakeholders
+    // This starts the Dashboard Server (WebSockets + UI) in the background
+    dashboard.Start("8080") 
+    
+    // 3. Enter Creator Mode: Keeps the engine alive to poll for new UI entities
+    ctx := context.Background()
+    myCrew.RunCreatorMode(ctx) 
+}
+```
+
 
 ### B. Giving Your Agents Infinite Memory (Vector Stores)
 In Crew-GO, I built a system where agents can store and verify information permanently natively using Vector math (Embeddings).

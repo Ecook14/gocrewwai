@@ -161,6 +161,15 @@ f.AddRouter(&flow.RouterNode{
 
 ---
 
+## 5. The Creator Studio (Prototyping Elite Crews)
+
+While writing Go code gives you the ultimate control, I built the **Creator Studio** inside the Web UI to let you prototype complex agent meshes in seconds.
+Using the `--ui` flag, you can:
+- **Hot-Swap Models**: Change an agent from `gpt-4o` to `claude-3-opus` live to compare reasoning quality.
+- **Stage Bridges**: Establish A2A bridges between local agents and remote MCP tools with zero code.
+
+---
+
 ## Challenge: Help Me Expand This!
 
 These features lay the groundwork for building essentially any complex reasoning software application imaginable. 

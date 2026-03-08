@@ -63,12 +63,18 @@ telemetry.GlobalBus.Publish(telemetry.Event{
 
 Because it uses isolated Go channels, this publishing has negligible impact on execution latency or frame rates.
 
-### The Dashboard WebSocket Bridge (`internal/server/ws.go`)
-When you launch the UI Dashboard (using `--ui` or `server.StartDashboardServer`), the system initializes:
+### The Dashboard WebSocket Bridge (`pkg/dashboard/dashboard.go`)
+When you launch the UI Dashboard (using `--ui` or `dashboard.Start`), the system initializes:
 1.  A lightweight Go HTTP handler for standard `html/css/js` delivery.
 2.  A WebSocket `/ws` upgrade handler.
 3.  It calls `telemetry.GlobalBus.Subscribe()`, grabbing the live firehose of ReAct events.
 4.  It asynchronously marshals those events into JSON chunks over the TCP socket, giving your browser real-time frame rates of the AI reasoning cycle without polling!
+
+## Bi-Directional Execution Control (`pkg/telemetry/events.go`)
+
+Telemetry in Crew-GO is not just for watching—it's for **control**. Using Go's `sync.Cond` and the `GlobalExecutionController`, the Dashboard sends signals back to the engine:
+1. **Pause/Resume**: Blocks worker goroutines until a signal is received, prevents CPU spinning while execution is "Idle".
+2. **HITL Reviews**: The engine identifies sensitive tool calls, fires a `review_requested` event, and parks the goroutine until the dashboard sends an approval via the `/api/review` endpoint.
 
 ---
 

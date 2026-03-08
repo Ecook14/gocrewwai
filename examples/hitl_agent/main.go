@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/Ecook14/crewai-go/internal/server"
+	"github.com/Ecook14/crewai-go/pkg/dashboard"
 	"github.com/Ecook14/crewai-go/pkg/agents"
 	"github.com/Ecook14/crewai-go/pkg/guardrails"
 	"github.com/Ecook14/crewai-go/pkg/llm"
@@ -23,7 +23,7 @@ func (t *ReviewableFileWriteTool) RequiresReview() bool { return true }
 
 func main() {
 	// 1. Initialise the Dashboard Server in the background
-	go server.StartDashboardServer("8081") // Using 8081 to avoid conflict if 8080 is used
+	dashboard.Start("8081") // Using 8081 to avoid conflict if 8080 is used
 	slog.Info("🖥️  Dashboard active at http://localhost:8081/web-ui")
 	slog.Info("Please open the dashboard in your browser to approve the file write!")
 	time.Sleep(3 * time.Second)
