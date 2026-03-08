@@ -18,7 +18,7 @@ type FrameworkConfig struct {
 }
 
 // Global defaults
-var DefaultFrameworkConfig = FrameworkConfig{
+var DefaultConfig = FrameworkConfig{
 	TelemetryEnabled: false,
 	DefaultTimeout:   30,
 	LoggingLevel:     "info",

@@ -103,6 +103,16 @@ To truly master Crew-GO, dive into our extensive guides:
 3. 🔥 **[Advanced Orchestration](docs/advanced_usage.md)**: Master Cyclic Graphs, Hierarchical Delegation, and Reactive Flows.
 4. 🏗️ **[Internal Architecture](docs/architecture.md)**: Read how the ReAct Loop, Global Event Bus, and Graph Engine work under the hood.
 
+### Deep Dive Feature Guides
+* [🧠 Autonomous Agents](docs/features/agents.md)
+* [🧰 Native Tools & Sandboxing](docs/features/tools.md)
+* [💾 Advanced Memory Architectures](docs/features/memory.md)
+* [📊 Enterprise Telemetry](docs/features/telemetry.md)
+* [🌐 Model Context Protocol (MCP)](docs/features/mcp.md)
+
+### Project State & Roadmap
+* ⚠️ **[Pending Features & Technical Debt](docs/pending_features.md)**: Review known stubs and missing implementations before v1.0.0.
+
 ---
 
 ## 📊 Tier Comparison Matrix

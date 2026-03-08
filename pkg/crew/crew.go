@@ -305,9 +305,8 @@ func (c *Crew) executeHierarchical(ctx context.Context) (interface{}, error) {
 		orchestrator.Verbose = c.Verbose
 	}
 
-	var wg sync.WaitGroup
-	errCh := make(chan error, len(c.Tasks))
-	results := make([]interface{}, len(c.Tasks))
+	// Results slice to grow as tasks grow
+	finalResults := make([]interface{}, 0, len(c.Tasks))
 
 	concurrency := c.MaxConcurrency
 	if concurrency <= 0 {
@@ -315,107 +314,138 @@ func (c *Crew) executeHierarchical(ctx context.Context) (interface{}, error) {
 	}
 	sem := make(chan struct{}, concurrency)
 
-	// The Manager delegates tasks to workers in parallel
-	for i, t := range c.Tasks {
-		wg.Add(1)
+	maxReplans := 5 // Safety limit to avoid infinite loops
+	replanCount := 0
 
-		go func(index int, task *tasks.Task) {
-			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
-			
-			select {
-			case <-ctx.Done():
-				errCh <- ctx.Err()
-				return
-			default:
+	for {
+		var wg sync.WaitGroup
+		var pendingTasks []*tasks.Task
+		var pendingIndices []int
+
+		for i, t := range c.Tasks {
+			if !t.Processed {
+				pendingTasks = append(pendingTasks, t)
+				pendingIndices = append(pendingIndices, i)
 			}
+		}
 
-			// Dynamic Delegation: The manager selects the best agent for this task
-			assignedAgent, err := orchestrator.DelegateTask(ctx, task.Description)
-			if err != nil {
-				// Fallback to pre-assigned agent if delegation fails or manager is not available
-				if task.Agent == nil {
-					errCh <- fmt.Errorf("task delegation failed and no default agent assigned: %w", err)
+		// Grow results array if c.Tasks grew during replanning
+		for len(finalResults) < len(c.Tasks) {
+			finalResults = append(finalResults, nil)
+		}
+
+		if len(pendingTasks) == 0 {
+			break // All tasks processed
+		}
+
+		errCh := make(chan error, len(pendingTasks))
+
+		for i, pTask := range pendingTasks {
+			wg.Add(1)
+			go func(index int, task *tasks.Task) {
+				defer wg.Done()
+				sem <- struct{}{}
+				defer func() { <-sem }()
+				
+				select {
+				case <-ctx.Done():
+					errCh <- ctx.Err()
+					return
+				default:
+				}
+
+				assignedAgent, err := orchestrator.DelegateTask(ctx, task.Description)
+				if err != nil {
+					if task.Agent == nil {
+						errCh <- fmt.Errorf("task delegation failed and no default agent assigned: %w", err)
+						return
+					}
+					assignedAgent = task.Agent
+				}
+				task.Agent = assignedAgent
+
+				if c.Verbose {
+					defaultLogger.Info("Manager Delegating Task",
+						slog.Int("index", index+1),
+						slog.String("assignee", strings.Clone(task.Agent.Role)))
+				}
+
+				if task.Agent.StepCallback != nil {
+					task.Agent.StepCallback(map[string]interface{}{"status": "delegated_by_manager"})
+				}
+
+				res, err := task.Execute(ctx)
+				if err != nil {
+					taskErr := crewErrors.NewTaskError(index+1, task.Description, err)
+					errCh <- taskErr
+					if c.OnTaskError != nil {
+						c.OnTaskError(index+1, taskErr)
+					}
 					return
 				}
-				assignedAgent = task.Agent
-			}
-			task.Agent = assignedAgent
 
-			if c.Verbose {
-				defaultLogger.Info("Manager Delegating Task",
-					slog.Int("index", index+1),
-					slog.String("assignee", strings.Clone(task.Agent.Role)))
-			}
+				task.Processed = true
+				task.Output = res // Store output on the task object natively
 
-			// Pre-execution callback
-			if task.Agent.StepCallback != nil {
-				task.Agent.StepCallback(map[string]interface{}{"status": "delegated_by_manager"})
-			}
+				// Populate finalResults safely using a local scoped lock if needed,
+				// but since indices are unique per goroutine in this round, direct assignment is safe.
+				finalResults[index] = res
 
-			res, err := task.Execute(ctx)
-			if err != nil {
-				taskErr := crewErrors.NewTaskError(index+1, task.Description, err)
-				errCh <- taskErr
-				if c.OnTaskError != nil {
-					c.OnTaskError(index+1, taskErr)
+				if c.OnTaskComplete != nil {
+					c.OnTaskComplete(index+1, res)
 				}
-				return
-			}
-
-			results[index] = res
-			if c.OnTaskComplete != nil {
-				c.OnTaskComplete(index+1, res)
-			}
-		}(i, t)
-	}
-
-	wg.Wait()
-	close(errCh)
-
-	for err := range errCh {
-		if err != nil {
-			return nil, err
+			}(pendingIndices[i], pTask)
 		}
-	}
 
-	// ---------------------------------------------------------
-	// DYNAMIC RE-PLANNING STAGE
-	// ---------------------------------------------------------
-	if c.Verbose {
-		defaultLogger.Info("🔍 Manager evaluating plan for potential re-routing")
-	}
-	
-	planContext := "CURRENT STATUS:\n"
-	for i, t := range c.Tasks {
-		status := "Pending"
-		if t.Processed {
-			status = "Completed"
-		}
-		planContext += fmt.Sprintf("Task %d: %s [%s]\n", i+1, t.Description, status)
-	}
+		wg.Wait()
+		close(errCh)
 
-	replanPrompt := planContext + "\n\nAs the Manager, should we add any new tasks or modify the existing plan based on current results? " +
-		"If yes, describe the new tasks. If no, respond with 'PLAN_STABLE'."
-	
-	decision, err := orchestrator.Execute(ctx, replanPrompt, nil)
-	if err == nil {
-		decisionStr := fmt.Sprintf("%v", decision)
-		if !strings.Contains(strings.ToUpper(decisionStr), "PLAN_STABLE") {
-			if c.Verbose {
-				defaultLogger.Info("🔄 Manager INITIATED RE-PLANNING", slog.String("decision", decisionStr))
+		for err := range errCh {
+			if err != nil {
+				return nil, err
 			}
-			// Elite Pattern: Dynamic Re-Planning via Manager review.
-			// Adds the manager's refinement decision as a prioritized follow-up task.
-			newTask := &tasks.Task{
-				Description: "Finalize the re-planned goals: " + decisionStr,
-				Agent:       &orchestrator.Agent,
-			}
-			c.Tasks = append(c.Tasks, newTask)
-			// Return a special message or continue? 
-			// For simplicity, we'll signal it needs a follow-up kickoff or just return the current results.
 		}
+
+		// ---------------------------------------------------------
+		// DYNAMIC RE-PLANNING STAGE
+		// ---------------------------------------------------------
+		if c.Verbose {
+			defaultLogger.Info("🔍 Manager evaluating plan for potential re-routing")
+		}
+		
+		planContext := "CURRENT STATUS:\n"
+		for i, t := range c.Tasks {
+			status := "Pending"
+			if t.Processed {
+				status = "Completed"
+			}
+			planContext += fmt.Sprintf("Task %d: %s [%s]\n", i+1, t.Description, status)
+		}
+
+		replanPrompt := planContext + "\n\nAs the Manager, review the completed tasks. Should we add any new follow-up tasks or modify the existing plan based on current results? " +
+			"If yes, describe the new tasks cleanly. If no and the goals are met, respond with exactly 'PLAN_STABLE'."
+		
+		decision, err := orchestrator.Execute(ctx, replanPrompt, nil)
+		if err == nil {
+			decisionStr := fmt.Sprintf("%v", decision)
+			if !strings.Contains(strings.ToUpper(decisionStr), "PLAN_STABLE") && replanCount < maxReplans {
+				if c.Verbose {
+					defaultLogger.Info("🔄 Manager INITIATED RE-PLANNING", slog.String("decision", decisionStr))
+				}
+				
+				// Elite Pattern: Dynamic Re-Planning native injection.
+				newTask := &tasks.Task{
+					Description: "Follow-up execution based on manager refinement: " + decisionStr,
+					Agent:       &orchestrator.Agent,
+				}
+				
+				c.Tasks = append(c.Tasks, newTask)
+				replanCount++
+				continue // Trigger outer loop to process the newly appended task natively
+			}
+		}
+		
+		break // The plan is stable or we hit the replan limit
 	}
 
 	// 4. Final Aggregation and Metric Sync
@@ -436,18 +466,18 @@ func (c *Crew) executeHierarchical(ctx context.Context) (interface{}, error) {
 
 	// Manager synthesis
 	if orchestrator.LLM != nil {
-		var sb fmt.Stringer = &resultAggregator{results: results, tasks: c.Tasks}
+		var sb fmt.Stringer = &resultAggregator{results: finalResults, tasks: c.Tasks}
 		synthesisInput := fmt.Sprintf(
 			"You are aggregating results from %d parallel worker tasks. "+
 				"Please provide a coherent, well-structured final summary.\n\n%s",
-			len(results), sb)
+			len(finalResults), sb)
 
 		synthesized, err := orchestrator.Execute(ctx, synthesisInput, nil)
 		if err != nil {
 			if c.Verbose {
 				defaultLogger.Warn("Manager synthesis failed, returning raw results", slog.String("error", err.Error()))
 			}
-			return results, nil
+			return sb.String(), nil
 		}
 
 		// Sync manager metrics too
@@ -458,7 +488,7 @@ func (c *Crew) executeHierarchical(ctx context.Context) (interface{}, error) {
 		return synthesized, nil
 	}
 
-	return results, nil
+	return finalResults, nil
 }
 
 // resultAggregator formats task results for the manager's synthesis prompt.

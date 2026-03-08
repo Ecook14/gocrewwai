@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -32,6 +33,9 @@ func NewWSServer() *WSServer {
 // Start launches the WebSocket server and begins broadcasting events.
 func (s *WSServer) Start(port string) {
 	http.HandleFunc("/ws", s.handleConnections)
+	http.HandleFunc("/api/review", s.handleReview)
+	http.HandleFunc("/api/start", s.handleStart)
+	http.HandleFunc("/api/stop", s.handleStop)
 
 	// Serve static files for the dashboard
 	fs := http.FileServer(http.Dir("web-ui"))
@@ -70,6 +74,54 @@ func (s *WSServer) handleConnections(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
+}
+
+func (s *WSServer) handleReview(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		ReviewID string `json:"review_id"`
+		Approved bool   `json:"approved"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	telemetry.GlobalReviewManager.SubmitReview(req.ReviewID, req.Approved)
+	
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"status":"ok"}`))
+}
+
+func (s *WSServer) handleStart(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := telemetry.GlobalExecutionController.Start(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"status":"started"}`))
+}
+
+func (s *WSServer) handleStop(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := telemetry.GlobalExecutionController.Stop(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"status":"stopped"}`))
 }
 
 func (s *WSServer) handleMessages() {

@@ -27,7 +27,12 @@ func (l *LongTermMemory) Save(ctx context.Context, text string, metadata map[str
 		return fmt.Errorf("embedder is required for long term memory")
 	}
 
-	vector, err := l.Embedder.GenerateEmbedding(ctx, text)
+	embedder, ok := l.Embedder.(llm.Embedder)
+	if !ok {
+		return fmt.Errorf("configured LLM does not support text embeddings")
+	}
+
+	vector, err := embedder.GenerateEmbedding(ctx, text)
 	if err != nil {
 		return fmt.Errorf("failed to generate embedding: %w", err)
 	}
@@ -50,7 +55,12 @@ func (l *LongTermMemory) Search(ctx context.Context, query string, limit int) ([
 		return nil, fmt.Errorf("embedder is required for long term memory search")
 	}
 
-	queryVector, err := l.Embedder.GenerateEmbedding(ctx, query)
+	embedder, ok := l.Embedder.(llm.Embedder)
+	if !ok {
+		return nil, fmt.Errorf("configured LLM does not support text embeddings")
+	}
+
+	queryVector, err := embedder.GenerateEmbedding(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate query embedding: %w", err)
 	}

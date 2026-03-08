@@ -194,11 +194,6 @@ func (c *GeminiClient) GenerateStructured(ctx context.Context, messages []Messag
 	return schema, nil
 }
 
-// GenerateEmbedding (Stub - Gemini supports these natively, but we'll stick to text-gen for now)
-func (c *GeminiClient) GenerateEmbedding(ctx context.Context, text string) ([]float32, error) {
-	return nil, fmt.Errorf("gemini embeddings not yet implemented in this wrapper")
-}
-
 // StreamGenerate handles real-time token output.
 func (c *GeminiClient) StreamGenerate(ctx context.Context, messages []Message, options map[string]interface{}) (<-chan string, error) {
 	ch := make(chan string)
@@ -210,12 +205,4 @@ func (c *GeminiClient) StreamGenerate(ctx context.Context, messages []Message, o
 		}
 	}()
 	return ch, nil
-}
-
-// Multi-modal stubs for interface compliance
-func (c *GeminiClient) GenerateSpeech(ctx context.Context, text string, options map[string]interface{}) ([]byte, error) {
-	return nil, fmt.Errorf("gemini does not support TTS in this direct api wrapper")
-}
-func (c *GeminiClient) TranscribeSpeech(ctx context.Context, audio []byte, options map[string]interface{}) (string, error) {
-	return "", fmt.Errorf("gemini does not support STT in this direct api wrapper")
 }

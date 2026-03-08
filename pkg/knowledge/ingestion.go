@@ -1,9 +1,12 @@
 package knowledge
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"encoding/csv"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -15,6 +18,7 @@ import (
 
 	"github.com/Ecook14/crewai-go/pkg/llm"
 	"github.com/Ecook14/crewai-go/pkg/memory"
+	"github.com/ledongthuc/pdf"
 )
 
 // IngestionEngine takes physical files, chunks them, and saves them into the Agent's Vector Memory.
@@ -35,6 +39,7 @@ func (ie *IngestionEngine) IngestDirectory(ctx context.Context, dirPath string) 
 	supportedExts := map[string]bool{
 		".md": true, ".txt": true, ".csv": true,
 		".json": true, ".jsonl": true,
+		".pdf": true, ".docx": true,
 	}
 
 	for _, entry := range entries {
@@ -62,6 +67,10 @@ func (ie *IngestionEngine) IngestFile(ctx context.Context, filePath string) erro
 		return ie.IngestJSON(ctx, filePath)
 	case ".jsonl":
 		return ie.IngestJSONL(ctx, filePath)
+	case ".pdf":
+		return ie.IngestPDF(ctx, filePath)
+	case ".docx":
+		return ie.IngestDocx(ctx, filePath)
 	default:
 		// .md, .txt, and any other text format
 		return ie.IngestText(ctx, filePath)
@@ -165,6 +174,77 @@ func (ie *IngestionEngine) IngestJSONL(ctx context.Context, filePath string) err
 	return ie.storeChunks(ctx, filePath, chunks)
 }
 
+// IngestPDF extracts plain text from a PDF document using ledongthuc/pdf.
+func (ie *IngestionEngine) IngestPDF(ctx context.Context, filePath string) error {
+	f, r, err := pdf.Open(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to open pdf: %w", err)
+	}
+	defer f.Close()
+
+	var buf bytes.Buffer
+	b, err := r.GetPlainText()
+	if err != nil {
+		return fmt.Errorf("failed to extract pdf text: %w", err)
+	}
+	
+	buf.ReadFrom(b)
+	content := buf.String()
+
+	chunks := ie.Splitter.SplitText(content)
+	return ie.storeChunks(ctx, filePath, chunks)
+}
+
+// IngestDocx extracts plain text natively from a Word Document's zipped XML structure.
+func (ie *IngestionEngine) IngestDocx(ctx context.Context, filePath string) error {
+	r, err := zip.OpenReader(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to open docx: %w", err)
+	}
+	defer r.Close()
+
+	var docXML []byte
+	for _, f := range r.File {
+		if f.Name == "word/document.xml" {
+			rc, err := f.Open()
+			if err != nil {
+				return err
+			}
+			buf := new(bytes.Buffer)
+			_, _ = io.Copy(buf, rc)
+			rc.Close()
+			docXML = buf.Bytes()
+			break
+		}
+	}
+
+	if docXML == nil {
+		return fmt.Errorf("word/document.xml not found inside docx archive")
+	}
+
+	// Stream through XML and extract raw CharData (the actual text)
+	var buf bytes.Buffer
+	decoder := xml.NewDecoder(bytes.NewReader(docXML))
+	for {
+		t, err := decoder.Token()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("failed to parse docx xml: %w", err)
+		}
+		if cd, ok := t.(xml.CharData); ok {
+			buf.Write(cd)
+			buf.WriteString(" ")
+		}
+	}
+
+	// Docx text often needs basic spacing cleanup
+	content := stripHTMLTags(buf.String())
+	chunks := ie.Splitter.SplitText(content)
+	return ie.storeChunks(ctx, filePath, chunks)
+}
+
 // IngestURL fetches content from a URL, extracts text, and ingests it.
 // For HTML pages, basic tag stripping is applied. For JSON endpoints,
 // the response is parsed as JSON.
@@ -219,7 +299,12 @@ func (ie *IngestionEngine) storeChunks(ctx context.Context, source string, chunk
 			continue
 		}
 
-		vector, err := ie.LLM.GenerateEmbedding(ctx, chunk)
+		embedder, ok := ie.LLM.(llm.Embedder)
+		if !ok {
+			return fmt.Errorf("configured LLM does not support text embeddings, cannot ingest")
+		}
+
+		vector, err := embedder.GenerateEmbedding(ctx, chunk)
 		if err != nil {
 			return fmt.Errorf("failed to embed chunk %d from %s: %w", i, source, err)
 		}
