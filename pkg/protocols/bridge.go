@@ -1,1 +1,0 @@
-// This file has been moved to pkg/tools/mcp_bridge.go to prevent import cycles.

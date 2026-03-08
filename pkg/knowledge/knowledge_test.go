@@ -47,6 +47,11 @@ func (m *mockStore) Add(ctx context.Context, item *memory.MemoryItem) error {
 	return nil
 }
 
+func (m *mockStore) BulkAdd(ctx context.Context, items []*memory.MemoryItem) error {
+	m.items = append(m.items, items...)
+	return nil
+}
+
 func TestIngestionEngine(t *testing.T) {
 	tmpFile := "test_ingest.txt"
 	content := "This is a test file for RAG ingestion. It should be split into multiple chunks."
