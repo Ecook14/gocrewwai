@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Ecook14/crewai-go/pkg/telemetry"
+	"github.com/Ecook14/gocrew/pkg/telemetry"
 )
 
 // ---------------------------------------------------------------------------

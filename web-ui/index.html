@@ -499,9 +499,15 @@
                     <input type="text" id="agent-model" class="form-input" placeholder="e.g. gpt-4o">
                 </div>
             </div>
-            <div class="form-group">
-                <label>API Key (Optional, overrides env)</label>
-                <input type="password" id="agent-apikey" class="form-input" placeholder="sk-...">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>API Key (Optional, overrides env)</label>
+                    <input type="password" id="agent-apikey" class="form-input" placeholder="sk-...">
+                </div>
+                <div class="form-group">
+                    <label>Max RPM (Rate Limit)</label>
+                    <input type="number" id="agent-maxrpm" class="form-input" placeholder="e.g. 5" min="0">
+                </div>
             </div>
             <div class="form-group" style="margin-top: 0.5rem;">
                 <label>Tools (Select multiple)</label>
@@ -598,6 +604,21 @@
                 <button class="btn approve" onclick="submitCreateA2A()">Establish Bridge</button>
                 <button class="btn"
                     onclick="document.getElementById('modal-create-a2a').classList.add('hidden')">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Result Modal -->
+    <div id="modal-view-result" class="review-modal hidden">
+        <div class="review-content glass-card" style="max-width: 800px; width: 90%;">
+            <h3>Task Output Result</h3>
+            <div class="form-group" style="flex: 1; display: flex; flex-direction: column;">
+                <textarea id="task-result-content" class="form-input" readonly
+                    style="min-height: 400px; font-family: monospace; resize: vertical; line-height: 1.5; font-size: 0.9rem; background: rgba(0,0,0,0.3); color: #e2e8f0;"></textarea>
+            </div>
+            <div class="review-actions" style="margin-top: 1rem;">
+                <button class="btn"
+                    onclick="document.getElementById('modal-view-result').classList.add('hidden')">Close</button>
             </div>
         </div>
     </div>

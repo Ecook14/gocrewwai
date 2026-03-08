@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/Ecook14/crewai-go/pkg/llm"
+	"github.com/Ecook14/gocrew/pkg/llm"
 )
 
 // ManagerAgent is a specialized agent that orchestrates other agents.

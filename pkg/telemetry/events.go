@@ -326,6 +326,43 @@ func (r *DynamicRegistry) UpdateTask(index int, task interface{}) {
 	}
 }
 
+// SyncTaskResult updates a task's status and output in the registry without re-triggering it.
+func (r *DynamicRegistry) SyncTaskResult(description string, agentRole string, output interface{}, err error, processed bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for i, t := range r.Tasks {
+		// Use type assertion to check fields
+		// We'll use a map check since tasks are stored as interface{}
+		if taskMap, ok := t.(map[string]interface{}); ok {
+			if taskMap["description"] == description && taskMap["agent_role"] == agentRole {
+				taskMap["output"] = output
+				taskMap["processed"] = processed
+				if err != nil {
+					taskMap["failed"] = true
+					taskMap["error"] = err.Error()
+				}
+				r.Tasks[i] = taskMap
+				return
+			}
+		} else if taskPtr, ok := t.(interface{ 
+			GetDescription() string
+			GetAgentRole() string
+			SetOutput(interface{})
+			SetError(error)
+			SetProcessed(bool)
+		}); ok {
+			// If it's a rich object (unlikely for UI staged tasks but possible for Go-defined ones)
+			if taskPtr.GetDescription() == description && taskPtr.GetAgentRole() == agentRole {
+				taskPtr.SetOutput(output)
+				taskPtr.SetError(err)
+				taskPtr.SetProcessed(processed)
+				return
+			}
+		}
+	}
+}
+
 func (r *DynamicRegistry) UpdateMCP(index int, client interface{}) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -347,11 +384,22 @@ func (r *DynamicRegistry) UpdateA2A(index int, bridge interface{}) {
 func (r *DynamicRegistry) ListAll() map[string]interface{} {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
+
+	// Create shallow copies of the slices to prevent race conditions during JSON marshaling
+	agents := make([]interface{}, len(r.Agents))
+	copy(agents, r.Agents)
+	tasks := make([]interface{}, len(r.Tasks))
+	copy(tasks, r.Tasks)
+	mcp := make([]interface{}, len(r.MCPClients))
+	copy(mcp, r.MCPClients)
+	a2a := make([]interface{}, len(r.A2ABridges))
+	copy(a2a, r.A2ABridges)
+
 	return map[string]interface{}{
-		"agents": r.Agents,
-		"tasks":  r.Tasks,
-		"mcp":    r.MCPClients,
-		"a2a":    r.A2ABridges,
+		"agents": agents,
+		"tasks":  tasks,
+		"mcp":    mcp,
+		"a2a":    a2a,
 	}
 }
 

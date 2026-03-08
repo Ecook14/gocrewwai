@@ -32,12 +32,13 @@ func NewOpenRouterClient(apiKey, model string) *OpenRouterClient {
 	config.BaseURL = "https://openrouter.ai/api/v1"
 
 	httpClient := &http.Client{
-		Timeout: 60 * time.Second,
+		Timeout: 300 * time.Second,
 		Transport: &retryRoundTripper{
 			next: &openRouterHeaderRoundTripper{
 				next: http.DefaultTransport,
 			},
-			maxRetries: 3,
+			maxRetries:   5,
+			providerName: "OpenRouter",
 		},
 	}
 	config.HTTPClient = httpClient
@@ -58,7 +59,7 @@ type openRouterHeaderRoundTripper struct {
 }
 
 func (r *openRouterHeaderRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	req.Header.Set("HTTP-Referer", "https://github.com/Ecook14/crewai-go")
+	req.Header.Set("HTTP-Referer", "https://github.com/Ecook14/gocrew")
 	req.Header.Set("X-OpenRouter-Title", "Crew-GO Framework")
 	return r.next.RoundTrip(req)
 }

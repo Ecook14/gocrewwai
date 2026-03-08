@@ -8,11 +8,11 @@ import (
 	"os"
 	"strings"
 	"encoding/json"
-	"github.com/Ecook14/crewai-go/pkg/agents"
-	crewErrors "github.com/Ecook14/crewai-go/pkg/errors"
-	"github.com/Ecook14/crewai-go/pkg/guardrails"
-	"github.com/Ecook14/crewai-go/pkg/telemetry"
-	"github.com/Ecook14/crewai-go/pkg/tools"
+	"github.com/Ecook14/gocrew/pkg/agents"
+	crewErrors "github.com/Ecook14/gocrew/pkg/errors"
+	"github.com/Ecook14/gocrew/pkg/guardrails"
+	"github.com/Ecook14/gocrew/pkg/telemetry"
+	"github.com/Ecook14/gocrew/pkg/tools"
 )
 
 // Task translates the `class Task` python abstraction into idiomatic Go.
@@ -23,24 +23,26 @@ type Task struct {
 	AgentRole      string `json:"agent_role"` // For late binding, especially from UI
 	Tools          []tools.Tool `json:"-"`
 	AsyncExecution bool `json:"-"`
-	OutputFile     string      // Path to save the final task output (.md, .json, etc.)
+	OutputFile     string `json:"-"` // Path to save the final task output (.md, .json, etc.)
 
 	// Output Formatting
-	OutputJSON   bool
-	OutputPydan  interface{} // Deprecated: use OutputSchema
-	OutputSchema interface{} // Target Go struct for validation
-	MaxRetries   int         // Retries for schema validation failures
+	OutputJSON   bool `json:"-"`
+	OutputPydan  interface{} `json:"-"` // Deprecated: use OutputSchema
+	OutputSchema interface{} `json:"-"` // Target Go struct for validation
+	MaxRetries   int         `json:"-"` // Retries for schema validation failures
 
 	// Execution Tracking
-	Processed bool
-	Output    interface{}
+	Processed bool        `json:"processed"`
+	Failed    bool        `json:"failed"`
+	Error     error       `json:"-"`
+	Output    interface{} `json:"output"`
 
 	// Advanced Quality-of-Life Mappings
 	Context    []*Task `json:"-"` // Strict outputs to pipe into this task's prompt
 	HumanInput bool    `json:"-"` // Blocks CLI execution for mid-flight approval/feedback
 
 	// Guardrails validate task output before marking it as complete.
-	Guardrails []guardrails.Guardrail
+	Guardrails []guardrails.Guardrail `json:"-"`
 
 	// CallbackOnComplete fires after the task completes successfully.
 	CallbackOnComplete func(result interface{}) `json:"-"`
@@ -56,10 +58,10 @@ type Task struct {
 	NextPaths map[string]*Task `json:"-"`
 
 	// MaxCycles limits how many times this task can be re-executed in a cycle.
-	MaxCycles int
+	MaxCycles int `json:"-"`
 	
 	// Internal tracking
-	CycleCount int
+	CycleCount int `json:"-"`
 }
 
 // Execute kicks off the Task lifecycle utilizing the bound Agent.

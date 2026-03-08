@@ -31,8 +31,9 @@ type OpenAIClient struct {
 
 // retryRoundTripper adds resilient retries for OpenAI API 429 and 5xx responses
 type retryRoundTripper struct {
-	next       http.RoundTripper
-	maxRetries int
+	next         http.RoundTripper
+	maxRetries   int
+	providerName string
 }
 
 func (r *retryRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -40,12 +41,24 @@ func (r *retryRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 	var err error
 
 	for i := 0; i <= r.maxRetries; i++ {
+		// If this is a retry, we must reset the body
+		if i > 0 && req.GetBody != nil {
+			newBody, err := req.GetBody()
+			if err != nil {
+				return nil, err
+			}
+			req.Body = newBody
+		}
+
 		resp, err = r.next.RoundTrip(req)
 		
 		if err != nil {
 			// Network err
 		} else if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500 {
-			resp.Body.Close()
+			// Only close if we are going to retry
+			if i < r.maxRetries {
+				resp.Body.Close()
+			}
 		} else {
 			return resp, nil
 		}
@@ -64,7 +77,11 @@ func (r *retryRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 			if resp != nil {
 				status = resp.StatusCode
 			}
-			slog.Warn("OpenAI API rate limited or unavailable, retrying", "status", status, "delay", delay, "attempt", i+1)
+			provider := r.providerName
+			if provider == "" {
+				provider = "LLM"
+			}
+			slog.Warn(fmt.Sprintf("%s API rate limited or unavailable, retrying", provider), "status", status, "delay", delay, "attempt", i+1)
 			
 			select {
 			case <-req.Context().Done():
@@ -83,10 +100,11 @@ func NewOpenAIClient(apiKey string) *OpenAIClient {
 
 	// Robust networking with explicit timeouts and retry backoff.
 	httpClient := &http.Client{
-		Timeout: 60 * time.Second,
+		Timeout: 300 * time.Second,
 		Transport: &retryRoundTripper{
-			next:       http.DefaultTransport,
-			maxRetries: 3,
+			next:         http.DefaultTransport,
+			maxRetries:   5,
+			providerName: "OpenAI",
 		},
 	}
 

@@ -7,7 +7,7 @@ Thank you for your interest in contributing! This guide will help you get starte
 1. **Prerequisites**: Go 1.22+ installed
 2. **Clone and build**:
    ```bash
-   git clone https://github.com/Ecook14/crewai-go.git
+   git clone https://github.com/Ecook14/gocrew.git
    cd Crew-GO
    go build ./...
    ```

@@ -1,6 +1,6 @@
-# Welcome to Crew-GO! 🚀
+# Welcome to Gocrew! 🚀
 
-Hey there! I am absolutely thrilled to introduce you to **Crew-GO**, an open-source project I’ve been pouring my heart into. If you've ever dreamt of building your own team of autonomous AI agents that work together, debate problems, and seamlessly execute complex workflows, you've found your new home.
+Hey there! I am absolutely thrilled to introduce you to **Gocrew**, an open-source project I’ve been pouring my heart into. Inspired by the incredible work of **CrewAI, LangChain, and LangGraph**, I've built a high-performance, strictly-typed orchestrator that brings the best of agentic AI to the Go ecosystem.
 
 Think of Crew-GO as a framework for assembling a digital "crew." You assign each member a specific persona—like a Lead Researcher, a Senior Data Analyst, or an Expert Coder. You hand them a goal, provide them with tools, and they figure out how to communicate and collaborate to achieve that goal!
 
@@ -76,25 +76,29 @@ Are you ready to see this magic in action? It takes exactly 5 minutes.
 - **Go**: Version `1.22` or higher installed on your computer.
 - **API Keys**: You'll need a key from an AI provider (like OpenAI, Anthropic, or Gemini).
 
-### 1. Installation (Library-First)
-Crew-GO is designed to be imported directly into your existing Go applications.
+### 1. Installation
 
+**📦 For Elite Architects (Library Usage)**
+Import the core orchestration engine directly into your Go projects:
 ```bash
-# Add the library to your project
-go get github.com/Ecook14/crewai-go
-
-# (Optional) Install the CLI for scaffolding and quick demos
-go install github.com/Ecook14/crewai-go/cmd/crewai@latest
+go get github.com/Ecook14/gocrew
 ```
+
+**🛠️ For Dynamic Operators (Global CLI)**
+Install the `gocrew` command-line tool globally to scaffold projects and launch the Dashboard from anywhere:
+```bash
+go install github.com/Ecook14/gocrew/cmd/gocrew@latest
+```
+*Note: Ensure your `$GOPATH/bin` (usually `~/go/bin`) is in your system's `PATH`!*
 
 ### 2. Basic Library Usage (Import & Build)
 Building a crew in code is highly idiomatic and strictly typed:
 
 ```go
 import (
-    "github.com/Ecook14/crewai-go/pkg/agents"
-    "github.com/Ecook14/crewai-go/pkg/crew"
-    "github.com/Ecook14/crewai-go/pkg/tasks"
+    "github.com/Ecook14/gocrew/pkg/agents"
+    "github.com/Ecook14/gocrew/pkg/crew"
+    "github.com/Ecook14/gocrew/pkg/tasks"
 )
 
 func main() {
@@ -169,4 +173,4 @@ I've written up a bunch of detailed guides if you want to understand exactly how
 3. 🏗️ **[Internal Architecture](docs/architecture.md)**: Want to see exactly how our Agent execution loops and OpenTelemetry buses work under the hood? Read this!
 
 ---
-**Crew-GO** - Let's build reliable, powerful AI systems together.
+**Gocrew** - Let's build reliable, powerful AI systems together.

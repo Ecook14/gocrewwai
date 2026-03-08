@@ -7,11 +7,11 @@ import (
 	//"os"
 	"os" // Added os import
 
-	"github.com/Ecook14/crewai-go/pkg/dashboard"
-	"github.com/Ecook14/crewai-go/pkg/agents"
-	"github.com/Ecook14/crewai-go/pkg/crew"
-	"github.com/Ecook14/crewai-go/pkg/tasks"
-	"github.com/Ecook14/crewai-go/pkg/telemetry"
+	"github.com/Ecook14/gocrew/pkg/dashboard"
+	"github.com/Ecook14/gocrew/pkg/agents"
+	"github.com/Ecook14/gocrew/pkg/crew"
+	"github.com/Ecook14/gocrew/pkg/tasks"
+	"github.com/Ecook14/gocrew/pkg/telemetry"
 	//"time"
 )
 
@@ -93,10 +93,14 @@ func handleKickoff(showUI bool) error {
 	result, err := c.Kickoff(ctx)
 	if err != nil {
 		slog.Error("Crew Execution Failed", slog.Any("error", err))
-		return err
+		if !showUI {
+			return err
+		}
+		// In UI mode, we log the error but keep the daemon alive
+		slog.Warn("⚠️ Initial execution failed, but Creator Mode will remain active.")
+	} else {
+		slog.Info("✨ Final Output", slog.Any("result", result))
 	}
-
-	slog.Info("✨ Final Output", slog.Any("result", result))
 	
 	if showUI {
 		return c.RunCreatorMode(ctx)

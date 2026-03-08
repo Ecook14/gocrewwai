@@ -9,12 +9,12 @@ import (
 	"strings"
 	"time"
 
-	crewErrors "github.com/Ecook14/crewai-go/pkg/errors"
-	"github.com/Ecook14/crewai-go/pkg/guardrails"
-	"github.com/Ecook14/crewai-go/pkg/llm"
-	"github.com/Ecook14/crewai-go/pkg/memory"
-	"github.com/Ecook14/crewai-go/pkg/telemetry"
-	"github.com/Ecook14/crewai-go/pkg/tools"
+	crewErrors "github.com/Ecook14/gocrew/pkg/errors"
+	"github.com/Ecook14/gocrew/pkg/guardrails"
+	"github.com/Ecook14/gocrew/pkg/llm"
+	"github.com/Ecook14/gocrew/pkg/memory"
+	"github.com/Ecook14/gocrew/pkg/telemetry"
+	"github.com/Ecook14/gocrew/pkg/tools"
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -28,6 +28,8 @@ type Agent struct {
 	Role      string `json:"role"`
 	Goal      string `json:"goal"`
 	Backstory string `json:"backstory"`
+	Provider  string `json:"provider,omitempty"`
+	LLMModel  string `json:"llm_model,omitempty"`
 	Verbose   bool   `json:"verbose"`
 
 	LLM   llm.Client `json:"-"`
@@ -36,7 +38,7 @@ type Agent struct {
 	// Execution context limits
 	MaxIterations        int `json:"-"`
 	MaxRetryLimit        int `json:"-"`
-	MaxRPM               int `json:"-"`
+	MaxRPM               int `json:"max_rpm"`
 	RespectContextWindow bool `json:"-"`
 
 	// Memory enables agents to recall and store context across executions.
@@ -71,19 +73,21 @@ type Agent struct {
 	StepStreamCallback func(token string) `json:"-"`
 
 	// SelfCritique enables internal reflection before returning an answer.
-	SelfCritique bool
+	SelfCritique bool `json:"-"`
 
 	// KnowledgeBases provide additional context for the agent's tasks.
-	KnowledgeBases []string
+	KnowledgeBases []string `json:"-"`
 	
 	// FewShotExamples are used to train the agent's prompt for better accuracy.
-	FewShotExamples []string
+	FewShotExamples []string `json:"-"`
 
 	// InterruptCh allows sending async instructions/interrupts to the agent mid-execution.
 	InterruptCh chan string `json:"-"`
 
 	// Sandbox defines the preferred execution environment for the agent's code tools.
 	Sandbox string // "local", "docker", "e2b", "wasm"
+
+	lastExecution time.Time
 }
 
 // AgentOption defines a functional option for configuring an Agent.
@@ -132,6 +136,11 @@ func WithMaxIterations(max int) AgentOption {
 	return func(a *Agent) { a.MaxIterations = max }
 }
 
+// WithMaxRPM sets the maximum requests per minute for the agent.
+func WithMaxRPM(rpm int) AgentOption {
+	return func(a *Agent) { a.MaxRPM = rpm }
+}
+
 func NewAgent(role, goal, backstory string, llm llm.Client, opts ...AgentOption) *Agent {
 	a := &Agent{
 		Role:          role,
@@ -159,6 +168,26 @@ func (a *Agent) GetRole() string {
 // This forms the core logic layer for Agent behavior mapping.
 // Provides structured outputs if mapped via Options array.
 func (a *Agent) Execute(ctx context.Context, taskInput string, options map[string]interface{}) (interface{}, error) {
+	// ---------------------------------------------------------
+	// Rate Limiting (MaxRPM)
+	// ---------------------------------------------------------
+	if a.MaxRPM > 0 {
+		minInterval := time.Minute / time.Duration(a.MaxRPM)
+		elapsed := time.Since(a.lastExecution)
+		if elapsed < minInterval {
+			wait := minInterval - elapsed
+			if a.Verbose {
+				defaultLogger.Info("⏳ Rate Limiting (Agent MaxRPM)", slog.String("role", a.Role), slog.Duration("wait", wait))
+			}
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(wait):
+			}
+		}
+		defer func() { a.lastExecution = time.Now() }()
+	}
+
 	ctx, span := telemetry.StartSpan(ctx, "Agent.Execute")
 	if span != nil {
 		defer span.End()

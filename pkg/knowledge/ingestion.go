@@ -16,8 +16,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Ecook14/crewai-go/pkg/llm"
-	"github.com/Ecook14/crewai-go/pkg/memory"
+	"github.com/Ecook14/gocrew/pkg/llm"
+	"github.com/Ecook14/gocrew/pkg/memory"
 	"github.com/ledongthuc/pdf"
 )
 

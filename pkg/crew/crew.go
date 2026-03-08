@@ -7,14 +7,12 @@ import (
 	"strings"
 	"sync"
 	
-	"github.com/Ecook14/crewai-go/pkg/agents"
-	"github.com/Ecook14/crewai-go/pkg/delegation"
-	crewErrors "github.com/Ecook14/crewai-go/pkg/errors"
-	"github.com/Ecook14/crewai-go/pkg/llm"
-	"github.com/Ecook14/crewai-go/pkg/tasks"
-	"github.com/Ecook14/crewai-go/pkg/telemetry"
-	"github.com/Ecook14/crewai-go/pkg/protocols"
-	"github.com/Ecook14/crewai-go/pkg/tools"
+	"github.com/Ecook14/gocrew/pkg/agents"
+	"github.com/Ecook14/gocrew/pkg/delegation"
+	crewErrors "github.com/Ecook14/gocrew/pkg/errors"
+	"github.com/Ecook14/gocrew/pkg/llm"
+	"github.com/Ecook14/gocrew/pkg/tasks"
+	"github.com/Ecook14/gocrew/pkg/telemetry"
 	"os"
 	"time"
 )
@@ -206,66 +204,7 @@ func (c *Crew) Kickoff(ctx context.Context) (interface{}, error) {
 	}
 }
 
-func (c *Crew) syncDynamicEntities() {
-	// Pull Agents
-	newAgents := telemetry.GlobalDynamicRegistry.PullAgents()
-	for _, a := range newAgents {
-		if agent, ok := a.(*agents.Agent); ok {
-			c.Agents = append(c.Agents, agent)
-			
-			if c.Verbose {
-				defaultLogger.Info("Dynamic Agent injected", slog.String("role", agent.Role))
-			}
 
-			// Register for A2A discovery
-			protocols.GlobalA2ARegistry.Register(&protocols.AgentCard{
-				ID:   agent.Role,
-				Name: agent.Role,
-				Role: agent.Role,
-			})
-		}
-	}
-
-	// Pull MCP Clients
-	newMCPs := telemetry.GlobalDynamicRegistry.PullMCPClients()
-	for _, m := range newMCPs {
-		if client, ok := m.(*protocols.MCPClient); ok {
-			// Handshake to discover tools
-			if err := client.Initialize(context.Background()); err == nil {
-				// Wrap discovered tools and inject into all agents
-				for _, tDef := range client.ListTools() {
-					tool := tools.WrapMCPToolForCrewGo(client, tDef)
-					for _, agent := range c.Agents {
-						agent.Tools = append(agent.Tools, tool)
-					}
-				}
-				if c.Verbose {
-					defaultLogger.Info("MCP Remote Tools injected into all agents", slog.String("mcp_server", client.URL()))
-				}
-			}
-		}
-	}
-
-	// Pull Tasks
-	newTasks := telemetry.GlobalDynamicRegistry.PullTasks()
-	for _, t := range newTasks {
-		if task, ok := t.(*tasks.Task); ok {
-			// Late bind agent by role if needed
-			if task.Agent == nil && task.AgentRole != "" {
-				for _, a := range c.Agents {
-					if strings.EqualFold(a.Role, task.AgentRole) {
-						task.Agent = a
-						break
-					}
-				}
-			}
-			c.Tasks = append(c.Tasks, task)
-			if c.Verbose {
-				defaultLogger.Info("Dynamic Task injected", slog.String("description", task.Description))
-			}
-		}
-	}
-}
 
 
 // executeSequential executes tasks one by one in order, piping context between them.
@@ -276,11 +215,15 @@ func (c *Crew) executeSequential(ctx context.Context) (interface{}, error) {
 	var asyncFutures []*asyncEntry
 
 	for i := 0; i < len(c.Tasks); i++ {
-		c.syncDynamicEntities()
 		task := c.Tasks[i]
 		// Skip if already processed
 		if task.Processed {
 			continue
+		}
+
+		// Cooldown delay between tasks to prevent bursty rate limits (Elite Tier Reliability)
+		if i > 0 {
+			time.Sleep(2 * time.Second)
 		}
 
 		// Context check before task execution
@@ -331,12 +274,18 @@ func (c *Crew) executeSequential(ctx context.Context) (interface{}, error) {
 		} else {
 			result, err := task.Execute(ctx)
 			if err != nil {
+				task.Failed = true
+				task.Error = err
+				task.Processed = true // Prevent infinite re-run
 				taskErr := crewErrors.NewTaskError(i+1, task.Description, err)
 				if c.OnTaskError != nil {
 					c.OnTaskError(i+1, taskErr)
 				}
+				slog.Error("Task Failed", slog.Int("index", i+1), slog.String("error", err.Error()))
 				return finalResult, taskErr
 			}
+			task.Processed = true
+			task.Output = result
 			finalResult = result
 			if c.OnTaskComplete != nil {
 				c.OnTaskComplete(i+1, result)
@@ -413,7 +362,6 @@ func (c *Crew) executeHierarchical(ctx context.Context) (interface{}, error) {
 	replanCount := 0
 
 	for {
-		c.syncDynamicEntities()
 		var wg sync.WaitGroup
 		var pendingTasks []*tasks.Task
 		var pendingIndices []int
@@ -472,11 +420,15 @@ func (c *Crew) executeHierarchical(ctx context.Context) (interface{}, error) {
 
 				res, err := task.Execute(ctx)
 				if err != nil {
+					task.Failed = true
+					task.Error = err
+					task.Processed = true
 					taskErr := crewErrors.NewTaskError(index+1, task.Description, err)
 					errCh <- taskErr
 					if c.OnTaskError != nil {
 						c.OnTaskError(index+1, taskErr)
 					}
+					slog.Error("Task Failed in Hierarchical", slog.Int("index", index+1), slog.String("error", err.Error()))
 					return
 				}
 
@@ -998,6 +950,22 @@ func (c *Crew) runPlanningPhase(ctx context.Context) error {
 // This is an Elite Tier developer feature for building long-running AI orchestration services.
 func (c *Crew) RunCreatorMode(ctx context.Context) error {
 	slog.Info("✅ Engine is now in 'Creator Mode'. Active polling for UI-staged entities...")
+
+	// Setup synchronization callbacks for Dashboard result persistence
+	c.OnTaskComplete = func(index int, result interface{}) {
+		// Sync the current task's result back to the Dashboard's master list
+		if index > 0 && index <= len(c.Tasks) {
+			task := c.Tasks[index-1]
+			telemetry.GlobalDynamicRegistry.SyncTaskResult(task.Description, task.Agent.Role, result, nil, true)
+		}
+	}
+	c.OnTaskError = func(index int, err error) {
+		if index > 0 && index <= len(c.Tasks) {
+			task := c.Tasks[index-1]
+			telemetry.GlobalDynamicRegistry.SyncTaskResult(task.Description, task.Agent.Role, nil, err, true)
+		}
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -1013,13 +981,40 @@ func (c *Crew) RunCreatorMode(ctx context.Context) error {
 				// Inject Agents first so tasks can bind to them
 				for _, a := range newAgents {
 					if agent, ok := a.(*agents.Agent); ok {
-						c.Agents = append(c.Agents, agent)
+						updated := false
+						// Overwrite existing agent if role matches (to capture UI updates)
+						for i, existing := range c.Agents {
+							slog.Debug("Comparing agent roles", slog.String("existing", existing.Role), slog.String("new", agent.Role))
+							if strings.TrimSpace(strings.ToLower(existing.Role)) == strings.TrimSpace(strings.ToLower(agent.Role)) {
+								c.Agents[i] = agent
+								slog.Info("📥 Dynamic Agent updated within engine", slog.String("role", agent.Role))
+								updated = true
+								break
+							}
+						}
+						// Otherwise append as a brand new agent
+						if !updated {
+							c.Agents = append(c.Agents, agent)
+							slog.Info("📥 Dynamic Agent injected", slog.String("role", agent.Role))
+						}
 					}
 				}
 
 				// Inject Tasks
 				for _, t := range newTasks {
-					if task, ok := t.(*tasks.Task); ok {
+					var task *tasks.Task
+					if tm, ok := t.(map[string]interface{}); ok {
+						desc, _ := tm["description"].(string)
+						role, _ := tm["agent_role"].(string)
+						task = &tasks.Task{
+							Description: desc,
+							AgentRole:   role,
+						}
+					} else if tp, ok := t.(*tasks.Task); ok {
+						task = tp
+					}
+
+					if task != nil {
 						// Late bind agent if needed
 						if task.Agent == nil {
 							// Try to match by role
@@ -1044,6 +1039,20 @@ func (c *Crew) RunCreatorMode(ctx context.Context) error {
 
 						if task.Agent == nil {
 							slog.Error("❌ Task Injection Failed: No agents available to assign", slog.String("task", task.Description))
+							continue
+						}
+
+						// Deduplication: Don't inject if task is already in the crew
+						isDuplicate := false
+						for _, existing := range c.Tasks {
+							if existing == task || (existing.Description == task.Description && existing.Agent == task.Agent) {
+								isDuplicate = true
+								break
+							}
+						}
+
+						if isDuplicate {
+							slog.Debug("⏭️ Skipping duplicate task injection", slog.String("task", task.Description))
 							continue
 						}
 

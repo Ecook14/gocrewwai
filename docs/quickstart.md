@@ -21,10 +21,10 @@ Let's pull the Crew-GO library into a fresh Go module:
 mkdir my-first-crew
 cd my-first-crew
 go mod init my-first-crew
-go get github.com/Ecook14/crewai-go
+go get github.com/Ecook14/gocrew
 ```
 
-*(If you ever want to scaffold a project automatically, we also have a CLI you can install via `go install github.com/Ecook14/crewai-go/cmd/crewai@latest`!)*
+*(If you ever want to scaffold a project automatically, we also have a CLI you can install via `go install github.com/Ecook14/gocrew/cmd/crewai@latest`!)*
 
 ---
 
@@ -46,11 +46,11 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/Ecook14/crewai-go/pkg/agents"
-	"github.com/Ecook14/crewai-go/pkg/crew"
-	"github.com/Ecook14/crewai-go/pkg/llm"
-	"github.com/Ecook14/crewai-go/pkg/tasks"
-	"github.com/Ecook14/crewai-go/pkg/tools"
+	"github.com/Ecook14/gocrew/pkg/agents"
+	"github.com/Ecook14/gocrew/pkg/crew"
+	"github.com/Ecook14/gocrew/pkg/llm"
+	"github.com/Ecook14/gocrew/pkg/tasks"
+	"github.com/Ecook14/gocrew/pkg/tools"
 )
 
 func main() {
@@ -152,7 +152,7 @@ Watching terminal logs is fun, but observing your agents think in a real-time we
 
 Simply import our server package into your `main.go`:
 ```go
-import "github.com/Ecook14/crewai-go/pkg/dashboard"
+import "github.com/Ecook14/gocrew/pkg/dashboard"
 ```
 And add this line right before you call `techCrew.Kickoff(...)`:
 ```go

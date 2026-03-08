@@ -53,12 +53,14 @@ function handleEvent(event) {
         case 'agent_finished':
             updateAgent(agent_role, 'Idle');
             addLog('system', `Agent [${agent_role}] successfully completed task.`, 'success');
+            fetchEntities();
             break;
         case 'task_started':
             addLog('system', `New Task Started: ${payload.description.substring(0, 100)}...`);
             break;
         case 'task_finished':
             addLog('system', `Task Completed successfully.`, 'success');
+            fetchEntities();
             break;
         case 'review_requested':
             updateAgent(agent_role, 'Awaiting Review');
@@ -153,7 +155,10 @@ function renderEntities(data) {
         data.tasks.forEach((task, index) => {
             if (task && task.description) {
                 const desc = task.description.length > 30 ? task.description.substring(0, 30) + '...' : task.description;
-                addEntityItem('Task', desc, task.agent_role || 'No Agent', index);
+                let status = task.agent_role || 'No Agent';
+                if (task.failed) status += ' [FAILED ❌]';
+                else if (task.processed) status += ' [COMPLETED ✅]';
+                addEntityItem('Task', desc, status, index, task.processed || task.failed);
             }
         });
     }
@@ -174,25 +179,55 @@ function renderEntities(data) {
     }
 }
 
-function addEntityItem(type, name, subtext, index) {
+function addEntityItem(type, name, subtext, index, isProcessed = false) {
     const el = document.createElement('div');
     el.className = 'agent-item';
     if (!name) name = 'Unnamed';
     if (type === 'Agent') {
         el.id = `agent-${name.replace(/\s+/g, '-')}`;
     }
+
+    let extraButtons = '';
+    if (type === 'Task' && isProcessed) {
+        extraButtons = `<button class="btn" style="padding: 0.2rem 0.5rem; font-size: 0.6rem; background: #10b981;" onclick="viewTaskResult(${index})">View Result</button>`;
+    }
+
     el.innerHTML = `
         <div class="agent-info">
             <h4 style="font-size: 0.8rem;"><span style="color: var(--accent-color); font-weight: 800; font-size: 0.65rem; margin-right: 0.5rem;">${type.toUpperCase()}</span> ${name}</h4>
             <p class="agent-status">${subtext}</p>
         </div>
-        <div style="display: flex; gap: 0.5rem;">
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+            ${extraButtons}
             <button class="btn" style="padding: 0.2rem 0.5rem; font-size: 0.6rem; background: var(--accent-color);" onclick="editEntity('${type.toLowerCase()}', ${index})">Edit</button>
             <button class="delete-btn" onclick="deleteEntity('${type.toLowerCase()}', ${index})">Delete</button>
         </div>
     `;
     agentList.appendChild(el);
 }
+
+function viewTaskResult(index) {
+    fetch('/api/list')
+        .then(res => res.json())
+        .then(data => {
+            const task = data.tasks[index];
+            if (!task) return;
+            const contentBox = document.getElementById('task-result-content');
+            if (task.failed && task.error) {
+                contentBox.value = `❌ ERROR:\n${task.error}`;
+            } else if (task.output) {
+                if (typeof task.output === 'object') {
+                    contentBox.value = JSON.stringify(task.output, null, 2);
+                } else {
+                    contentBox.value = task.output;
+                }
+            } else {
+                contentBox.value = "No output recorded.";
+            }
+            document.getElementById('modal-view-result').classList.remove('hidden');
+        });
+}
+
 
 function editEntity(type, index) {
     currentEditType = type;
@@ -211,6 +246,7 @@ function editEntity(type, index) {
                 document.getElementById('agent-backstory').value = item.backstory;
                 document.getElementById('agent-provider').value = item.provider || 'openai';
                 document.getElementById('agent-model').value = item.llm_model || '';
+                document.getElementById('agent-maxrpm').value = item.max_rpm || 0;
                 // Check tools
                 const toolCheckboxes = document.querySelectorAll('input[name="tools"]');
                 toolCheckboxes.forEach(cb => cb.checked = item.tools && item.tools.includes(cb.value));
@@ -379,11 +415,14 @@ function submitCreateAgent() {
     const selectedTools = Array.from(document.querySelectorAll('input[name="tools"]:checked'))
         .map(el => el.value);
 
+    const max_rpm = parseInt(document.getElementById('agent-maxrpm').value) || 0;
+
     fetch('/api/create/agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             role, goal, backstory, provider, llm_model, api_key,
+            max_rpm,
             memory, memory_config: { connection_string: memory_conn },
             tools: selectedTools,
             index: currentEditIndex
