@@ -60,7 +60,7 @@ func TestInMemCosineStoreAddAndSearch(t *testing.T) {
 
 func TestCosineSimilarityCalculation(t *testing.T) {
 	// Identical vectors should have similarity ≈ 1.0
-	sim, err := cosineSimilarity([]float32{1, 0, 0}, []float32{1, 0, 0})
+	sim, err := CosineSimilarity([]float32{1, 0, 0}, []float32{1, 0, 0})
 	if err != nil {
 		t.Fatalf("cosineSimilarity failed: %v", err)
 	}
@@ -69,7 +69,7 @@ func TestCosineSimilarityCalculation(t *testing.T) {
 	}
 
 	// Orthogonal vectors should have similarity ≈ 0.0
-	sim, err = cosineSimilarity([]float32{1, 0, 0}, []float32{0, 1, 0})
+	sim, err = CosineSimilarity([]float32{1, 0, 0}, []float32{0, 1, 0})
 	if err != nil {
 		t.Fatalf("cosineSimilarity failed: %v", err)
 	}
@@ -115,7 +115,7 @@ func TestMismatchedVectors(t *testing.T) {
 }
 
 func TestCosineSimilarityMismatchedLengths(t *testing.T) {
-	_, err := cosineSimilarity([]float32{1, 0}, []float32{1, 0, 0})
+	_, err := CosineSimilarity([]float32{1, 0}, []float32{1, 0, 0})
 	if err == nil {
 		t.Error("expected error for mismatched vector lengths, got nil")
 	}

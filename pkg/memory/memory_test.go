@@ -20,7 +20,7 @@ func TestShortTermMemory(t *testing.T) {
 		t.Fatalf("Add failed: %v", err)
 	}
 
-	results, err := stm.Search(ctx, []float32{0.1}, 1)
+	results, err := stm.Search(ctx, "Hello", 1)
 	if err != nil {
 		t.Fatalf("Search failed: %v", err)
 	}
@@ -50,8 +50,7 @@ func TestLongTermMemory(t *testing.T) {
 	ltm := NewLongTermMemory(mockStore, mockLLM)
 	ctx := context.Background()
 
-	item := &MemoryItem{ID: "lt1", Text: "Long term info", Vector: []float32{0.1}}
-	if err := ltm.Add(ctx, item); err != nil {
+	if err := ltm.Save(ctx, "Long term info", map[string]interface{}{"id": "lt1"}); err != nil {
 		t.Fatalf("Add failed: %v", err)
 	}
 

@@ -139,3 +139,22 @@ func (f *Flow) AddParallelNodes(nodes []Node) {
 	}
 	f.AddNode(wrapped)
 }
+// OnEvent is a DX-friendly wrapper for registering event listeners.
+// It allows for cleaner flow definitions in a builder-like style.
+func (f *Flow) OnEvent(event string, handler Node) *Flow {
+	f.On(event, handler)
+	return f
+}
+
+// When registers a listener that only triggers if the event matches AND a secondary predicate is true.
+func (f *Flow) When(event string, pred Predicate, handler Node) *Flow {
+	wrapped := func(ctx context.Context, state State) (State, error) {
+		if !pred(state) {
+			slog.Info("Event predicate not met, skipping handler", slog.String("event", event))
+			return state, nil
+		}
+		return handler(ctx, state)
+	}
+	f.On(event, wrapped)
+	return f
+}

@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"strings"
-
+	"encoding/json"
 	"github.com/Ecook14/crewai-go/pkg/agents"
 	crewErrors "github.com/Ecook14/crewai-go/pkg/errors"
 	"github.com/Ecook14/crewai-go/pkg/guardrails"
@@ -22,6 +22,7 @@ type Task struct {
 	Agent          *agents.Agent
 	Tools          []tools.Tool
 	AsyncExecution bool
+	OutputFile     string      // Path to save the final task output (.md, .json, etc.)
 
 	// Output Formatting
 	OutputJSON   bool
@@ -71,7 +72,7 @@ func (t *Task) Execute(ctx context.Context) (interface{}, error) {
 	// Publish telemetry event
 	telemetry.GlobalBus.Publish(telemetry.Event{
 		Type:      telemetry.EventTaskStarted,
-		AgentRole: t.Agent.Role,
+		AgentRole: strings.Clone(t.Agent.Role),
 		Payload: map[string]interface{}{
 			"description": baseDescription,
 		},
@@ -125,17 +126,33 @@ func (t *Task) Execute(ctx context.Context) (interface{}, error) {
 
 	var result interface{}
 	var err error
+	validator := &Validator{}
 
 	for i := 0; i < maxRetries; i++ {
 		result, err = t.Agent.Execute(ctx, baseDescription, options)
 		if err == nil {
-			// If we have a schema, verify we got a structured result
+			// If we have a schema, and the result is a string, try to repair and unmarshal
 			if t.OutputSchema != nil || t.OutputPydan != nil {
-				// The LLM.GenerateStructured tool handles the actual unmarshaling.
-				// If it succeeded, result will be a pointer to the struct.
-				break 
+				if resultStr, ok := result.(string); ok {
+					schema := t.OutputSchema
+					if schema == nil {
+						schema = t.OutputPydan
+					}
+					
+					repaired := validator.RepairJSON(resultStr)
+					validated, vErr := validator.ValidateSchema(repaired, schema)
+					if vErr == nil {
+						result = validated
+						break
+					}
+					err = vErr // Set error for possible retry
+				} else {
+					// result is already a struct/map from structured generation
+					break
+				}
+			} else {
+				break
 			}
-			break
 		}
 		
 		if i < maxRetries-1 {
@@ -159,6 +176,23 @@ func (t *Task) Execute(ctx context.Context) (interface{}, error) {
 
 	t.Processed = true
 	t.Output = result
+
+	// 5. Auto-save output to file if specified
+	if t.OutputFile != "" {
+		var outputBytes []byte
+		if t.OutputJSON {
+			outputBytes, _ = json.MarshalIndent(result, "", "  ")
+		} else {
+			outputBytes = []byte(fmt.Sprintf("%v", result))
+		}
+		
+		err := os.WriteFile(t.OutputFile, outputBytes, 0644)
+		if err != nil {
+			slog.Error("Failed to auto-save task output", slog.String("file", t.OutputFile), slog.Any("error", err))
+		} else {
+			slog.Info("Task output auto-saved", slog.String("file", t.OutputFile))
+		}
+	}
 
 	// 4. Fire completion callback
 	if t.CallbackOnComplete != nil {
@@ -193,11 +227,43 @@ func (t *Task) Execute(ctx context.Context) (interface{}, error) {
 	// Publish telemetry event
 	telemetry.GlobalBus.Publish(telemetry.Event{
 		Type:      telemetry.EventTaskFinished,
-		AgentRole: t.Agent.Role,
+		AgentRole: strings.Clone(t.Agent.Role),
 		Payload: map[string]interface{}{
 			"result": result,
 		},
 	})
 
 	return result, nil
+}
+
+// GetOutput securely translates the raw interface{} Output into a strongly typed pointer.
+// This provides true type-safety for autonomous engine outputs.
+func GetOutput[T any](t *Task) (*T, error) {
+	if !t.Processed {
+		return nil, fmt.Errorf("task has not been processed yet")
+	}
+	if t.Output == nil {
+		return nil, fmt.Errorf("task output is nil")
+	}
+
+	// Case 1: The output is exactly *T (from LLM mapping).
+	if typed, ok := t.Output.(*T); ok {
+		return typed, nil
+	}
+
+	// Case 2: The output is exactly T.
+	if typed, ok := t.Output.(T); ok {
+		return &typed, nil
+	}
+
+	// Case 3: Try simple string assertion explicitly if T is string
+	if s, ok := t.Output.(string); ok {
+		var target T
+		if anyTarget, ok := any(&target).(*string); ok {
+			*anyTarget = s
+			return &target, nil
+		}
+	}
+
+	return nil, fmt.Errorf("task output is of type %T, expected *%T", t.Output, new(T))
 }

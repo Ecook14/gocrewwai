@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 // ArxivTool allows agents to search for academic papers.
@@ -34,9 +35,38 @@ func (t *ArxivTool) Execute(ctx context.Context, input map[string]interface{}) (
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
-	// Actual Implementation: Returns raw XML response from arXiv API for parsing.
-	return string(body), nil
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	body := string(bodyBytes)
+
+	// Simple extraction of titles and summaries from arXiv XML
+	var results []string
+	entries := strings.Split(body, "<entry>")
+	for _, entry := range entries[1:] {
+		title := extractTag(entry, "title")
+		summary := extractTag(entry, "summary")
+		results = append(results, fmt.Sprintf("Title: %s\nSummary: %s", title, summary))
+	}
+
+	if len(results) == 0 {
+		return "No academic papers found for: " + query, nil
+	}
+
+	return strings.Join(results, "\n---\n"), nil
+}
+
+func extractTag(content, tag string) string {
+	startTag := "<" + tag + ">"
+	endTag := "</" + tag + ">"
+	start := strings.Index(content, startTag)
+	if start == -1 {
+		return ""
+	}
+	start += len(startTag)
+	end := strings.Index(content[start:], endTag)
+	if end == -1 {
+		return ""
+	}
+	return strings.TrimSpace(content[start : start+end])
 }
 
 func (t *ArxivTool) RequiresReview() bool { return false }

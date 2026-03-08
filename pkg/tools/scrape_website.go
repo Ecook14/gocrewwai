@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // ScrapeWebsiteTool fetches text content from a simple HTTP URL.
@@ -45,7 +46,9 @@ func (t *ScrapeWebsiteTool) Execute(ctx context.Context, input map[string]interf
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
 
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("HTTP request failed: %w", err)

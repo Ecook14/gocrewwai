@@ -16,7 +16,7 @@ func NewShortTermMemory() *ShortTermMemory {
 	}
 }
 
-func (s *ShortTermMemory) Save(ctx context.Context, item *MemoryItem) error {
+func (s *ShortTermMemory) Add(ctx context.Context, item *MemoryItem) error {
 	s.items = append(s.items, item)
 	return nil
 }

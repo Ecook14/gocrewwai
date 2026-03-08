@@ -51,7 +51,7 @@ func evaluateExpression(expr string) (float64, error) {
 	var op string
 	n, err := fmt.Sscanf(expr, "%f %s %f", &a, &op, &b)
 	if err != nil || n < 3 {
-		return 0, fmt.Errorf("unsupported expression format. Use 'x op y' (e.g. '10 + 5')")
+		return 0, fmt.Errorf("unsupported expression format. Use 'x op y' (e.g. '10 + 5'). Important: Ensure spaces between numbers and the operator.")
 	}
 
 	switch op {

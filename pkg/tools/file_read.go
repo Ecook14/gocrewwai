@@ -8,20 +8,18 @@ import (
 
 // FileReadTool allows agents to read the contents of a local file.
 type FileReadTool struct {
-	Options map[string]interface{}
+	BaseTool
 }
 
 func NewFileReadTool() *FileReadTool {
-	return &FileReadTool{}
+	return &FileReadTool{
+		BaseTool: BaseTool{
+			NameValue:        "FileReadTool",
+			DescriptionValue: "Reads the content of a specified file. Input requires 'file_path' as a string.",
+		},
+	}
 }
 
-func (t *FileReadTool) Name() string {
-	return "FileReadTool"
-}
-
-func (t *FileReadTool) Description() string {
-	return "Reads the content of a specified file. Input requires 'file_path' as a string."
-}
 
 func (t *FileReadTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	pathRaw, ok := input["file_path"]

@@ -64,3 +64,18 @@ func TestSlackToolConfiguration(t *testing.T) {
 		t.Fatal("expected NewSlackTool to return instance")
 	}
 }
+
+func TestArxivToolName(t *testing.T) {
+	tool := NewArxivTool()
+	if tool.Name() != "ArxivTool" {
+		t.Errorf("expected name 'ArxivTool', got '%s'", tool.Name())
+	}
+}
+
+func TestArxivToolMissingInput(t *testing.T) {
+	tool := NewArxivTool()
+	_, err := tool.Execute(context.Background(), map[string]interface{}{})
+	if err == nil {
+		t.Error("expected error for missing query")
+	}
+}

@@ -9,6 +9,7 @@ import (
 	"github.com/Ecook14/crewai-go/pkg/config"
 	"github.com/Ecook14/crewai-go/pkg/crew"
 	"github.com/Ecook14/crewai-go/pkg/llm"
+	"github.com/Ecook14/crewai-go/pkg/memory"
 	"github.com/Ecook14/crewai-go/pkg/tasks"
 	"github.com/Ecook14/crewai-go/pkg/telemetry"
 	"github.com/Ecook14/crewai-go/pkg/tools"
@@ -34,7 +35,7 @@ func main() {
 		"Find the latest AI trends",
 		"Expert researcher",
 		model,
-		agents.WithMemory(true),
+		agents.WithMemory(memory.NewInMemCosineStore()),
 		agents.WithSelfHealing(true),
 		agents.WithMaxIterations(5),
 	)

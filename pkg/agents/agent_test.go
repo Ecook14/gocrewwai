@@ -3,6 +3,8 @@ package agents
 import (
 	"context"
 	"errors"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/Ecook14/crewai-go/pkg/llm"
@@ -68,7 +70,7 @@ func TestAgentExecute_SelfHealing(t *testing.T) {
 		LLM:         mock,
 		Tools:       []tools.Tool{failingTool},
 		SelfHealing: true,
-		MaxIter:     3,
+		MaxIterations: 3,
 	}
 
 	result, err := agent.Execute(context.Background(), "Heal me", nil)
@@ -91,6 +93,8 @@ type mockTool struct {
 	requiresReview bool
 }
 
+func (m *mockTool) Name() string        { return m.name }
+func (m *mockTool) Description() string { return "Mock Description" }
 func (m *mockTool) RequiresReview() bool { return m.requiresReview }
 
 func (m *mockTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
@@ -100,6 +104,12 @@ func (m *mockTool) Execute(ctx context.Context, input map[string]interface{}) (s
 func TestAgentExecute_HITL(t *testing.T) {
 	mock := &mockLLM{
 		generateFunc: func(messages []llm.Message) (string, error) {
+			// If we already have an observation in history, return it as final answer
+			for _, m := range messages {
+				if strings.Contains(m.Content, "Observation: Tool Executed") {
+					return "Tool Executed", nil
+				}
+			}
 			return `{"tool": "ReviewedTool", "input": {}}`, nil
 		},
 	}
@@ -118,7 +128,7 @@ func TestAgentExecute_HITL(t *testing.T) {
 		LLM:   mock,
 		Tools: []tools.Tool{tool},
 		UsageMetrics: make(map[string]int),
-		StepReview: func(toolName string, input map[string]interface{}) bool {
+		StepReview: func(toolName string, input interface{}) bool {
 			return true // Approved
 		},
 	}
@@ -132,7 +142,7 @@ func TestAgentExecute_HITL(t *testing.T) {
 	}
 
 	// 2. Test Denial
-	agent.StepReview = func(toolName string, input map[string]interface{}) bool {
+	agent.StepReview = func(toolName string, input interface{}) bool {
 		return false // Denied
 	}
 
@@ -154,7 +164,40 @@ func TestAgentExecute_HITL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected no error on denial, got %v", err)
 	}
-	if !strings.Contains(res, "Stopping because human denied") {
+	if resStr, ok := res.(string); !ok || !strings.Contains(resStr, "Stopping because human denied") {
 		t.Errorf("Expected final answer after denial, got %v", res)
+	}
+}
+
+func TestAgentExecute_Cache(t *testing.T) {
+	callCount := 0
+	mock := &mockLLM{
+		generateFunc: func(messages []llm.Message) (string, error) {
+			callCount++
+			return "Cached Result", nil
+		},
+	}
+
+	tempDir := "./test_cache_agent"
+	defer os.RemoveAll(tempDir)
+	cache := llm.NewFileCache(tempDir)
+
+	agent := &Agent{
+		Role:  "CacheTester",
+		LLM:   mock,
+		Cache: cache,
+	}
+
+	ctx := context.Background()
+	// First call - should hit LLM
+	_, _ = agent.Execute(ctx, "Test cache", nil)
+	if callCount != 1 {
+		t.Errorf("Expected 1 LLM call, got %d", callCount)
+	}
+
+	// Second call - should hit Cache
+	_, _ = agent.Execute(ctx, "Test cache", nil)
+	if callCount != 1 {
+		t.Errorf("Expected no new LLM call (cache hit), got %d", callCount)
 	}
 }

@@ -19,10 +19,7 @@ func main() {
 	}
 
 	// Initialize LLM
-	model := &llm.OpenAIClient{
-		APIKey: apiKey,
-		Model:  "gpt-4o",
-	}
+	model := llm.NewOpenAIClient(apiKey)
 
 	// 1. Define Agents
 	researcher := &agents.Agent{

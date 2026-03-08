@@ -21,10 +21,7 @@ func main() {
 		return
 	}
 
-	model := &llm.OpenAIClient{
-		APIKey: apiKey,
-		Model:  "gpt-4o",
-	}
+	model := llm.NewOpenAIClient(apiKey)
 
 	// 1. Setup Persistent Memory
 	sqliteStore, err := memory.NewSQLiteStore("crew_memory.db")
@@ -34,7 +31,6 @@ func main() {
 	}
 	defer sqliteStore.Close()
 
-	ltm := memory.NewLongTermMemory(sqliteStore, model)
 
 	// 2. Define Advanced Agents
 	researcher := &agents.Agent{
@@ -44,8 +40,7 @@ func main() {
 		LLM:              model,
 		Tools:            []tools.Tool{tools.NewSearchWebTool(), tools.NewCalculatorTool()},
 		AllowDelegation:  true,
-		Memory:           true,
-		LongTermMemory:   ltm,
+		Memory:           sqliteStore,
 		Verbose:          true,
 	}
 
@@ -54,8 +49,7 @@ func main() {
 		Goal:             "Translate complex research into engaging, actionable content.",
 		Backstory:        "Award-winning writer known for making technology relatable.",
 		LLM:              model,
-		Memory:           true,
-		LongTermMemory:   ltm,
+		Memory:           sqliteStore,
 		Verbose:          true,
 	}
 

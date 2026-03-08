@@ -23,12 +23,12 @@ Executes Python or Go code dynamically. In the Elite tier, you MUST use sandboxe
     )
     ```
 
-*   **E2B Cloud Configuration:**
-    Executes code in secure, isolated cloud environments. Unbeatable security.
+	```
+
+*   **Local Process Configuration:**
+    Executes code natively on the host machine. (Use only in completely trusted environments!)
     ```go
-    tool := tools.NewCodeInterpreterTool(
-        tools.WithE2B(os.Getenv("E2B_API_KEY")),
-    )
+    tool := tools.NewCodeInterpreterTool()
     ```
 
 **`WASMSandboxTool`**
@@ -141,7 +141,43 @@ coderAgent.Guardrails = append(coderAgent.Guardrails, reviewGuardrail)
 
 ---
 
-## 4. Agent Memory Architectures (`pkg/memory`)
+## 4. Elite Orchestration & Reliability
+
+### A. Strongly-Typed Output Extraction (Generics)
+Avoid `interface{}` type assertions. Use the generic `tasks.GetOutput[T]` helper to safely extract structured results from a task.
+
+```go
+type AnalysisResult struct {
+    Trends []string `json:"trends"`
+    Score  int      `json:"score"`
+}
+
+// ... execute crew ...
+
+// Securely extract the result into your struct pointer
+result, err := tasks.GetOutput[AnalysisResult](marketTask)
+if err != nil {
+    log.Fatal(err)
+}
+fmt.Printf("Score: %d\n", result.Score)
+```
+
+### B. Concurrency & Rate Limit Resiliency
+Crew-GO is built for production volume. It handles API rate limits (`429`) and server errors (`5xx`) automatically with an **Exponential Backoff** retry strategy.
+
+You can also gate the maximum parallelism of your crew to avoid hitting provider limits:
+
+```go
+myCrew := crew.NewCrew(
+    agents, 
+    tasks, 
+    crew.WithMaxConcurrency(10), // Limit to 10 simultaneous LLM calls
+)
+```
+
+---
+
+## 5. Agent Memory Architectures (`pkg/memory`)
 
 Agents with Memory are significantly smarter. Crew-GO utilizes an advanced RAG (Retrieval-Augmented Generation) loop inside the agent.
 

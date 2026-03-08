@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -107,6 +108,54 @@ func (s *RedisStore) Search(ctx context.Context, queryVector []float32, limit in
 	}
 
 	return out, nil
+}
+
+// BulkAdd inserts multiple items using a Redis pipeline for efficiency.
+func (s *RedisStore) BulkAdd(ctx context.Context, items []*MemoryItem) error {
+	pipe := s.client.Pipeline()
+	for _, item := range items {
+		data, err := json.Marshal(item)
+		if err != nil {
+			return fmt.Errorf("failed to marshal item %s: %w", item.ID, err)
+		}
+		key := s.prefix + item.ID
+		if !item.ExpiresAt.IsZero() {
+			ttl := time.Until(item.ExpiresAt)
+			if ttl > 0 {
+				pipe.Set(ctx, key, data, ttl)
+			}
+		} else {
+			pipe.Set(ctx, key, data, 0)
+		}
+	}
+	_, err := pipe.Exec(ctx)
+	return err
+}
+
+// Delete removes a memory item by ID.
+func (s *RedisStore) Delete(ctx context.Context, id string) error {
+	key := s.prefix + id
+	result := s.client.Del(ctx, key)
+	if result.Err() != nil {
+		return result.Err()
+	}
+	if result.Val() == 0 {
+		return fmt.Errorf("memory item not found: %s", id)
+	}
+	return nil
+}
+
+// Count returns the total number of memory items.
+func (s *RedisStore) Count(ctx context.Context) (int, error) {
+	var count int
+	iter := s.client.Scan(ctx, 0, s.prefix+"*", 0).Iterator()
+	for iter.Next(ctx) {
+		count++
+	}
+	if err := iter.Err(); err != nil {
+		return 0, err
+	}
+	return count, nil
 }
 
 func (s *RedisStore) Close() error {

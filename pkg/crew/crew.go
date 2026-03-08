@@ -41,6 +41,14 @@ func WithVerbose(v bool) CrewOption {
 	return func(c *Crew) { c.Verbose = v }
 }
 
+func WithMaxConcurrency(max int) CrewOption {
+	return func(c *Crew) { c.MaxConcurrency = max }
+}
+
+func WithPlanning(v bool) CrewOption {
+	return func(c *Crew) { c.Planning = v }
+}
+
 func WithManager(m *agents.Agent) CrewOption {
 	return func(c *Crew) { c.ManagerAgent = m }
 }
@@ -88,12 +96,18 @@ type Crew struct {
 	// MaxCycles is the global limit for cyclic graph/state machine execution.
 	MaxCycles int
 
+	// MaxConcurrency limits the number of goroutines actively executing at once in parallel topologies.
+	MaxConcurrency int
+
+	// Planning enables a pre-execution strategy phase.
+	Planning bool
+
 	// Execution Tracking
 	UsageMetrics map[string]int
 }
 
 // Kickoff starts the execution process based on the process type.
-func (c *Crew) Kickoff(ctx context.Context) (string, error) { // Changed return type to string
+func (c *Crew) Kickoff(ctx context.Context) (interface{}, error) { 
 	ctx, span := telemetry.Tracer.Start(ctx, "Crew.Kickoff")
 	defer span.End()
 
@@ -123,6 +137,13 @@ func (c *Crew) Kickoff(ctx context.Context) (string, error) { // Changed return 
 
 	if c.Verbose {
 		slog.Info("Starting Crew Execution", slog.String("process", string(c.Process)))
+	}
+
+	// Phase 2: Advanced Planning
+	if c.Planning {
+		if err := c.runPlanningPhase(ctx); err != nil {
+			return nil, fmt.Errorf("planning phase failed: %w", err)
+		}
 	}
 
 	// Initialize Delegation Tools for agents that allow it
@@ -165,8 +186,11 @@ func (c *Crew) Kickoff(ctx context.Context) (string, error) { // Changed return 
 }
 
 // executeSequential executes tasks one by one in order, piping context between them.
+// Tasks marked with AsyncExecution=true are dispatched in the background via TaskFuture
+// and their results are collected after all sequential tasks complete.
 func (c *Crew) executeSequential(ctx context.Context) (interface{}, error) {
 	var finalResult interface{}
+	var asyncFutures []*asyncEntry
 
 	for i, task := range c.Tasks {
 		// Context check before task execution
@@ -199,11 +223,16 @@ func (c *Crew) executeSequential(ctx context.Context) (interface{}, error) {
 		}
 
 		if task.AsyncExecution {
-			// Real goroutine pattern for Async
-			go func(t *tasks.Task) {
-				_, _ = t.Execute(ctx)
-			}(task)
-			finalResult = "Async task dispatched"
+			// Dispatch async task — result collected later via TaskFuture
+			if c.Verbose {
+				defaultLogger.Info("⚡ Dispatching async task", slog.Int("index", i+1))
+			}
+			future := c.dispatchAsyncTask(ctx, i+1, task)
+			asyncFutures = append(asyncFutures, &asyncEntry{
+				index:  i,
+				task:   task,
+				future: future,
+			})
 		} else {
 			result, err := task.Execute(ctx)
 			if err != nil {
@@ -220,7 +249,40 @@ func (c *Crew) executeSequential(ctx context.Context) (interface{}, error) {
 		}
 	}
 
+	// Collect all async task results
+	if len(asyncFutures) > 0 {
+		if c.Verbose {
+			defaultLogger.Info("⏳ Waiting for async tasks to complete", slog.Int("count", len(asyncFutures)))
+		}
+		for _, entry := range asyncFutures {
+			result, err := entry.future.Result()
+			if err != nil {
+				taskErr := crewErrors.NewTaskError(entry.index+1, entry.task.Description, err)
+				if c.OnTaskError != nil {
+					c.OnTaskError(entry.index+1, taskErr)
+				}
+				// Continue collecting remaining — don't fail the whole crew on one async error
+				defaultLogger.Warn("Async task failed", slog.Int("index", entry.index+1), slog.Any("error", err))
+				continue
+			}
+			// Update the task's output so downstream can reference it
+			entry.task.Processed = true
+			entry.task.Output = result
+			finalResult = result
+			if c.Verbose {
+				defaultLogger.Info("✅ Async task collected", slog.Int("index", entry.index+1))
+			}
+		}
+	}
+
 	return finalResult, nil
+}
+
+// asyncEntry pairs a task with its future for later collection.
+type asyncEntry struct {
+	index  int
+	task   *tasks.Task
+	future *TaskFuture
 }
 
 // executeHierarchical implements the Manager Agent delegation pattern.
@@ -247,12 +309,21 @@ func (c *Crew) executeHierarchical(ctx context.Context) (interface{}, error) {
 	errCh := make(chan error, len(c.Tasks))
 	results := make([]interface{}, len(c.Tasks))
 
+	concurrency := c.MaxConcurrency
+	if concurrency <= 0 {
+		concurrency = 5 // Safe default to prevent rate limits
+	}
+	sem := make(chan struct{}, concurrency)
+
 	// The Manager delegates tasks to workers in parallel
 	for i, t := range c.Tasks {
 		wg.Add(1)
 
 		go func(index int, task *tasks.Task) {
 			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			
 			select {
 			case <-ctx.Done():
 				errCh <- ctx.Err()
@@ -275,7 +346,7 @@ func (c *Crew) executeHierarchical(ctx context.Context) (interface{}, error) {
 			if c.Verbose {
 				defaultLogger.Info("Manager Delegating Task",
 					slog.Int("index", index+1),
-					slog.String("assignee", task.Agent.Role))
+					slog.String("assignee", strings.Clone(task.Agent.Role)))
 			}
 
 			// Pre-execution callback
@@ -428,10 +499,18 @@ func (c *Crew) executeConsensual(ctx context.Context) (string, error) {
 	results := make([]string, len(c.Agents))
 	errCh := make(chan error, len(c.Agents))
 
+	concurrency := c.MaxConcurrency
+	if concurrency <= 0 {
+		concurrency = 5 
+	}
+	sem := make(chan struct{}, concurrency)
+
 	for i, agent := range c.Agents {
 		wg.Add(1)
 		go func(idx int, a *agents.Agent) {
 			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
 			
 			// Execute task with this specific agent
 			res, err := a.Execute(ctx, mainTask.Description, nil)
@@ -510,6 +589,12 @@ func (c *Crew) executeGraph(ctx context.Context) (string, error) {
 	var wg sync.WaitGroup
 	errCh := make(chan error, len(c.Tasks)*2)
 
+	concurrency := c.MaxConcurrency
+	if concurrency <= 0 {
+		concurrency = 5 
+	}
+	sem := make(chan struct{}, concurrency)
+
 	maxGlobalCycles := c.MaxCycles
 	if maxGlobalCycles <= 0 {
 		maxGlobalCycles = 100
@@ -553,6 +638,8 @@ func (c *Crew) executeGraph(ctx context.Context) (string, error) {
 			wg.Add(1)
 			go func(task *tasks.Task) {
 				defer wg.Done()
+				sem <- struct{}{}
+				defer func() { <-sem }()
 				res, err := task.Execute(ctx)
 				if err != nil {
 					errCh <- err
@@ -737,4 +824,46 @@ func contains(tasks []*tasks.Task, t *tasks.Task) bool {
 		}
 	}
 	return false
+}
+
+func (c *Crew) runPlanningPhase(ctx context.Context) error {
+	if c.Verbose {
+		defaultLogger.Info("🗺️  Initiating Strategic Planning Phase")
+	}
+
+	// 1. Setup Manager
+	var orchestrator *agents.ManagerAgent
+	if c.ManagerAgent != nil {
+		orchestrator = &agents.ManagerAgent{Agent: *c.ManagerAgent, ManagedAgents: c.Agents}
+	} else {
+		model := c.ManagerLLM
+		if model == nil && len(c.Agents) > 0 {
+			model = c.Agents[0].LLM
+		}
+		orchestrator = agents.NewManagerAgent(model, c.Agents)
+		orchestrator.Verbose = c.Verbose
+	}
+
+	// 2. Prepare Task List for Planner
+	var tasksList strings.Builder
+	for i, t := range c.Tasks {
+		tasksList.WriteString(fmt.Sprintf("Task %d: %s\n", i+1, t.Description))
+	}
+
+	// 3. Generate Plan
+	plan, err := orchestrator.GeneratePlan(ctx, tasksList.String())
+	if err != nil {
+		return err
+	}
+
+	if c.Verbose {
+		defaultLogger.Info("✅ Strategic Plan Generated", slog.String("plan", plan))
+	}
+
+	// 4. Inject Plan into all Task contexts
+	for _, t := range c.Tasks {
+		t.Description = fmt.Sprintf("[STRATEGIC PLAN]\n%s\n\n[TASK DESCRIPTION]\n%s", plan, t.Description)
+	}
+
+	return nil
 }

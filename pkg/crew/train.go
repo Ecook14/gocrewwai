@@ -14,7 +14,7 @@ import (
 // in the agent's memory/prompt for future runs.
 func (c *Crew) Train(ctx context.Context, iterations int) error {
 	if c.Verbose {
-		defaultLogger.Info("🎓 Starting Training Mode", fmt.Sprintf("%d iterations", iterations))
+		defaultLogger.Info("🎓 Starting Training Mode", slog.Int("iterations", iterations))
 	}
 
 	reader := bufio.NewReader(os.Stdin)

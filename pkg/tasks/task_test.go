@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/Ecook14/crewai-go/pkg/agents"
+	"github.com/Ecook14/crewai-go/pkg/llm"
 )
 
 type mockAgent struct {

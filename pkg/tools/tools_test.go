@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -182,6 +183,29 @@ func TestStripHTMLTags(t *testing.T) {
 		result := stripHTMLTags(tt.input)
 		if result != tt.expected {
 			t.Errorf("stripHTMLTags(%q) = %q, want %q", tt.input, result, tt.expected)
+		}
+	}
+}
+
+func TestCalculatorToolExecute(t *testing.T) {
+	tool := NewCalculatorTool()
+	
+	tests := []struct {
+		expr     string
+		expected string
+	}{
+		{"2 + 2", "4"},
+		{"10 / 2", "5"},
+		{"10 * 5", "50"},
+	}
+
+	for _, tt := range tests {
+		res, err := tool.Execute(context.Background(), map[string]interface{}{"expression": tt.expr})
+		if err != nil {
+			t.Errorf("expr %s failed: %v", tt.expr, err)
+		}
+		if !strings.Contains(res, tt.expected) {
+			t.Errorf("expr %s expected %s, got %s", tt.expr, tt.expected, res)
 		}
 	}
 }

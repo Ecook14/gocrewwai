@@ -58,55 +58,54 @@ Agents are defined by their `Role`, `Goal`, and `Backstory`. We will create two 
 *Notice how we equip the Researcher with a `SearchWebTool` so it can actually browse the internet!*
 
 ```go
-    // 2. Create the Researcher Agent
-    researcher := agents.NewAgent(
-        "Senior Tech Researcher", // Role
-        "Discover the absolute latest developments in the Go programming language.", // Goal
-        "You are a relentless tech journalist who digs deep to find cutting-edge information.", // Backstory
-        client,
-    )
-    // Equip the agent with a search tool
-    researcher.Tools = []tools.Tool{tools.NewSearchWebTool()}
-    researcher.Verbose = true // Enables detailed logging of the agent's thoughts
+    // 2. Create the Researcher Agent using the Fluent Builder (Recommended DX)
+    researcher := agents.NewAgentBuilder().
+        Role("Senior Tech Researcher").
+        Goal("Discover the absolute latest developments in the Go programming language.").
+        Backstory("You are a relentless tech journalist who digs deep to find cutting-edge information.").
+        LLM(client).
+        Tools(tools.NewSearchWebTool()).
+        Verbose(true).
+        Build()
 
     // 3. Create the Writer Agent
-    writer := agents.NewAgent(
-        "Senior Technical Writer",
-        "Craft engaging, accurate, and concise blog posts about technology.",
-        "You are an expert copywriter known for your clear and engaging tone.",
-        client,
-    )
+    writer := agents.NewAgentBuilder().
+        Role("Senior Technical Writer").
+        Goal("Craft engaging, accurate, and concise blog posts about technology.").
+        Backstory("You are an expert copywriter known for your clear and engaging tone.").
+        LLM(client).
+        Build()
 ```
 
 ### Step 3: Define the Tasks
 Tasks dictate exactly what each agent should do. Tasks can be chained together using `Context`.
 
 ```go
-    // 4. Create the Research Task
-    researchTask := &tasks.Task{
-        Description: "Search the web for news about the 'Go 1.24 Release' or 'Go memory management updates in 2026'. Gather key links and summaries.",
-        Agent:       researcher,
-    }
+    // 4. Create the Research Task using the Task Builder
+    researchTask := tasks.NewTaskBuilder().
+        Description("Search the web for news about the 'Go 1.24 Release' or 'Go memory management updates in 2026'. Gather key links and summaries.").
+        Agent(researcher).
+        Build()
 
     // 5. Create the Writing Task
-    writingTask := &tasks.Task{
-        Description: "Using the context provided by the researcher, write a 3-paragraph blog post summarizing the latest Go updates.",
-        Agent:       writer,
-        Context:     []*tasks.Task{researchTask}, // Explicit dependency mapping!
-    }
+    writingTask := tasks.NewTaskBuilder().
+        Description("Using the context provided by the researcher, write a 3-paragraph blog post summarizing the latest Go updates.").
+        Agent(writer).
+        Context(researchTask). // Explicit dependency mapping!
+        Build()
 ```
 
 ### Step 4: Assemble & Kickoff the Crew
 A `Crew` manages the execution flow. We will use the default `Sequential` process, meaning `researchTask` will finish entirely before `writingTask` begins.
 
 ```go
-    // 6. Assemble the Crew
-    techCrew := crew.Crew{
-        Agents:  []*agents.Agent{researcher, writer},
-        Tasks:   []*tasks.Task{researchTask, writingTask},
-        Process: crew.Sequential,
-        Verbose: true, // Enables high-level crew logging
-    }
+    // 6. Assemble the Crew using the Crew Builder
+    techCrew := crew.NewCrewBuilder().
+        Agents(researcher, writer).
+        Tasks(researchTask, writingTask).
+        Process(crew.Sequential).
+        Verbose(true).
+        Build()
 
     // 7. Kickoff Execution
     slog.Info("🚀 Kicking off the Tech News Crew...")
@@ -136,7 +135,7 @@ To use it, you can programmatically start the server in your `main.go`, OR use t
 ### Option A: Using the CLI (Recommended)
 If you built your project using the `crewai create` scaffolding tool, simply run:
 ```bash
-crewai kickoff --ui
+~/go/bin/crewai kickoff --ui
 ```
 
 ### Option B: Programmatically in Code

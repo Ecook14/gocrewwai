@@ -3,7 +3,9 @@ package tools
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
+	"time"
 
 	"github.com/google/go-github/v60/github"
 )
@@ -20,7 +22,10 @@ func NewGitHubTool(token string) *GitHubTool {
 	if token == "" {
 		return nil
 	}
-	client := github.NewClient(nil).WithAuthToken(token)
+	httpClient := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+	client := github.NewClient(httpClient).WithAuthToken(token)
 	return &GitHubTool{client: client}
 }
 

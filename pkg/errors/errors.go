@@ -5,6 +5,7 @@ package errors
 import (
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // Sentinel errors for common failure modes across the framework.
@@ -29,10 +30,11 @@ type AgentError struct {
 }
 
 func (e *AgentError) Error() string {
+	role := strings.Clone(e.Role)
 	if e.Iter > 0 {
-		return fmt.Sprintf("agent '%s' (iter %d): %v", e.Role, e.Iter, e.Err)
+		return "agent '" + role + "' (iter " + fmt.Sprintf("%d", e.Iter) + "): " + e.Err.Error()
 	}
-	return fmt.Sprintf("agent '%s': %v", e.Role, e.Err)
+	return "agent '" + role + "': " + e.Err.Error()
 }
 
 func (e *AgentError) Unwrap() error { return e.Err }

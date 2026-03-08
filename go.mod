@@ -5,6 +5,7 @@ go 1.24.0
 require (
 	github.com/chromedp/chromedp v0.9.5
 	github.com/docker/docker v24.0.7+incompatible
+	github.com/go-sql-driver/mysql v1.9.3
 	github.com/google/go-github/v60 v60.0.0
 	github.com/gorilla/websocket v1.5.1
 	github.com/lib/pq v1.10.9
@@ -16,10 +17,12 @@ require (
 	go.opentelemetry.io/otel v1.24.0
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.24.0
 	go.opentelemetry.io/otel/sdk v1.24.0
+	go.opentelemetry.io/otel/trace v1.24.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
+	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/Microsoft/go-winio v0.4.21 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/chromedp/cdproto v0.0.0-20240202021202-6d0b6a386732 // indirect
@@ -43,7 +46,6 @@ require (
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	go.opentelemetry.io/otel/metric v1.24.0 // indirect
-	go.opentelemetry.io/otel/trace v1.24.0 // indirect
 	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/sys v0.17.0 // indirect
 	golang.org/x/time v0.14.0 // indirect

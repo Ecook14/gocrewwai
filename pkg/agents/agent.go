@@ -19,6 +19,9 @@ import (
 
 var defaultLogger = slog.New(slog.NewTextHandler(os.Stdout, nil))
 
+// Tool is a convenience alias for tools.Tool
+type Tool = tools.Tool
+
 // Agent translates the `class Agent` python abstraction into idiomatic Go.
 type Agent struct {
 	Role      string
@@ -38,11 +41,17 @@ type Agent struct {
 	// Memory enables agents to recall and store context across executions.
 	Memory memory.Store
 
+	// EntityMemory stores specific named facts about people, places, or things.
+	EntityMemory memory.EntityStore
+
 	// Guardrails validate agent output before it is returned.
 	Guardrails []guardrails.Guardrail
 
 	// SelfHealing enables the agent to autonomously correct tool errors.
 	SelfHealing bool
+
+	// Cache persists LLM and tool results to save costs and latency.
+	Cache llm.Cache
 
 	// UsageMetrics tracks token consumption during the agent's lifecycle.
 	UsageMetrics map[string]int
@@ -79,18 +88,42 @@ type Agent struct {
 // AgentOption defines a functional option for configuring an Agent.
 type AgentOption func(*Agent)
 
-// WithMemory enables or disables memory for the agent.
-func WithMemory(enabled bool) AgentOption {
+// WithMemory enables memory for the agent with a specific store.
+func WithMemory(store memory.Store) AgentOption {
 	return func(a *Agent) { 
-		if enabled {
-			a.Memory = memory.NewInMemCosineStore()
-		}
+		a.Memory = store
+	}
+}
+
+// WithEntityMemory enables entity-specific memory for the agent.
+func WithEntityMemory(store memory.EntityStore) AgentOption {
+	return func(a *Agent) {
+		a.EntityMemory = store
+	}
+}
+
+// WithTools adds tools to the agent.
+func WithTools(t []tools.Tool) AgentOption {
+	return func(a *Agent) {
+		a.Tools = append(a.Tools, t...)
+	}
+}
+
+// WithVerbose toggles verbose logging.
+func WithVerbose(v bool) AgentOption {
+	return func(a *Agent) {
+		a.Verbose = v
 	}
 }
 
 // WithSelfHealing enables or disables autonomous error correction.
 func WithSelfHealing(enabled bool) AgentOption {
 	return func(a *Agent) { a.SelfHealing = enabled }
+}
+
+// WithCache enables result caching for the agent.
+func WithCache(cache llm.Cache) AgentOption {
+	return func(a *Agent) { a.Cache = cache }
 }
 
 // WithMaxIterations sets the maximum number of steps an agent can take.
@@ -241,7 +274,7 @@ Once you have gathered all necessary information and are ready to provide the fi
 		// Publish telemetry event
 		telemetry.GlobalBus.Publish(telemetry.Event{
 			Type:      telemetry.EventAgentThinking,
-			AgentRole: a.Role,
+			AgentRole: strings.Clone(a.Role),
 			Payload: map[string]interface{}{
 				"iteration": i + 1,
 			},
@@ -256,22 +289,38 @@ Once you have gathered all necessary information and are ready to provide the fi
 
 		// LLM Generation (Streaming vs Block)
 		var responseText string
-		if a.StepStreamCallback != nil {
-			stream, err := a.LLM.StreamGenerate(ctx, messages, options)
-			if err != nil {
-				return nil, crewErrors.NewAgentError(a.Role, i+1, fmt.Errorf("%w: %v", crewErrors.ErrLLMFailed, err))
+		cacheKey := ""
+		if a.Cache != nil {
+			cacheKey = llm.GenerateCacheKey(fmt.Sprintf("%T", a.LLM), fmt.Sprintf("%v", messages), options)
+			if cached, ok := a.Cache.Get(cacheKey); ok {
+				responseText = cached
+				if a.Verbose {
+					defaultLogger.Info("💾 Agent LLM Cache Hit", slog.String("role", a.Role))
+				}
 			}
-			var sb strings.Builder
-			for token := range stream {
-				sb.WriteString(token)
-				a.StepStreamCallback(token)
+		}
+
+		if responseText == "" {
+			if a.StepStreamCallback != nil {
+				stream, err := a.LLM.StreamGenerate(ctx, messages, options)
+				if err != nil {
+					return nil, crewErrors.NewAgentError(strings.Clone(strings.TrimSpace(a.Role)), i+1, fmt.Errorf("%w: %v", crewErrors.ErrLLMFailed, err))
+				}
+				var sb strings.Builder
+				for token := range stream {
+					sb.WriteString(token)
+					a.StepStreamCallback(token)
+				}
+				responseText = sb.String()
+			} else {
+				var err error
+				responseText, err = a.LLM.Generate(ctx, messages, options)
+				if err != nil {
+					return nil, crewErrors.NewAgentError(strings.Clone(strings.TrimSpace(a.Role)), i+1, fmt.Errorf("%w: %v", crewErrors.ErrLLMFailed, err))
+				}
 			}
-			responseText = sb.String()
-		} else {
-			var err error
-			responseText, err = a.LLM.Generate(ctx, messages, options)
-			if err != nil {
-				return nil, crewErrors.NewAgentError(a.Role, i+1, fmt.Errorf("%w: %v", crewErrors.ErrLLMFailed, err))
+			if a.Cache != nil {
+				_ = a.Cache.Set(cacheKey, responseText)
 			}
 		}
 
@@ -306,7 +355,7 @@ Once you have gathered all necessary information and are ready to provide the fi
 				// Publish telemetry event
 				telemetry.GlobalBus.Publish(telemetry.Event{
 					Type:      telemetry.EventToolStarted,
-					AgentRole: a.Role,
+					AgentRole: strings.Clone(a.Role),
 					Payload: map[string]interface{}{
 						"tool":  toolReq.Tool,
 						"input": toolReq.Input,
@@ -327,12 +376,30 @@ Once you have gathered all necessary information and are ready to provide the fi
 				}
 
 				// Tool Execution
-				toolResult, toolErr := activeTool.Execute(ctx, toolReq.Input)
+				var toolResult string
+				var toolErr error
+				toolCacheKey := ""
+				if a.Cache != nil {
+					toolCacheKey = fmt.Sprintf("tool:%s|input:%v", toolReq.Tool, toolReq.Input)
+					if cached, ok := a.Cache.Get(toolCacheKey); ok {
+						toolResult = cached
+						if a.Verbose {
+							defaultLogger.Info("💾 Agent Tool Cache Hit", slog.String("role", a.Role), slog.String("tool", toolReq.Tool))
+						}
+					}
+				}
+
+				if toolResult == "" {
+					toolResult, toolErr = activeTool.Execute(ctx, toolReq.Input)
+					if toolErr == nil && a.Cache != nil {
+						_ = a.Cache.Set(toolCacheKey, toolResult)
+					}
+				}
 
 				// Publish telemetry event
 				telemetry.GlobalBus.Publish(telemetry.Event{
 					Type:      telemetry.EventToolFinished,
-					AgentRole: a.Role,
+					AgentRole: strings.Clone(a.Role),
 					Payload: map[string]interface{}{
 						"tool":   toolReq.Tool,
 						"result": toolResult,
@@ -382,7 +449,7 @@ Once you have gathered all necessary information and are ready to provide the fi
 					}
 					continue
 				}
-				return nil, crewErrors.NewAgentError(a.Role, i+1,
+				return nil, crewErrors.NewAgentError(strings.Clone(strings.TrimSpace(a.Role)), i+1,
 					fmt.Errorf("%w: %v", crewErrors.ErrGuardrailFailed, err))
 			}
 		}
@@ -415,7 +482,7 @@ Once you have gathered all necessary information and are ready to provide the fi
 		// Publish telemetry event
 		telemetry.GlobalBus.Publish(telemetry.Event{
 			Type:      telemetry.EventAgentFinished,
-			AgentRole: a.Role,
+			AgentRole: strings.Clone(a.Role),
 			Payload: map[string]interface{}{
 				"result": responseText,
 			},
@@ -424,7 +491,7 @@ Once you have gathered all necessary information and are ready to provide the fi
 		return responseText, nil
 	}
 
-	return nil, crewErrors.NewAgentError(a.Role, maxLoops,
+	return nil, crewErrors.NewAgentError(strings.Clone(strings.TrimSpace(a.Role)), maxLoops,
 		fmt.Errorf("%w (%d iterations)", crewErrors.ErrMaxIterations, maxLoops))
 }
 
@@ -435,29 +502,48 @@ func (a *Agent) recallMemory(ctx context.Context, taskInput string) string {
 		return taskInput
 	}
 
-	// Generate embedding for the current task input
-	vector, err := a.LLM.GenerateEmbedding(ctx, taskInput)
-	if err != nil {
-		if a.Verbose {
-			defaultLogger.Warn("Memory recall: embedding generation failed", slog.String("error", err.Error()))
-		}
-		return taskInput
-	}
-
-	// Search for relevant past memories
-	items, err := a.Memory.Search(ctx, vector, 3)
-	if err != nil || len(items) == 0 {
-		return taskInput
-	}
-
 	var sb strings.Builder
-	sb.WriteString("RELEVANT PAST CONTEXT:\n")
-	for i, item := range items {
-		sb.WriteString(fmt.Sprintf("--- Memory %d ---\n%s\n", i+1, item.Text))
+	hasContext := false
+
+	// 1. Vector Search (Short-Term/Long-Term)
+	if a.Memory != nil {
+		vector, err := a.LLM.GenerateEmbedding(ctx, taskInput)
+		if err == nil {
+			items, _ := a.Memory.Search(ctx, vector, 2)
+			if len(items) > 0 {
+				if !hasContext {
+					sb.WriteString("RELEVANT PAST CONTEXT:\n")
+					hasContext = true
+				}
+				for i, item := range items {
+					sb.WriteString(fmt.Sprintf("--- Historical Memory %d ---\n%s\n", i+1, item.Text))
+				}
+			}
+		}
 	}
-	sb.WriteString("--------------------------\n\n")
-	sb.WriteString(taskInput)
-	return sb.String()
+
+	// 2. Entity Fact Retrieval
+	if a.EntityMemory != nil {
+		// Use the task input as a keyword search for entities
+		entities, _ := a.EntityMemory.Search(ctx, taskInput, 2)
+		if len(entities) > 0 {
+			if !hasContext {
+				sb.WriteString("RELEVANT PAST CONTEXT:\n")
+				hasContext = true
+			}
+			for i, entity := range entities {
+				sb.WriteString(fmt.Sprintf("--- Tracked Entity %d ---\n%s\n", i+1, entity.Text))
+			}
+		}
+	}
+
+	if hasContext {
+		sb.WriteString("--------------------------\n\n")
+		sb.WriteString(taskInput)
+		return sb.String()
+	}
+
+	return taskInput
 }
 
 // saveMemory persists the task input and result to the agent's memory store.
@@ -482,10 +568,40 @@ func (a *Agent) saveMemory(ctx context.Context, taskInput, result string) {
 			"type":       "execution_result",
 		},
 	}
+	_ = a.Memory.Add(ctx, item)
 
-	if err := a.Memory.Add(ctx, item); err != nil {
-		if a.Verbose {
-			defaultLogger.Warn("Memory save: storage failed", slog.String("error", err.Error()))
+	// If EntityMemory is present, we try to extract and save specific facts
+	if a.EntityMemory != nil {
+		go a.extractAndStoreEntities(ctx, result)
+	}
+}
+
+// extractAndStoreEntities uses the LLM to find entities/facts in a result and saves them.
+func (a *Agent) extractAndStoreEntities(ctx context.Context, text string) {
+	prompt := fmt.Sprintf(
+		"Extract key entities and facts from the following text. "+
+		"Return ONLY a JSON array of objects like: [{\"entity\": \"Name\", \"value\": \"Value\", \"description\": \"Context\"}]. "+
+		"If none found, return [].\nText: %s", text)
+
+	response, err := a.LLM.Generate(ctx, []llm.Message{
+		{Role: "system", Content: "You are a precise data extractor."},
+		{Role: "user", Content: prompt},
+	}, nil)
+
+	if err != nil {
+		return
+	}
+
+	var entities []struct {
+		Entity      string `json:"entity"`
+		Value       string `json:"value"`
+		Description string `json:"description"`
+	}
+
+	if err := json.Unmarshal([]byte(strings.TrimSpace(response)), &entities); err == nil {
+		for _, e := range entities {
+			_ = a.EntityMemory.Upsert(ctx, e.Entity, e.Value, e.Description)
 		}
 	}
 }
+

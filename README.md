@@ -9,10 +9,12 @@
 ## 🌟 Why Choose Crew-GO?
 
 While Python frameworks are great for prototyping, **production AI systems require guarantees**. Crew-GO provides:
-1. **True Concurrency**: Python's GIL limits true parallelism. Crew-GO uses Go's native goroutines to blast through hundreds of parallel agent tasks simultaneously.
-2. **Type Safety**: No more runtime `KeyError` crashes. Every Agent, Task, and Tool in Crew-GO is strictly typed.
+1. **True Concurrency**: Python's GIL limits true parallelism. Crew-GO uses Go's native goroutines to blast through hundreds of parallel agent tasks simultaneously, now with **Smart Concurrency Gating**.
+2. **Type Safety**: No more runtime `KeyError` crashes. Every Agent, Task, and Tool in Crew-GO is strictly typed, and now supports **Strongly-Typed Output Extraction via Go Generics**.
 3. **Structured Outputs**: Native extraction of LLM JSON responses directly into Go structs.
-4. **Extreme Performance**: Compiled binaries that deploy anywhere with a tiny memory footprint.
+4. **Resilient Networking**: Built-in **Exponential Backoff & Automatic Retries** for HTTP 429 (Rate Limit) and 5xx errors.
+5. **Elite Tier DX**: Premium **Fluent Builder APIs** and **Event-Driven Flows** (Listen/Emit) for elegant choreography.
+6. **Extreme Performance**: Compiled binaries that deploy anywhere with a tiny memory footprint.
 
 ---
 
@@ -21,7 +23,6 @@ While Python frameworks are great for prototyping, **production AI systems requi
 ### 🛡️ 1. Multi-modal Execution Sandboxing
 Execute code-heavy or untrusted tasks with maximum security and absolute isolation. Crew-GO natively supports multiple sandbox environments:
 - **Docker Integration**: Run agent-generated code inside ephemeral, resource-limited Docker containers (CPU/Memory caps).
-- **E2B Cloud**: Secure, cloud-based environments for production-grade code interpretation without local overhead.
 - **WASM (wazero)**: Lightning-fast, zero-dependency local sandboxing for untrusted snippets directly within your Go binary.
 - **Local Isolation**: Sub-process isolation for trusted local environments.
 
@@ -31,6 +32,12 @@ Experience unmatched observability with our **Premium Glassmorphic UI**.
 - **Agent Status Visualization**: Real-time cards showing current agent activity (Idle, Thinking, Working) and system metrics.
 - **WebSocket Streaming**: Powered by a high-performance Go backend event bus for zero-latency updates.
 - **CLI Integration**: Simply append `--ui` to your `crewai kickoff` command to instantly launch the dashboard.
+
+### 🧠 3. Advanced Persistence (Short-term, Long-term, & Entity Memory)
+Beyond standard RAG, Crew-GO implements a sophisticated multi-layer memory system:
+- **Short-term Memory**: Contextual thread of the current execution.
+- **Long-term Memory**: Historical vector-backed database of past interactions.
+- **Entity Memory (Elite)**: Persistent tracking of specific metadata (facts, keys, preferences) across disparate tasks.
 
 ### 🧰 3. Industrial Tool Arsenal (24+ Native Tools)
 Equip your agents with a massive suite of capabilities out-of-the-box:
@@ -74,14 +81,14 @@ go install github.com/Ecook14/crewai-go/cmd/crewai@latest
 
 ### 3. Scaffold a New Project
 ```bash
-crewai create my-ops-crew
+~/go/bin/crewai create my-ops-crew
 cd my-ops-crew
 ```
 
 ### 4. Run your Crew with the Live UI
 ```bash
 export OPENAI_API_KEY=your_key
-crewai kickoff --ui
+~/go/bin/crewai kickoff --ui
 ```
 *Navigate to `http://localhost:8080/web-ui` to watch your agents think!*
 
@@ -103,7 +110,7 @@ To truly master Crew-GO, dive into our extensive guides:
 | Capability | Standard Crew Frameworks | Crew-GO (Elite Tier) |
 | :--- | :--- | :--- |
 | **Concurrency Model** | Blocking / Asyncio Loops | **Native Goroutines (Massive Async)** |
-| **Execution Sandboxes**| Local Process | **Docker, E2B Cloud, WASM** |
+| **Execution Sandboxes**| Local Process | **Docker, WASM, Local** |
 | **Observability** | Standard Output logs | **Live WebSocket Glassmorphic Dashboard** |
 | **Orchestration Logic**| Sequential Pipelines | **Cyclic Graphs & State Machines** |
 | **Safety & Validation**| Basic Prompting | **PII Redaction, LLM Review, Strict Schemas** |

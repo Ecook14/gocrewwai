@@ -20,6 +20,10 @@ type Flow struct {
 	nodes []Node
 	state State
 	mu    sync.RWMutex
+
+	// Event-Driven Architecture
+	listeners map[string][]Node
+	lMu       sync.RWMutex
 }
 
 func NewFlow(initialState State) *Flow {
@@ -27,21 +31,63 @@ func NewFlow(initialState State) *Flow {
 		initialState = make(State)
 	}
 	return &Flow{
-		nodes: make([]Node, 0),
-		state: initialState,
+		nodes:     make([]Node, 0),
+		state:     initialState,
+		listeners: make(map[string][]Node),
 	}
 }
 
-// AddNode pushes a generic work block onto the state machine chain.
+// AddNode pushes a generic work block onto the state machine chain manually.
 func (f *Flow) AddNode(n Node) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.nodes = append(f.nodes, n)
 }
 
-// Kickoff securely runs the state machine top-to-bottom.
-// In Go, because Channels and WaitGroups are first-class citizens, this base sequencer
-// natively supports Context timeouts far more securely than Python loops.
+// On registers a listener for a specific event. When the event is emitted, this node executes.
+func (f *Flow) On(event string, n Node) {
+	f.lMu.Lock()
+	defer f.lMu.Unlock()
+	f.listeners[event] = append(f.listeners[event], n)
+}
+
+// Emit broadcasts an event to all registered listeners.
+func (f *Flow) Emit(ctx context.Context, event string, state State) error {
+	f.lMu.RLock()
+	handlers := f.listeners[event]
+	f.lMu.RUnlock()
+
+	if len(handlers) == 0 {
+		return nil
+	}
+
+	slog.Info("📡 Flow Event Emitted", slog.String("event", event), slog.Int("listeners", len(handlers)))
+
+	for _, handler := range handlers {
+		newState, err := handler(ctx, state)
+		if err != nil {
+			return err
+		}
+		// Merge outputs back into the master state
+		f.mu.Lock()
+		for k, v := range newState {
+			f.state[k] = v
+		}
+		f.mu.Unlock()
+	}
+	return nil
+}
+
+// Start kicks off the flow from a specific starting event.
+func (f *Flow) Start(ctx context.Context, event string) (State, error) {
+	slog.Info("🌊 Starting Event Flow...", slog.String("entry_event", event))
+	if err := f.Emit(ctx, event, f.state); err != nil {
+		return nil, err
+	}
+	return f.state, nil
+}
+
+// Kickoff securely runs the state machine top-to-bottom sequentially.
 func (f *Flow) Kickoff(ctx context.Context) (State, error) {
 	slog.Info("🌊 Starting Event Flow...", slog.Int("nodes", len(f.nodes)))
 

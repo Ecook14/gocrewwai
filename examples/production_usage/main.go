@@ -33,7 +33,7 @@ func main() {
 
 	// 2. Setup Production Memory (Redis Backend)
 	// Assuming local Redis for this example
-	redisStore, err := memory.NewRedisStore("localhost:6379", "", 0, "prod_crew:")
+	redisStore, err := memory.NewRedisStore([]string{"localhost:6379"}, "", 0, "prod_crew:")
 	if err != nil {
 		fmt.Printf("Redis not available, falling back to In-Memory: %v\n", err)
 	}
@@ -42,7 +42,6 @@ func main() {
 	if redisStore != nil {
 		store = redisStore
 	}
-	mem := memory.NewLongTermMemory(store, model)
 
 	// 3. Define Specialized Agents
 	
@@ -57,8 +56,7 @@ func main() {
 		Backstory:        "Expert in Python and Docker environments.",
 		LLM:              model,
 		Tools:            []tools.Tool{interpreter},
-		Memory:           true,
-		LongTermMemory:   mem,
+		Memory:           store,
 		AllowDelegation:  true,
 	}
 

@@ -64,3 +64,36 @@ func (s *InMemCosineStore) Search(ctx context.Context, queryVector []float32, li
 
 	return out, nil
 }
+
+// BulkAdd inserts multiple items.
+func (s *InMemCosineStore) BulkAdd(ctx context.Context, items []*MemoryItem) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.items = append(s.items, items...)
+	return nil
+}
+
+// Delete removes an item by ID.
+func (s *InMemCosineStore) Delete(ctx context.Context, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i, item := range s.items {
+		if item.ID == id {
+			s.items = append(s.items[:i], s.items[i+1:]...)
+			return nil
+		}
+	}
+	return nil
+}
+
+// Count returns the number of stored items.
+func (s *InMemCosineStore) Count(ctx context.Context) (int, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.items), nil
+}
+
+// Close is a no-op for in-memory stores.
+func (s *InMemCosineStore) Close() error {
+	return nil
+}

@@ -166,6 +166,62 @@ func (s *ChromaStore) Search(ctx context.Context, queryVector []float32, limit i
 	return items, nil
 }
 
+// BulkAdd inserts multiple items by calling Add for each.
+func (s *ChromaStore) BulkAdd(ctx context.Context, items []*MemoryItem) error {
+	for _, item := range items {
+		if err := s.Add(ctx, item); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Delete removes an item from the collection by ID.
+func (s *ChromaStore) Delete(ctx context.Context, id string) error {
+	deleteURL := fmt.Sprintf("%s/api/v1/collections/%s/delete", s.BaseURL, s.CollectionID)
+	payload := map[string]interface{}{
+		"ids": []string{id},
+	}
+	jsonPayload, _ := json.Marshal(payload)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, deleteURL, bytes.NewBuffer(jsonPayload))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("chroma delete error: %s", string(body))
+	}
+	return nil
+}
+
+// Count returns the number of items in the collection.
+func (s *ChromaStore) Count(ctx context.Context) (int, error) {
+	countURL := fmt.Sprintf("%s/api/v1/collections/%s/count", s.BaseURL, s.CollectionID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, countURL, nil)
+	if err != nil {
+		return 0, err
+	}
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	var count int
+	if err := json.NewDecoder(resp.Body).Decode(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
 func (s *ChromaStore) Close() error {
 	// HTTP client doesn't need explicit closing in this context
 	return nil

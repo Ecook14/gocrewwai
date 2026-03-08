@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // ScraperTool reads the raw text content of a web page.
@@ -22,15 +23,21 @@ func (t *ScraperTool) Description() string {
 }
 
 func (t *ScraperTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
-	url, ok := input["url"].(string)
+	urlStr, ok := input["url"].(string)
 	if !ok {
 		return "", fmt.Errorf("missing 'url' parameter")
 	}
 
-	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
-	req.Header.Set("User-Agent", "Crew-GO Agent/1.0")
+	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("User-Agent", "Crew-GO Agent/1.0 (WebScraper)")
 
-	resp, err := http.DefaultClient.Do(req)
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch URL: %w", err)
 	}
@@ -40,18 +47,40 @@ func (t *ScraperTool) Execute(ctx context.Context, input map[string]interface{})
 		return "", fmt.Errorf("webpage returned status %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("failed to read body: %w", err)
 	}
 
-	// Advanced Implementation: Extracts clean text context from the raw HTML body.
-	text := string(body)
-	if len(text) > 15000 {
-		text = text[:15000] + "\n... [Content Truncated]"
+	body := string(bodyBytes)
+	
+	// Basic HTML-to-Text cleanup
+	body = stripHTML(body)
+
+	if len(body) > 15000 {
+		body = body[:15000] + "\n... [Content Truncated]"
 	}
 
-	return strings.TrimSpace(text), nil
+	return strings.TrimSpace(body), nil
+}
+
+func stripHTML(html string) string {
+	var sb strings.Builder
+	inTag := false
+	for _, r := range html {
+		if r == '<' {
+			inTag = true
+			continue
+		}
+		if r == '>' {
+			inTag = false
+			continue
+		}
+		if !inTag {
+			sb.WriteRune(r)
+		}
+	}
+	return sb.String()
 }
 
 func (t *ScraperTool) RequiresReview() bool { return false }

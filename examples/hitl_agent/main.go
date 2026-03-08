@@ -26,10 +26,7 @@ func main() {
 		return
 	}
 
-	model := &llm.OpenAIClient{
-		APIKey: apiKey,
-		Model:  "gpt-4o",
-	}
+	model := llm.NewOpenAIClient(apiKey)
 
 	// 1. Create a tool that requires review
 	fileTool := &ReviewableFileWriteTool{
@@ -44,7 +41,7 @@ func main() {
 		LLM:       model,
 		Tools:     []tools.Tool{fileTool},
 		Verbose:   true,
-		StepReview: func(toolName string, input map[string]interface{}) bool {
+		StepReview: func(toolName string, input interface{}) bool {
 			fmt.Printf("\n[HUMAN-IN-THE-LOOP] Agent wants to use tool: %s\n", toolName)
 			fmt.Printf("Input: %v\n", input)
 			fmt.Print("Do you approve? (y/n): ")

@@ -9,6 +9,8 @@ import (
 	"mime/multipart"
 	"net/http"
 	"time"
+	"log/slog"
+	"os"
 
 	"github.com/sashabaranov/go-openai"
 )
@@ -27,11 +29,65 @@ type OpenAIClient struct {
 	HTTPClient *http.Client
 }
 
+// retryRoundTripper adds resilient retries for OpenAI API 429 and 5xx responses
+type retryRoundTripper struct {
+	next       http.RoundTripper
+	maxRetries int
+}
+
+func (r *retryRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	var resp *http.Response
+	var err error
+
+	for i := 0; i <= r.maxRetries; i++ {
+		resp, err = r.next.RoundTrip(req)
+		
+		if err != nil {
+			// Network err
+		} else if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500 {
+			resp.Body.Close()
+		} else {
+			return resp, nil
+		}
+
+		if i < r.maxRetries {
+			delay := time.Duration(1<<i) * time.Second 
+			if resp != nil {
+				if retryAfter := resp.Header.Get("Retry-After"); retryAfter != "" {
+					if parsed, pErr := time.ParseDuration(retryAfter + "s"); pErr == nil {
+						delay = parsed
+					}
+				}
+			}
+			
+			status := 0
+			if resp != nil {
+				status = resp.StatusCode
+			}
+			slog.Warn("OpenAI API rate limited or unavailable, retrying", "status", status, "delay", delay, "attempt", i+1)
+			
+			select {
+			case <-req.Context().Done():
+				return nil, req.Context().Err()
+			case <-time.After(delay):
+			}
+		}
+	}
+	return resp, err
+}
+
 func NewOpenAIClient(apiKey string) *OpenAIClient {
-	// Elite Pattern: Robust networking with explicit timeouts.
-	// Prevents hung processes during heavy multimodal transfers.
+	if apiKey == "" {
+		apiKey = os.Getenv("OPENAI_API_KEY")
+	}
+
+	// Robust networking with explicit timeouts and retry backoff.
 	httpClient := &http.Client{
 		Timeout: 60 * time.Second,
+		Transport: &retryRoundTripper{
+			next:       http.DefaultTransport,
+			maxRetries: 3,
+		},
 	}
 
 	config := openai.DefaultConfig(apiKey)
@@ -93,6 +149,69 @@ func (c *OpenAIClient) Generate(ctx context.Context, messages []Message, options
 	}
 
 	return resp.Choices[0].Message.Content, nil
+}
+
+// GenerateWithUsage implements Client — returns both text and token usage data.
+func (c *OpenAIClient) GenerateWithUsage(ctx context.Context, messages []Message, options map[string]interface{}) (string, *Usage, error) {
+	if c.APIKey == "" {
+		return "", nil, fmt.Errorf("OpenAI API Key is required")
+	}
+
+	var oaiMessages []openai.ChatCompletionMessage
+	for _, m := range messages {
+		if len(m.Images) > 0 {
+			parts := []openai.ChatMessagePart{
+				{Type: openai.ChatMessagePartTypeText, Text: m.Content},
+			}
+			for _, img := range m.Images {
+				parts = append(parts, openai.ChatMessagePart{
+					Type: openai.ChatMessagePartTypeImageURL,
+					ImageURL: &openai.ChatMessageImageURL{
+						URL:    img,
+						Detail: openai.ImageURLDetailAuto,
+					},
+				})
+			}
+			oaiMessages = append(oaiMessages, openai.ChatCompletionMessage{
+				Role:         m.Role,
+				MultiContent: parts,
+			})
+		} else {
+			oaiMessages = append(oaiMessages, openai.ChatCompletionMessage{
+				Role:    m.Role,
+				Content: m.Content,
+			})
+		}
+	}
+
+	model := openai.GPT4o
+	if options != nil && options["model"] != nil {
+		model = options["model"].(string)
+	}
+
+	req := openai.ChatCompletionRequest{
+		Model:    model,
+		Messages: oaiMessages,
+	}
+
+	start := time.Now()
+	resp, err := c.client.CreateChatCompletion(ctx, req)
+	latency := time.Since(start).Milliseconds()
+	if err != nil {
+		return "", nil, fmt.Errorf("ChatCompletion error: %v", err)
+	}
+
+	usage := &Usage{
+		PromptTokens:     resp.Usage.PromptTokens,
+		CompletionTokens: resp.Usage.CompletionTokens,
+		TotalTokens:      resp.Usage.TotalTokens,
+		Model:            model,
+		Provider:         "openai",
+		LatencyMs:        latency,
+	}
+	usage.CostUSD = CalculateCost(*usage)
+
+	return resp.Choices[0].Message.Content, usage, nil
 }
 
 // GenerateStructured implements generation with structured JSON schema outputs.

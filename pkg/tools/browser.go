@@ -70,7 +70,15 @@ func (t *BrowserTool) Execute(ctx context.Context, input map[string]interface{})
 		if url == "" {
 			return "", fmt.Errorf("navigate requires 'url'")
 		}
-		err := chromedp.Run(ctx, chromedp.Navigate(url))
+		// Enhanced: Wait for a specific selector if provided, otherwise just navigate
+		waitSelector, _ := input["wait_selector"].(string)
+		var actions []chromedp.Action
+		actions = append(actions, chromedp.Navigate(url))
+		if waitSelector != "" {
+			actions = append(actions, chromedp.WaitVisible(waitSelector, chromedp.ByQuery))
+		}
+		
+		err := chromedp.Run(ctx, actions...)
 		if err != nil {
 			return "", err
 		}
@@ -81,7 +89,10 @@ func (t *BrowserTool) Execute(ctx context.Context, input map[string]interface{})
 		if selector == "" {
 			return "", fmt.Errorf("click requires 'selector'")
 		}
-		err := chromedp.Run(ctx, chromedp.Click(selector, chromedp.ByQuery))
+		err := chromedp.Run(ctx, 
+			chromedp.WaitVisible(selector, chromedp.ByQuery),
+			chromedp.Click(selector, chromedp.ByQuery),
+		)
 		if err != nil {
 			return "", err
 		}
@@ -93,7 +104,10 @@ func (t *BrowserTool) Execute(ctx context.Context, input map[string]interface{})
 		if selector == "" || text == "" {
 			return "", fmt.Errorf("type requires 'selector' and 'text'")
 		}
-		err := chromedp.Run(ctx, chromedp.SendKeys(selector, text, chromedp.ByQuery))
+		err := chromedp.Run(ctx, 
+			chromedp.WaitVisible(selector, chromedp.ByQuery),
+			chromedp.SendKeys(selector, text, chromedp.ByQuery),
+		)
 		if err != nil {
 			return "", err
 		}
@@ -120,9 +134,20 @@ func (t *BrowserTool) Execute(ctx context.Context, input map[string]interface{})
 			selector = "body"
 		}
 		var text string
-		err := chromedp.Run(ctx, chromedp.Text(selector, &text, chromedp.ByQuery))
-		if err != nil {
-			return "", err
+		// Enhanced: Use JavaScript for cleaner text extraction of the whole page if body
+		if selector == "body" {
+			err := chromedp.Run(ctx, chromedp.Evaluate(`document.body.innerText`, &text))
+			if err != nil {
+				return "", err
+			}
+		} else {
+			err := chromedp.Run(ctx, 
+				chromedp.WaitVisible(selector, chromedp.ByQuery),
+				chromedp.Text(selector, &text, chromedp.ByQuery),
+			)
+			if err != nil {
+				return "", err
+			}
 		}
 		result = text
 

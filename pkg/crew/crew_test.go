@@ -71,10 +71,11 @@ func TestCrewKickoff_Hierarchical(t *testing.T) {
 		Process: Hierarchical,
 	}
 
-	res, err := c.Kickoff(context.Background())
+	_, err := c.Kickoff(context.Background())
 	if err != nil {
 		t.Fatalf("Kickoff failed: %v", err)
 	}
+}
 
 func TestCrewKickoff_DelegationInjection(t *testing.T) {
 	mock := &mockLLM{
@@ -107,5 +108,40 @@ func TestCrewKickoff_DelegationInjection(t *testing.T) {
 
 	if !foundDelegation {
 		t.Errorf("Expected DelegateWork tool to be injected")
+	}
+}
+
+func TestCrewKickoff_Planning(t *testing.T) {
+	mock := &mockLLM{
+		generateFunc: func(messages []llm.Message) (string, error) {
+			for _, m := range messages {
+				if strings.Contains(m.Content, "Strategic Manager") {
+					return "Plan: Do A then B.", nil
+				}
+			}
+			return "Done", nil
+		},
+	}
+
+	agent := &agents.Agent{Role: "Worker", LLM: mock}
+	task := &tasks.Task{Description: "Job", Agent: agent}
+
+	c := &Crew{
+		Agents:   []*agents.Agent{agent},
+		Tasks:    []*tasks.Task{task},
+		Planning: true,
+		Process:  Sequential,
+	}
+
+	_, err := c.Kickoff(context.Background())
+	if err != nil {
+		t.Fatalf("Kickoff failed: %v", err)
+	}
+
+	if !strings.Contains(task.Description, "[STRATEGIC PLAN]") {
+		t.Error("Expected task description to contain strategic plan")
+	}
+	if !strings.Contains(task.Description, "Plan: Do A then B.") {
+		t.Error("Expected task description to contain the generated plan content")
 	}
 }

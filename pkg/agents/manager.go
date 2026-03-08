@@ -63,11 +63,40 @@ Respond ONLY with the name of the 'Role' of the agent.`, taskDescription, agentR
 	for _, a := range m.ManagedAgents {
 		if strings.Contains(strings.ToLower(chosenRole), strings.ToLower(a.Role)) {
 			if m.Verbose {
-				slog.Info("Manager delegated task", slog.String("agent", a.Role))
+				slog.Info("Manager delegated task", slog.String("agent", strings.Clone(a.Role)))
 			}
 			return a, nil
 		}
 	}
 
 	return nil, fmt.Errorf("manager could not find agent with role: %s", chosenRole)
+}
+
+func (m *ManagerAgent) GeneratePlan(ctx context.Context, tasks_list string) (string, error) {
+	prompt := fmt.Sprintf(`You are the Strategic Manager. Given the following list of tasks for the Crew:
+%s
+
+Please create a high-level strategic plan. 
+Include:
+1. Coordination strategy (which tasks depend on which).
+2. Key risks or hurdles for the agents.
+3. How to ensure the final output is unified and consistent.
+
+Respond with the plan details.`, tasks_list)
+
+	messages := []llm.Message{
+		{Role: "system", Content: m.Backstory},
+		{Role: "user", Content: prompt},
+	}
+
+	if m.Verbose {
+		slog.Info("Manager generating strategic plan")
+	}
+
+	response, err := m.LLM.Generate(ctx, messages, nil)
+	if err != nil {
+		return "", fmt.Errorf("manager failed to generate plan: %w", err)
+	}
+
+	return strings.TrimSpace(response), nil
 }
