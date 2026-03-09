@@ -203,6 +203,25 @@ func (s *PineconeStore) Count(ctx context.Context) (int, error) {
 	return result.TotalVectorCount, nil
 }
 
+func (s *PineconeStore) Reset(ctx context.Context) error {
+	payload := map[string]interface{}{
+		"deleteAll": true,
+		"namespace": s.Namespace,
+	}
+
+	resp, err := s.doRequest(ctx, http.MethodPost, "/vectors/delete", payload)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("pinecone reset error: %s", string(body))
+	}
+	return nil
+}
+
 func (s *PineconeStore) Close() error {
 	return nil
 }

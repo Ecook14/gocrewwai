@@ -12,6 +12,7 @@ import (
 
 // SerperTool uses the Serper.dev API to perform web searches.
 type SerperTool struct {
+	BaseTool
 	APIKey string
 }
 
@@ -19,14 +20,15 @@ func NewSerperTool(apiKey string) *SerperTool {
 	if apiKey == "" {
 		apiKey = os.Getenv("SERPER_API_KEY")
 	}
-	return &SerperTool{APIKey: apiKey}
+	return &SerperTool{
+		BaseTool: BaseTool{
+			NameValue:        "SerperSearch",
+			DescriptionValue: "Searches the web for a given query and returns search results (titles, snippets, and links).",
+		},
+		APIKey: apiKey,
+	}
 }
 
-func (t *SerperTool) Name() string { return "SerperSearch" }
-
-func (t *SerperTool) Description() string {
-	return "Searches the web for a given query and returns search results (titles, snippets, and links)."
-}
 
 func (t *SerperTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	query, ok := input["query"].(string)

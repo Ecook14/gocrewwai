@@ -201,3 +201,17 @@ func TestAgentExecute_Cache(t *testing.T) {
 		t.Errorf("Expected no new LLM call (cache hit), got %d", callCount)
 	}
 }
+
+func TestAgent_JSONMarshaling(t *testing.T) {
+	agent := &Agent{
+		Role: "MarshalTester",
+		BeforeLLMCall: func(messages []llm.Message) []llm.Message {
+			return messages
+		},
+	}
+
+	_, err := json.Marshal(agent)
+	if err != nil {
+		t.Fatalf("Failed to marshal agent to JSON: %v. This likely means a function field is missing a `json:\"-\"` tag.", err)
+	}
+}

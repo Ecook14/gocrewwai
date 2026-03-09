@@ -8,20 +8,19 @@ import (
 
 // FileWriteTool allows agents to write or overwrite contents to a local file.
 type FileWriteTool struct {
+	BaseTool
 	Options map[string]interface{}
 }
 
 func NewFileWriteTool() *FileWriteTool {
-	return &FileWriteTool{}
+	return &FileWriteTool{
+		BaseTool: BaseTool{
+			NameValue:        "FileWriteTool",
+			DescriptionValue: "Writes content to a specified file. Input requires 'file_path' as a string and 'content' as a string.",
+		},
+	}
 }
 
-func (t *FileWriteTool) Name() string {
-	return "FileWriteTool"
-}
-
-func (t *FileWriteTool) Description() string {
-	return "Writes content to a specified file. Input requires 'file_path' as a string and 'content' as a string."
-}
 
 func (t *FileWriteTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	pathRaw, okPath := input["file_path"]

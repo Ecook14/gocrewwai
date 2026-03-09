@@ -8,9 +8,7 @@ import (
 	"time"
 
 	"github.com/Ecook14/gocrewwai/pkg/agents"
-	"github.com/Ecook14/gocrewwai/pkg/crew"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
-	"github.com/Ecook14/gocrewwai/pkg/tasks"
 )
 
 func main() {
@@ -24,7 +22,7 @@ func main() {
 	defer os.RemoveAll("./demo_cache") // Cleanup for demo
 
 	// 2. Setup Client
-	client := llm.NewOpenRouterClient(apiKey, "google/gemini-2.0-flash-lite-preview-02-05:free")
+	client := llm.NewOpenRouterClient(apiKey, "")
 
 	// 3. Create Agent with Cache
 	agent := agents.NewAgentBuilder().

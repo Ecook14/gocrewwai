@@ -10,14 +10,13 @@ import (
 )
 
 // MySQLTool allows agents to interact with a MySQL/MariaDB database.
-// Input: {"query": "SELECT * FROM users WHERE id = 1"}
 type MySQLTool struct {
+	BaseTool
 	ConnectionString string
 	db               *sql.DB
 }
 
 // NewMySQLTool creates a new MySQL tool with the given DSN.
-// DSN format: user:password@tcp(host:port)/dbname
 func NewMySQLTool(dsn string) (*MySQLTool, error) {
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
@@ -29,16 +28,18 @@ func NewMySQLTool(dsn string) (*MySQLTool, error) {
 	db.SetMaxOpenConns(10)
 	db.SetMaxIdleConns(5)
 
-	return &MySQLTool{ConnectionString: dsn, db: db}, nil
+	return &MySQLTool{
+		BaseTool: BaseTool{
+			NameValue: "MySQLTool",
+			DescriptionValue: "Execute SQL queries against a MySQL/MariaDB database. " +
+				"Input: {'query': 'SQL statement'}. Supports SELECT, INSERT, UPDATE, DELETE. " +
+				"Returns formatted result rows or affected count.",
+		},
+		ConnectionString: dsn,
+		db:               db,
+	}, nil
 }
 
-func (t *MySQLTool) Name() string { return "MySQLTool" }
-
-func (t *MySQLTool) Description() string {
-	return "Execute SQL queries against a MySQL/MariaDB database. " +
-		"Input: {'query': 'SQL statement'}. Supports SELECT, INSERT, UPDATE, DELETE. " +
-		"Returns formatted result rows or affected count."
-}
 
 func (t *MySQLTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	query, ok := input["query"].(string)

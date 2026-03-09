@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Ecook14/gocrewwai/pkg/events"
+	"github.com/Ecook14/gocrewwai/pkg/training"
 	crewErrors "github.com/Ecook14/gocrewwai/pkg/errors"
 	"github.com/Ecook14/gocrewwai/pkg/guardrails"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
@@ -23,6 +25,47 @@ var defaultLogger = slog.New(slog.NewTextHandler(os.Stdout, nil))
 // Tool is a convenience alias for tools.Tool
 type Tool = tools.Tool
 
+// AgentConfig defines the parameters for creating a new Agent in a declarative style.
+type AgentConfig struct {
+	Role                 string
+	Goal                 string
+	Backstory            string
+	LLM                  llm.Client
+	Tools                []tools.Tool
+	Verbose              bool
+	AllowDelegation      bool
+	MaxIterations        int
+	MaxRPM               int
+	MaxRetryLimit        int
+	MaxExecutionTime     time.Duration
+	RespectContextWindow bool
+	SelfHealing          bool
+	Cache                llm.Cache
+	SystemTemplate       string
+	PromptTemplate       string
+	ResponseTemplate     string
+	StepCallback         func(step map[string]interface{})
+	StepReview           func(toolName string, toolInput interface{}) bool
+	StepStreamCallback   func(token string)
+	SelfCritique         bool
+	KnowledgeBases       []string
+	FewShotExamples      []string
+	Reasoning            bool
+	MaxReasoningAttempts int
+	Embedder             map[string]interface{}
+	KnowledgeSources     []memory.KnowledgeSource
+	UseSystemPrompt      *bool // Pointer to distinguish between unset and false
+	AllowCodeExecution   bool
+	CodeExecutionMode    string // "safe" or "unsafe"
+	Multimodal           bool
+	InjectDate           bool
+	DateFormat           string
+	TrainingMode         bool
+	TrainingDir          string
+	BeforeLLMCall        func(messages []llm.Message) []llm.Message
+	Sandbox              string
+}
+
 // Agent translates the `class Agent` python abstraction into idiomatic Go.
 type Agent struct {
 	Role      string `json:"role"`
@@ -32,8 +75,10 @@ type Agent struct {
 	LLMModel  string `json:"llm_model,omitempty"`
 	Verbose   bool   `json:"verbose"`
 
-	LLM   llm.Client `json:"-"`
-	Tools []tools.Tool `json:"-"`
+	// LLM config
+	LLM                llm.Client `json:"-"`
+	FunctionCallingLLM llm.Client `json:"-"` // Separate LLM for tool calling
+	Tools              []tools.Tool `json:"-"`
 
 	// Execution context limits
 	MaxIterations        int `json:"-"`
@@ -81,13 +126,38 @@ type Agent struct {
 	// FewShotExamples are used to train the agent's prompt for better accuracy.
 	FewShotExamples []string `json:"-"`
 
+	// Custom Templates
+	SystemTemplate   string `json:"-"`
+	PromptTemplate   string `json:"-"`
+	ResponseTemplate string `json:"-"`
+
+	// Core 1 Perfection Fields
+	AllowCodeExecution   bool                   `json:"-"`
+	CodeExecutionMode    string                 `json:"-"` // "safe", "unsafe"
+	Multimodal           bool                   `json:"-"`
+	InjectDate           bool                   `json:"-"`
+	DateFormat           string                 `json:"-"`
+	Reasoning            bool                   `json:"-"`
+	MaxReasoningAttempts int                    `json:"-"`
+	EmbedderConfig       map[string]interface{} `json:"-"`
+	KnowledgeSources     []memory.KnowledgeSource  `json:"-"`
+	UseSystemPrompt      bool                   `json:"-"`
+
 	// InterruptCh allows sending async instructions/interrupts to the agent mid-execution.
 	InterruptCh chan string `json:"-"`
 
 	// Sandbox defines the preferred execution environment for the agent's code tools.
-	Sandbox string // "local", "docker", "e2b", "wasm"
+	Sandbox string `json:"sandbox"` // "local", "docker", "e2b", "wasm"
+
+	// Timeout enforces a maximum duration for the entire execute loop.
+	Timeout time.Duration `json:"timeout"`
 
 	lastExecution time.Time
+
+	TrainingMode bool   `json:"-"`
+	TrainingDir  string `json:"-"`
+
+	BeforeLLMCall func(messages []llm.Message) []llm.Message `json:"-"`
 }
 
 // AgentOption defines a functional option for configuring an Agent.
@@ -156,6 +226,96 @@ func NewAgent(role, goal, backstory string, llm llm.Client, opts ...AgentOption)
 	return a
 }
 
+// New creates a new Agent using a declarative configuration struct.
+// This is the preferred "CrewAI Python-like" way to initialize agents.
+func New(cfg AgentConfig) *Agent {
+	a := &Agent{
+		Role:                 cfg.Role,
+		Goal:                 cfg.Goal,
+		Backstory:            cfg.Backstory,
+		LLM:                  cfg.LLM,
+		Tools:                cfg.Tools,
+		Verbose:              cfg.Verbose,
+		AllowDelegation:      cfg.AllowDelegation,
+		MaxIterations:        cfg.MaxIterations,
+		MaxRPM:               cfg.MaxRPM,
+		MaxRetryLimit:        cfg.MaxRetryLimit,
+		Timeout:              cfg.MaxExecutionTime,
+		RespectContextWindow: cfg.RespectContextWindow,
+		SelfHealing:          cfg.SelfHealing,
+		Cache:                cfg.Cache,
+		SystemTemplate:       cfg.SystemTemplate,
+		PromptTemplate:       cfg.PromptTemplate,
+		ResponseTemplate:     cfg.ResponseTemplate,
+		StepCallback:         cfg.StepCallback,
+		StepReview:           cfg.StepReview,
+		StepStreamCallback:   cfg.StepStreamCallback,
+		SelfCritique:         cfg.SelfCritique,
+		KnowledgeBases:       cfg.KnowledgeBases,
+		FewShotExamples:      cfg.FewShotExamples,
+		Sandbox:              cfg.Sandbox,
+		AllowCodeExecution:   cfg.AllowCodeExecution,
+		CodeExecutionMode:    cfg.CodeExecutionMode,
+		Multimodal:           cfg.Multimodal,
+		InjectDate:           cfg.InjectDate,
+		DateFormat:           cfg.DateFormat,
+		Reasoning:            cfg.Reasoning,
+		MaxReasoningAttempts: cfg.MaxReasoningAttempts,
+		EmbedderConfig:       cfg.Embedder,
+		KnowledgeSources:     cfg.KnowledgeSources,
+		UsageMetrics:         make(map[string]int),
+		InterruptCh:          make(chan string, 1),
+		TrainingMode:         cfg.TrainingMode,
+		TrainingDir:          cfg.TrainingDir,
+		BeforeLLMCall:        cfg.BeforeLLMCall,
+	}
+
+	if cfg.UseSystemPrompt != nil {
+		a.UseSystemPrompt = *cfg.UseSystemPrompt
+	} else {
+		a.UseSystemPrompt = true // Default
+	}
+
+	if a.DateFormat == "" {
+		a.DateFormat = "2006-01-02" // Go's ISO format equivalent
+	}
+
+	if a.CodeExecutionMode == "" {
+		a.CodeExecutionMode = "safe"
+	}
+
+	if a.AllowCodeExecution {
+		safe := a.CodeExecutionMode == "safe"
+		opts := []tools.CodeInterpreterOption{tools.WithSafeMode(safe)}
+		
+		// Map agent sandbox config to tool options
+		switch strings.ToLower(a.Sandbox) {
+		case "docker":
+			opts = append(opts, tools.WithDocker("python:3.9-slim")) // Default image
+		case "e2b":
+			// Primary: Crew-GO standardized env, Fallback: E2B standard env
+			key := os.Getenv("CREW_GO_E2B_API_KEY")
+			if key == "" {
+				key = os.Getenv("E2B_API_KEY")
+			}
+			if key != "" {
+				opts = append(opts, tools.WithE2B(key))
+			}
+		}
+
+		a.Tools = append(a.Tools, tools.NewCodeInterpreterTool(opts...))
+	}
+
+	if a.MaxIterations <= 0 {
+		a.MaxIterations = 15
+	}
+	if a.MaxRetryLimit <= 0 {
+		a.MaxRetryLimit = 3
+	}
+
+	return a
+}
+
 // GetRole returns the agent's role. Implements the delegation.Agent interface.
 func (a *Agent) GetRole() string {
 	if a.UsageMetrics == nil {
@@ -168,6 +328,13 @@ func (a *Agent) GetRole() string {
 // This forms the core logic layer for Agent behavior mapping.
 // Provides structured outputs if mapped via Options array.
 func (a *Agent) Execute(ctx context.Context, taskInput string, options map[string]interface{}) (interface{}, error) {
+	// 1. Enforce Agent-level Timeout
+	if a.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, a.Timeout)
+		defer cancel()
+	}
+
 	// ---------------------------------------------------------
 	// Rate Limiting (MaxRPM)
 	// ---------------------------------------------------------
@@ -218,10 +385,10 @@ func (a *Agent) Execute(ctx context.Context, taskInput string, options map[strin
 		})
 	}
 
-	// Publish telemetry event
-	telemetry.GlobalBus.Publish(telemetry.Event{
-		Type:      telemetry.EventAgentStarted,
-		AgentRole: a.Role,
+	// Publish system event
+	events.GlobalBus.Publish(events.Event{
+		Type:   events.AgentExecutionStarted,
+		Source: a.Role,
 		Payload: map[string]interface{}{
 			"input": taskInput,
 		},
@@ -250,7 +417,26 @@ func (a *Agent) Execute(ctx context.Context, taskInput string, options map[strin
 		fewShotSection = "\n\nFEW-SHOT EXAMPLES FOR GUIDANCE:\n" + strings.Join(a.FewShotExamples, "\n---\n")
 	}
 
-	systemPrompt := fmt.Sprintf(`You are %s. %s
+	// Training Advice Section
+	trainingAdvice := ""
+	if a.TrainingDir != "" {
+		store := training.NewStore(a.TrainingDir)
+		if data, err := store.LoadAgentData(a.Role); err == nil && len(data.Suggestions) > 0 {
+			trainingAdvice = "\n\nPAST TRAINING ADVICE FOR YOUR ROLE:\n"
+			for _, s := range data.Suggestions {
+				trainingAdvice += fmt.Sprintf("- %s\n", s)
+			}
+		}
+	}
+
+	systemPrompt := a.SystemTemplate
+	if systemPrompt == "" {
+		dateInjection := ""
+		if a.InjectDate {
+			dateInjection = fmt.Sprintf("\nCurrent date: %s", time.Now().Format(a.DateFormat))
+		}
+
+		systemPrompt = fmt.Sprintf(`You are %s. %s%s
 Your goal is: %s
 %s
 %s
@@ -261,11 +447,30 @@ You have access to the following tools:
 To use a tool, you MUST reply with a pure JSON object in this exact format:
 {"tool": "ToolName", "input": {"parameter_name": "parameter_value"}}
 
-Once you have gathered all necessary information and are ready to provide the final answer, do NOT return a tool JSON. Simply output your final answer text natively.`, a.Role, a.Backstory, a.Goal, knowledgeSection, fewShotSection, toolDescriptions)
+Once you have gathered all necessary information and are ready to provide the final answer, do NOT return a tool JSON. Simply output your final answer text natively.%s`, a.Role, a.Backstory, dateInjection, a.Goal, knowledgeSection, fewShotSection, toolDescriptions, trainingAdvice)
+	}
 
-	messages := []llm.Message{
-		{Role: "system", Content: systemPrompt},
-		{Role: "user", Content: enrichedInput},
+	userInput := a.PromptTemplate
+	if userInput == "" {
+		userInput = enrichedInput
+	} else {
+		userInput = strings.ReplaceAll(userInput, "{input}", enrichedInput)
+	}
+
+	messages := []llm.Message{}
+	if a.UseSystemPrompt {
+		messages = append(messages, llm.Message{Role: "system", Content: systemPrompt})
+	}
+	messages = append(messages, llm.Message{Role: "user", Content: userInput})
+
+	// ---------------------------------------------------------
+	// Core 1 Perfection: Reasoning Phase (Reflect-Evaluate-Refine)
+	// ---------------------------------------------------------
+	if a.Reasoning {
+		plan, err := a.runReasoningLoop(ctx, messages, options)
+		if err == nil {
+			messages = append(messages, llm.Message{Role: "assistant", Content: "Plan: " + plan})
+		}
 	}
 
 	// ---------------------------------------------------------
@@ -306,14 +511,19 @@ Once you have gathered all necessary information and are ready to provide the fi
 			a.StepCallback(map[string]interface{}{"role": a.Role, "phase": "thinking", "iteration": i + 1})
 		}
 
-		// Publish telemetry event
-		telemetry.GlobalBus.Publish(telemetry.Event{
-			Type:      telemetry.EventAgentThinking,
-			AgentRole: strings.Clone(a.Role),
+		// Publish system event
+		events.GlobalBus.Publish(events.Event{
+			Type:   events.AgentThinking,
+			Source: a.Role,
 			Payload: map[string]interface{}{
 				"iteration": i + 1,
 			},
 		})
+
+		// Trigger BeforeLLMCall hook
+		if a.BeforeLLMCall != nil {
+			messages = a.BeforeLLMCall(messages)
+		}
 
 		// If a strict final schema is requested, disable autonomous looping
 		if options != nil && options["schema"] != nil {
@@ -337,6 +547,10 @@ Once you have gathered all necessary information and are ready to provide the fi
 
 		if responseText == "" {
 			if a.StepStreamCallback != nil {
+				// Trigger StepCallback for production monitoring
+				if a.StepCallback != nil {
+					a.StepCallback(map[string]interface{}{"role": a.Role, "phase": "generation_started", "streaming": true})
+				}
 				stream, err := a.LLM.StreamGenerate(ctx, messages, options)
 				if err != nil {
 					return nil, crewErrors.NewAgentError(strings.Clone(strings.TrimSpace(a.Role)), i+1, fmt.Errorf("%w: %v", crewErrors.ErrLLMFailed, err))
@@ -348,8 +562,15 @@ Once you have gathered all necessary information and are ready to provide the fi
 				}
 				responseText = sb.String()
 			} else {
+				llmClient := a.LLM
+				if a.FunctionCallingLLM != nil {
+					llmClient = a.FunctionCallingLLM
+				}
+				if a.StepCallback != nil {
+					a.StepCallback(map[string]interface{}{"role": a.Role, "phase": "generation_started", "streaming": false})
+				}
 				var err error
-				responseText, err = a.LLM.Generate(ctx, messages, options)
+				responseText, err = llmClient.Generate(ctx, messages, options)
 				if err != nil {
 					return nil, crewErrors.NewAgentError(strings.Clone(strings.TrimSpace(a.Role)), i+1, fmt.Errorf("%w: %v", crewErrors.ErrLLMFailed, err))
 				}
@@ -387,10 +608,10 @@ Once you have gathered all necessary information and are ready to provide the fi
 					a.StepCallback(map[string]interface{}{"role": a.Role, "phase": "tool_execution", "tool": toolReq.Tool})
 				}
 
-				// Publish telemetry event
-				telemetry.GlobalBus.Publish(telemetry.Event{
-					Type:      telemetry.EventToolStarted,
-					AgentRole: strings.Clone(a.Role),
+				// Publish system event
+				events.GlobalBus.Publish(events.Event{
+					Type:   events.ToolUsageStarted,
+					Source: a.Role,
 					Payload: map[string]interface{}{
 						"tool":  toolReq.Tool,
 						"input": toolReq.Input,
@@ -440,10 +661,10 @@ Once you have gathered all necessary information and are ready to provide the fi
 					}
 				}
 
-				// Publish telemetry event
-				telemetry.GlobalBus.Publish(telemetry.Event{
-					Type:      telemetry.EventToolFinished,
-					AgentRole: strings.Clone(a.Role),
+				// Publish system event
+				events.GlobalBus.Publish(events.Event{
+					Type:   events.ToolUsageFinished,
+					Source: a.Role,
 					Payload: map[string]interface{}{
 						"tool":   toolReq.Tool,
 						"result": toolResult,
@@ -523,14 +744,29 @@ Once you have gathered all necessary information and are ready to provide the fi
 			}
 		}
 
-		// Publish telemetry event
-		telemetry.GlobalBus.Publish(telemetry.Event{
-			Type:      telemetry.EventAgentFinished,
-			AgentRole: strings.Clone(a.Role),
+		// Publish system event
+		events.GlobalBus.Publish(events.Event{
+			Type:   events.AgentExecutionCompleted,
+			Source: a.Role,
 			Payload: map[string]interface{}{
 				"result": responseText,
 			},
 		})
+
+		// Handle Training Mode Persistence
+		if a.TrainingMode && a.TrainingDir != "" {
+			store := training.NewStore(a.TrainingDir)
+			data, _ := store.LoadAgentData(a.Role)
+			
+			// We already captured the interaction if it was HITL, 
+			// but here we force-consolidate it into the store.
+			iteration := training.IterationData{
+				InitialOutput:  taskInput,
+				ImprovedOutput: responseText,
+			}
+			data.Iterations = append(data.Iterations, iteration)
+			store.SaveAgentData(a.Role, data)
+		}
 
 		return responseText, nil
 	}
@@ -579,6 +815,19 @@ func (a *Agent) recallMemory(ctx context.Context, taskInput string) string {
 			}
 			for i, entity := range entities {
 				sb.WriteString(fmt.Sprintf("--- Tracked Entity %d ---\n%s\n", i+1, entity.Text))
+			}
+		}
+	}
+
+	// 3. Process Knowledge Sources
+	if len(a.KnowledgeSources) > 0 {
+		if !hasContext {
+			sb.WriteString("RELEVANT PAST CONTEXT:\n")
+			hasContext = true
+		}
+		for i, source := range a.KnowledgeSources {
+			if content, err := source.Query(ctx, taskInput); err == nil && content != "" {
+				sb.WriteString(fmt.Sprintf("--- Knowledge Source %d ---\n%s\n", i+1, content))
 			}
 		}
 	}

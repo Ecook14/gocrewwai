@@ -11,6 +11,7 @@ import (
 
 // WolframAlphaTool allows agents to perform complex calculations and queries.
 type WolframAlphaTool struct {
+	BaseTool
 	AppID string
 }
 
@@ -18,14 +19,15 @@ func NewWolframAlphaTool(appID string) *WolframAlphaTool {
 	if appID == "" {
 		appID = os.Getenv("WOLFRAM_APP_ID")
 	}
-	return &WolframAlphaTool{AppID: appID}
+	return &WolframAlphaTool{
+		BaseTool: BaseTool{
+			NameValue:        "WolframAlphaTool",
+			DescriptionValue: "Performs complex calculations and scientific queries via WolframAlpha.",
+		},
+		AppID: appID,
+	}
 }
 
-func (t *WolframAlphaTool) Name() string { return "WolframAlphaTool" }
-
-func (t *WolframAlphaTool) Description() string {
-	return "Performs complex calculations and scientific queries via WolframAlpha."
-}
 
 func (t *WolframAlphaTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	query, ok := input["query"].(string)

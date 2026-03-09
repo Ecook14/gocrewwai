@@ -80,6 +80,12 @@ func (t *mcpToolAdapter) Execute(ctx context.Context, input map[string]interface
 	return text, nil
 }
 
+// ArgsSchema returns nil for MCP tools as schema is managed by the remote server.
+func (t *mcpToolAdapter) ArgsSchema() []ArgSchema { return nil }
+
+// CacheFunction returns "" by default for MCP tools.
+func (t *mcpToolAdapter) CacheFunction(input map[string]interface{}) string { return "" }
+
 // RegisterAllToolsOnMCPServer registers all Gocrew tools from a registry onto an MCP server.
 func RegisterAllToolsOnMCPServer(mcpServer *protocols.MCPServer, registry *ToolRegistry) {
 	for _, tool := range registry.List() {

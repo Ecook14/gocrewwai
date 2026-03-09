@@ -222,6 +222,22 @@ func (s *ChromaStore) Count(ctx context.Context) (int, error) {
 	return count, nil
 }
 
+// Reset clears all data by deleting and recreating the collection.
+func (s *ChromaStore) Reset(ctx context.Context) error {
+	deleteURL := fmt.Sprintf("%s/api/v1/collections/%s", s.BaseURL, s.CollectionName)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, deleteURL, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+
+	return s.ensureCollection()
+}
+
 func (s *ChromaStore) Close() error {
 	// HTTP client doesn't need explicit closing in this context
 	return nil

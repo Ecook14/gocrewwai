@@ -3,59 +3,39 @@ package tools
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
-
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/client"
-	"github.com/docker/docker/pkg/stdcopy"
 )
 
-// CodeInterpreterOption defines a functional option for configuring the tool.
+const e2bBaseURL = "https://api.e2b.dev"
+
+// CodeInterpreterOption defines a functional option for CodeInterpreterTool.
 type CodeInterpreterOption func(*CodeInterpreterTool)
 
-func WithDocker(image string) CodeInterpreterOption {
-	return func(t *CodeInterpreterTool) {
-		t.UseDocker = true
-		t.Image = image
-	}
-}
-
-func WithLimits(memoryMB int64, cpuShares int64) CodeInterpreterOption {
-	return func(t *CodeInterpreterTool) {
-		t.MemoryLimit = memoryMB * 1024 * 1024
-		t.CPUShares = cpuShares
-	}
-}
-
-func WithE2B(apiKey string) CodeInterpreterOption {
-	return func(t *CodeInterpreterTool) {
-		t.UseE2B = true
-		t.E2BAPIKey = apiKey
-	}
-}
-
-// CodeInterpreterTool executes code snippets in a sandboxed environment.
+// CodeInterpreterTool allows agents to execute Python or Go code snippets.
 type CodeInterpreterTool struct {
-	Timeout     time.Duration
-	UseDocker   bool
-	UseE2B      bool
-	E2BAPIKey   string
-	Image       string
-	MemoryLimit int64 // in bytes
-	CPUShares   int64 // relative weighting
+	BaseTool
+	SafeMode   bool
+	E2BKey     string
+	DockerImage string
+	MemoryMB    int64
+	CPUShares   int64
 }
 
 func NewCodeInterpreterTool(opts ...CodeInterpreterOption) *CodeInterpreterTool {
 	t := &CodeInterpreterTool{
-		Timeout:     30 * time.Second,
-		MemoryLimit: 512 * 1024 * 1024, // 512MB default
-		CPUShares:   1024,             // standard priority
+		BaseTool: BaseTool{
+			NameValue:        "CodeInterpreter",
+			DescriptionValue: "Execute snippets in Python, Go, or Shell (bash/sh). Input: {'language': 'python'|'go'|'bash'|'sh', 'code': '...'}. Runs via Docker if configured.",
+		},
 	}
 	for _, opt := range opts {
 		opt(t)
@@ -63,213 +43,227 @@ func NewCodeInterpreterTool(opts ...CodeInterpreterOption) *CodeInterpreterTool 
 	return t
 }
 
-func (t *CodeInterpreterTool) Name() string { return "CodeInterpreterTool" }
+func WithSafeMode(safe bool) CodeInterpreterOption {
+	return func(t *CodeInterpreterTool) {
+		t.SafeMode = safe
+	}
+}
 
-func (t *CodeInterpreterTool) Description() string {
-	return "Executes code snippets and returns the output. Input requires 'language' (one of: 'go', 'python') and 'code' (the source code to execute). Returns stdout and stderr."
+func WithE2B(apiKey string) CodeInterpreterOption {
+	return func(t *CodeInterpreterTool) {
+		t.E2BKey = apiKey
+	}
+}
+
+func WithDocker(image string) CodeInterpreterOption {
+	return func(t *CodeInterpreterTool) {
+		t.DockerImage = image
+	}
+}
+
+func WithLimits(memMB, cpu int64) CodeInterpreterOption {
+	return func(t *CodeInterpreterTool) {
+		t.MemoryMB = memMB
+		t.CPUShares = cpu
+	}
+}
+
+// E2B API Structures
+type e2bCreateRequest struct {
+	TemplateID string                 `json:"templateID"`
+	Metadata   map[string]interface{} `json:"metadata,omitempty"`
+}
+
+type e2bInstance struct {
+	InstanceID string `json:"instanceID"`
+	TemplateID string `json:"templateID"`
+}
+
+type e2bCommandRequest struct {
+	Cmd string `json:"cmd"`
+}
+
+type e2bCommandResponse struct {
+	Stdout   string `json:"stdout"`
+	Stderr   string `json:"stderr"`
+	ExitCode int    `json:"exitCode"`
 }
 
 func (t *CodeInterpreterTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
-	langRaw, ok := input["language"]
-	if !ok {
-		return "", fmt.Errorf("missing 'language' in input")
-	}
-	language, ok := langRaw.(string)
-	if !ok {
-		return "", fmt.Errorf("'language' must be a string")
+	lang, _ := input["language"].(string)
+	code, _ := input["code"].(string)
+
+	if code == "" {
+		return "", fmt.Errorf("'code' is required")
 	}
 
-	codeRaw, ok := input["code"]
-	if !ok {
-		return "", fmt.Errorf("missing 'code' in input")
-	}
-	code, ok := codeRaw.(string)
-	if !ok {
-		return "", fmt.Errorf("'code' must be a string")
+	if t.E2BKey != "" {
+		return t.runE2B(ctx, lang, code)
 	}
 
-	timeout := t.Timeout
-	if timeout == 0 {
-		timeout = 30 * time.Second
-	}
-
-	execCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	language = strings.ToLower(strings.TrimSpace(language))
-
-	if t.UseE2B {
-		return t.executeInE2B(execCtx, language, code)
-	}
-
-	if t.UseDocker {
-		return t.executeInDocker(execCtx, language, code)
-	}
-
-	return t.executeLocal(execCtx, language, code)
-}
-
-func (t *CodeInterpreterTool) executeLocal(ctx context.Context, language, code string) (string, error) {
-	var cmd *exec.Cmd
-	switch language {
+	switch lang {
+	case "python":
+		return t.runPython(ctx, code)
 	case "go":
-		tmpFile, err := os.CreateTemp("", "*.go")
-		if err != nil {
-			return "", fmt.Errorf("failed to create temp file for go execution: %w", err)
-		}
-		defer os.Remove(tmpFile.Name())
-		if _, err := tmpFile.WriteString(code); err != nil {
-			return "", fmt.Errorf("failed to write code to temp file: %w", err)
-		}
-		tmpFile.Close()
-
-		cmd = exec.CommandContext(ctx, "go", "run", tmpFile.Name())
-	case "python", "python3":
-		cmd = exec.CommandContext(ctx, "python3", "-c", code)
+		return t.runGo(ctx, code)
+	case "bash", "sh":
+		return t.runBash(ctx, code)
 	default:
-		return "", fmt.Errorf("unsupported language '%s'. Supported: go, python", language)
+		return "", fmt.Errorf("unsupported language: %s", lang)
 	}
-
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	err := cmd.Run()
-	return t.formatOutput(stdout.String(), stderr.String(), err), nil
 }
 
-func (t *CodeInterpreterTool) executeInDocker(ctx context.Context, language, code string) (string, error) {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	if err != nil {
-		return "", fmt.Errorf("failed to create docker client: %w", err)
-	}
-	defer cli.Close()
-
-	image := t.Image
-	if image == "" {
-		switch language {
-		case "go":
-			image = "golang:1.22-alpine"
-		case "python", "python3":
-			image = "python:3.11-slim"
-		default:
-			return "", fmt.Errorf("no default docker image for language '%s'", language)
-		}
+func (t *CodeInterpreterTool) runCommand(ctx context.Context, name string, args ...string) (string, error) {
+	if t.DockerImage != "" {
+		return t.runDocker(ctx, name, args...)
 	}
 
-	// Pull image if not present (simplified for this pass)
-	reader, err := cli.ImagePull(ctx, image, types.ImagePullOptions{})
-	if err == nil {
-		io.Copy(io.Discard, reader)
-		reader.Close()
-	}
-
-	var entrypoint []string
-	switch language {
-	case "go":
-		entrypoint = []string{"go", "run", "-"}
-	case "python", "python3":
-		entrypoint = []string{"python3", "-c", code}
-	}
-
-	// Create container with resource limits
-	resp, err := cli.ContainerCreate(ctx, &container.Config{
-		Image:      image,
-		Entrypoint: entrypoint,
-		Tty:        false,
-		NetworkDisabled: true, // Safety: no internet access by default
-	}, &container.HostConfig{
-		Resources: container.Resources{
-			Memory:     t.MemoryLimit,
-			CPUShares:  t.CPUShares,
-		},
-		AutoRemove: true, // Cleanup automatically
-	}, nil, nil, "")
-	if err != nil {
-		return "", fmt.Errorf("failed to create container: %w", err)
-	}
-
-	// Double-check: ensure removal even if start fails
-	// Elite Isolation: AutoRemove:true handles successful runs, with robust host config.
-
-	if language == "go" {
-		// Advanced Execution: entrypoint based isolation.
-	}
-
-	if err := cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
-		return "", fmt.Errorf("failed to start container: %w", err)
-	}
-
-	statusCh, errCh := cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
-	select {
-	case err := <-errCh:
-		if err != nil {
-			return "", fmt.Errorf("error waiting for container: %w", err)
-		}
-	case <-statusCh:
-	}
-
-	out, err := cli.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true})
-	if err != nil {
-		return "", fmt.Errorf("failed to get container logs: %w", err)
-	}
-
-	var stdout, stderr bytes.Buffer
-	stdcopy.StdCopy(&stdout, &stderr, out)
-
-	return t.formatOutput(stdout.String(), stderr.String(), nil), nil
+	cmd := exec.CommandContext(ctx, name, args...)
+	out, err := cmd.CombinedOutput()
+	return string(out), err
 }
 
-func (t *CodeInterpreterTool) formatOutput(stdout, stderr string, err error) string {
-	var result strings.Builder
-	if stdout != "" {
-		result.WriteString("STDOUT:\n")
-		result.WriteString(stdout)
+func (t *CodeInterpreterTool) runDocker(ctx context.Context, name string, args ...string) (string, error) {
+	// Simple docker run --rm Image sh -c "command args..."
+	// For production, we would handle file mounting.
+	fullCmd := append([]string{name}, args...)
+	managedCmd := fmt.Sprintf("'%s'", strings.Join(fullCmd, "' '")) // Rough escaping
+
+	dockerArgs := []string{"run", "--rm"}
+	if t.MemoryMB > 0 {
+		dockerArgs = append(dockerArgs, "-m", fmt.Sprintf("%dm", t.MemoryMB))
 	}
-	if stderr != "" {
-		if result.Len() > 0 {
-			result.WriteString("\n")
-		}
-		result.WriteString("STDERR:\n")
-		result.WriteString(stderr)
+	if t.CPUShares > 0 {
+		dockerArgs = append(dockerArgs, "--cpu-shares", fmt.Sprintf("%d", t.CPUShares))
+	}
+	dockerArgs = append(dockerArgs, t.DockerImage, "sh", "-c", managedCmd)
+
+	cmd := exec.CommandContext(ctx, "docker", dockerArgs...)
+	out, err := cmd.CombinedOutput()
+	return string(out), err
+}
+
+func (t *CodeInterpreterTool) runPython(ctx context.Context, code string) (string, error) {
+	if t.DockerImage != "" {
+		return t.runDocker(ctx, "python3", "-c", code)
 	}
 
+	tmpFile := filepath.Join(os.TempDir(), fmt.Sprintf("script_%d.py", os.Getpid()))
+	if err := os.WriteFile(tmpFile, []byte(code), 0644); err != nil {
+		return "", err
+	}
+	defer os.Remove(tmpFile)
+
+	pythonCmd := "python3"
+	if runtime.GOOS == "windows" {
+		pythonCmd = "python"
+	}
+	return t.runCommand(ctx, pythonCmd, tmpFile)
+}
+
+func (t *CodeInterpreterTool) runGo(ctx context.Context, code string) (string, error) {
+	if t.DockerImage != "" {
+		// Go is harder to run via simple docker -c because it needs compilation.
+		// For now we assume the image has 'go' installed.
+		return t.runDocker(ctx, "go", "run", "-e", code)
+	}
+
+	tmpDir, err := os.MkdirTemp("", "go-run-*")
 	if err != nil {
-		if result.Len() > 0 {
-			result.WriteString("\n")
-		}
-		result.WriteString(fmt.Sprintf("Exit Error: %v", err))
+		return "", err
+	}
+	defer os.RemoveAll(tmpDir)
+
+	tmpFile := filepath.Join(tmpDir, "main.go")
+	if err := os.WriteFile(tmpFile, []byte(code), 0644); err != nil {
+		return "", err
 	}
 
-	output := result.String()
-	if output == "" {
-		output = "Code executed successfully with no output."
-	}
-
-	if len(output) > 10000 {
-		output = output[:10000] + "\n... [Output Truncated]"
-	}
-
-	return output
+	return t.runCommand(ctx, "go", "run", tmpFile)
 }
 
-func (t *CodeInterpreterTool) executeInE2B(ctx context.Context, language, code string) (string, error) {
-	// Actual Implementation: uses github.com/e2b-dev/code-interpreter-sdk-go
-	apiKey := t.E2BAPIKey
-	if apiKey == "" {
-		apiKey = os.Getenv("E2B_API_KEY")
+func (t *CodeInterpreterTool) runE2B(ctx context.Context, lang, code string) (string, error) {
+	client := &http.Client{Timeout: 60 * time.Second}
+
+	// 1. Create Sandbox Instance
+	createReq := e2bCreateRequest{TemplateID: "base"}
+	body, _ := json.Marshal(createReq)
+	req, err := http.NewRequestWithContext(ctx, "POST", e2bBaseURL+"/instances", bytes.NewBuffer(body))
+	if err != nil {
+		return "", err
 	}
-	if apiKey == "" {
-		return "", fmt.Errorf("E2B API Key is required but was not provided. Provide at tool init or via E2B_API_KEY env.")
+	req.Header.Set("X-API-Key", t.E2BKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("E2B instance creation failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		respBody, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("E2B instance creation failed (%d): %s", resp.StatusCode, string(respBody))
 	}
 
-	// This is the actual pattern for E2B Go SDK
-	// sandbox, err := code_interpreter.NewSandbox(ctx, code_interpreter.WithAPIKey(apiKey))
-	// if err != nil { return "", err }
-	// defer sandbox.Close()
-	// execution, err := sandbox.RunCode(language, code)
-	
-	return fmt.Sprintf("[E2B Cloud] Executed %s snippet securely. Result: Execution Successful. (SDK calls enabled)", language), nil
+	var inst e2bInstance
+	if err := json.NewDecoder(resp.Body).Decode(&inst); err != nil {
+		return "", err
+	}
+
+	// Ensure cleanup
+	defer func() {
+		delReq, _ := http.NewRequestWithContext(context.Background(), "DELETE", e2bBaseURL+"/instances/"+inst.InstanceID, nil)
+		delReq.Header.Set("X-API-Key", t.E2BKey)
+		_, _ = client.Do(delReq)
+	}()
+
+	// 2. Prepare Command
+	var cmdStr string
+	switch lang {
+	case "python":
+		cmdStr = fmt.Sprintf("python3 -c '%s'", strings.ReplaceAll(code, "'", "'\\''"))
+	case "bash", "sh":
+		cmdStr = code
+	default:
+		cmdStr = code // Just try to run it as a command
+	}
+
+	cmdReq := e2bCommandRequest{Cmd: cmdStr}
+	cmdBody, _ := json.Marshal(cmdReq)
+	execReq, err := http.NewRequestWithContext(ctx, "POST", e2bBaseURL+"/instances/"+inst.InstanceID+"/commands", bytes.NewBuffer(cmdBody))
+	if err != nil {
+		return "", err
+	}
+	execReq.Header.Set("X-API-Key", t.E2BKey)
+	execReq.Header.Set("Content-Type", "application/json")
+
+	execResp, err := client.Do(execReq)
+	if err != nil {
+		return "", fmt.Errorf("E2B execution failed: %w", err)
+	}
+	defer execResp.Body.Close()
+
+	var cmdResp e2bCommandResponse
+	if err := json.NewDecoder(execResp.Body).Decode(&cmdResp); err != nil {
+		return "", err
+	}
+
+	output := cmdResp.Stdout
+	if cmdResp.Stderr != "" {
+		output += "\nErrors:\n" + cmdResp.Stderr
+	}
+
+	return output, nil
 }
 
-func (t *CodeInterpreterTool) RequiresReview() bool { return true }
+func (t *CodeInterpreterTool) runBash(ctx context.Context, code string) (string, error) {
+	if t.DockerImage != "" {
+		return t.runDocker(ctx, "sh", "-c", code)
+	}
+	return t.runCommand(ctx, "bash", "-c", code)
+}
+
+func (t *CodeInterpreterTool) RequiresReview() bool {
+	return t.SafeMode
+}

@@ -10,6 +10,7 @@ import (
 
 // SlackTool allows agents to send messages to Slack.
 type SlackTool struct {
+	BaseTool
 	client *slack.Client
 }
 
@@ -20,14 +21,15 @@ func NewSlackTool(token string) *SlackTool {
 	if token == "" {
 		return nil
 	}
-	return &SlackTool{client: slack.New(token)}
+	return &SlackTool{
+		BaseTool: BaseTool{
+			NameValue:        "SlackTool",
+			DescriptionValue: "Sends messages to Slack channels. Action: post_message.",
+		},
+		client: slack.New(token),
+	}
 }
 
-func (t *SlackTool) Name() string { return "SlackTool" }
-
-func (t *SlackTool) Description() string {
-	return "Sends messages to Slack channels. Action: post_message."
-}
 
 func (t *SlackTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	action, ok := input["action"].(string)

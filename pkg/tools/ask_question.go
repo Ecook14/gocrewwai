@@ -6,27 +6,28 @@ import (
 	"log/slog"
 )
 
-// AskQuestionTool is a built-in tool that allows agents to ask questions to each other
-// or explicitly solicit user feedback if configured.
-type AskQuestionTool struct {
-	Verbose bool
-}
-
+// FeedbackProvider defines an interface for soliciting input.
 type FeedbackProvider interface {
 	Ask(question string) (string, error)
 }
 
+// AskQuestionTool is a built-in tool that allows agents to ask questions to each other
+// or explicitly solicit user feedback if configured.
+type AskQuestionTool struct {
+	BaseTool
+	Verbose bool
+}
+
 func NewAskQuestionTool() *AskQuestionTool {
-	return &AskQuestionTool{Verbose: false}
+	return &AskQuestionTool{
+		BaseTool: BaseTool{
+			NameValue:        "Ask Question",
+			DescriptionValue: "Useful to ask a question to another agent or request explicit feedback.",
+		},
+		Verbose: false,
+	}
 }
 
-func (t *AskQuestionTool) Name() string {
-	return "Ask Question"
-}
-
-func (t *AskQuestionTool) Description() string {
-	return "Useful to ask a question to another agent or request explicit feedback."
-}
 
 func (t *AskQuestionTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	question, ok := input["question"].(string)

@@ -158,6 +158,17 @@ func (s *RedisStore) Count(ctx context.Context) (int, error) {
 	return count, nil
 }
 
+// Reset clears all data by deleting all keys matching the prefix.
+func (s *RedisStore) Reset(ctx context.Context) error {
+	iter := s.client.Scan(ctx, 0, s.prefix+"*", 0).Iterator()
+	for iter.Next(ctx) {
+		if err := s.client.Del(ctx, iter.Val()).Err(); err != nil {
+			return err
+		}
+	}
+	return iter.Err()
+}
+
 func (s *RedisStore) Close() error {
 	return s.client.Close()
 }

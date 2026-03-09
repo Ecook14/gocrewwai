@@ -118,14 +118,44 @@ function submitReview(reviewId, approved, buttonEl) {
 
 function fetchEntities() {
     fetch('/api/list')
-        .then(res => res.json())
+        .then(res => {
+            if (!res.ok) {
+                throw new Error(`HTTP error! status: ${res.status}`);
+            }
+            return res.json();
+        })
         .then(data => {
             renderEntities(data);
         })
-        .catch(err => console.error('Error fetching entities:', err));
+        .catch(err => {
+            console.error('Error fetching entities:', err);
+            addLog('system', `Sync Error: Failed to fetch dashboard entities: ${err.message}`, 'error');
+        });
+}
+
+function updateProcessType() {
+    const processType = document.getElementById('config-process-type').value;
+    fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ process_type: processType })
+    })
+        .then(res => res.json())
+        .then(data => {
+            addLog('system', `Process Mode changed to: ${processType.toUpperCase()}`, 'success');
+        })
+        .catch(err => console.error('Error updating process type:', err));
 }
 
 function renderEntities(data) {
+    // Current Process Type sync
+    if (data.config && data.config.process_type) {
+        const select = document.getElementById('config-process-type');
+        if (select && select.value !== data.config.process_type) {
+            select.value = data.config.process_type;
+        }
+    }
+
     agentList.innerHTML = '';
 
     // Render Agents
@@ -137,7 +167,9 @@ function renderEntities(data) {
     if (data.agents && data.agents.length > 0) {
         data.agents.forEach((agent, index) => {
             if (agent && agent.role) {
-                addEntityItem('Agent', agent.role, 'Staged', index);
+                const isManager = agent.allow_delegation;
+                const managerBadge = isManager ? '<span class="status-badge" style="background:rgba(99,102,241,0.2); color:#818cf8; border-color:rgba(99,102,241,0.3); font-size:0.6rem; padding:0.1rem 0.4rem; margin-left:0.5rem; vertical-align:middle;">MANAGER</span>' : '';
+                addEntityItem('Agent', agent.role, 'Staged', index, false, managerBadge);
 
                 // Populate task creation dropdown
                 if (taskAgentSelect) {
@@ -407,24 +439,39 @@ function submitCreateAgent() {
     const goal = document.getElementById('agent-goal').value;
     const backstory = document.getElementById('agent-backstory').value;
     const provider = document.getElementById('agent-provider').value;
-    const llm_model = document.getElementById('agent-model').value;
-    const api_key = document.getElementById('agent-apikey').value;
+    const model = document.getElementById('agent-model').value;
+    const apikey = document.getElementById('agent-apikey').value;
+    const maxrpm = parseInt(document.getElementById('agent-maxrpm').value) || 0;
     const memory = document.getElementById('agent-memory').value;
-    const memory_conn = document.getElementById('agent-remote-conn').value;
+    const connStr = document.getElementById('agent-remote-conn').value;
+    const allowDelegation = document.getElementById('agent-delegation').checked;
+    const selfHealing = document.getElementById('agent-selfhealing').checked;
 
-    const selectedTools = Array.from(document.querySelectorAll('input[name="tools"]:checked'))
-        .map(el => el.value);
+    const selectedTools = [];
+    document.querySelectorAll('.tool-checkbox:checked').forEach(cb => {
+        selectedTools.push(cb.value);
+    });
 
-    const max_rpm = parseInt(document.getElementById('agent-maxrpm').value) || 0;
+    const payload = {
+        role,
+        goal,
+        backstory,
+        provider,
+        llm_model: model,
+        api_key: apikey,
+        max_rpm: maxrpm,
+        memory,
+        memory_config: { connection_string: connStr },
+        tools: selectedTools,
+        allow_delegation: allowDelegation,
+        self_healing: selfHealing
+    };
 
     fetch('/api/create/agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            role, goal, backstory, provider, llm_model, api_key,
-            max_rpm,
-            memory, memory_config: { connection_string: memory_conn },
-            tools: selectedTools,
+            ...payload,
             index: currentEditIndex
         })
     }).then(res => {
@@ -440,19 +487,29 @@ function submitCreateAgent() {
 function submitCreateTask() {
     const description = document.getElementById('task-desc').value;
     const agentRole = document.getElementById('task-agent').value;
+    const expectedOutput = document.getElementById('task-expected').value;
+    const asyncExecution = document.getElementById('task-async').checked;
+    const timeout = parseInt(document.getElementById('task-timeout').value) || 120;
+
+    const payload = {
+        description,
+        agent_role: agentRole,
+        expected_output: expectedOutput,
+        async_execution: asyncExecution,
+        timeout: timeout
+    };
 
     fetch('/api/create/task', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            description,
-            agent_role: agentRole,
+            ...payload,
             index: currentEditIndex
         })
     }).then(res => {
         if (res.ok) {
             document.getElementById('modal-create-task').classList.add('hidden');
-            addLog('system', `${currentEditIndex !== null ? 'Updated' : 'Created/staged'} Task for Agent [${agentRole}]`, 'success');
+            addLog('system', `${currentEditIndex !== null ? 'Updated' : 'Created/staged'} Task for Agent [${agentRole || 'First Available'}]`, 'success');
             resetForm('task');
             fetchEntities();
         }

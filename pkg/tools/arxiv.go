@@ -10,17 +10,19 @@ import (
 )
 
 // ArxivTool allows agents to search for academic papers.
-type ArxivTool struct{}
+type ArxivTool struct {
+	BaseTool
+}
 
 func NewArxivTool() *ArxivTool {
-	return &ArxivTool{}
+	return &ArxivTool{
+		BaseTool: BaseTool{
+			NameValue:        "ArxivTool",
+			DescriptionValue: "Searches arXiv.org for academic papers. Action: search.",
+		},
+	}
 }
 
-func (t *ArxivTool) Name() string { return "ArxivTool" }
-
-func (t *ArxivTool) Description() string {
-	return "Searches arXiv.org for academic papers. Action: search."
-}
 
 func (t *ArxivTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	query, ok := input["query"].(string)

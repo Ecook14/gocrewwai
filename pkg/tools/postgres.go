@@ -11,6 +11,7 @@ import (
 
 // PostgresTool allows agents to interact with a PostgreSQL database.
 type PostgresTool struct {
+	BaseTool
 	ConnectionString string
 	db               *sql.DB
 }
@@ -26,17 +27,16 @@ func NewPostgresTool(connStr string) (*PostgresTool, error) {
 	}
 
 	return &PostgresTool{
+		BaseTool: BaseTool{
+			NameValue: "PostgresTool",
+			DescriptionValue: "Execute SQL queries against a PostgreSQL database. Input requires 'query' (the SQL statement). " +
+				"Supports SELECT, INSERT, UPDATE, and DELETE. Returns results as a formatted string or affected rows count.",
+		},
 		ConnectionString: connStr,
 		db:               db,
 	}, nil
 }
 
-func (t *PostgresTool) Name() string { return "PostgresTool" }
-
-func (t *PostgresTool) Description() string {
-	return "Execute SQL queries against a PostgreSQL database. Input requires 'query' (the SQL statement). " +
-		"Supports SELECT, INSERT, UPDATE, and DELETE. Returns results as a formatted string or affected rows count."
-}
 
 func (t *PostgresTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	queryRaw, ok := input["query"]

@@ -2,6 +2,7 @@ package tasks
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/Ecook14/gocrewwai/pkg/agents"
@@ -46,6 +47,23 @@ func TestTaskExecute(t *testing.T) {
 
 	if !task.Processed {
 		t.Errorf("Expected task to be marked as processed")
+	}
+}
+
+func TestTask_JSONMarshaling(t *testing.T) {
+	task := &Task{
+		Description: "Marshal Task",
+		CallbackOnComplete: func(result interface{}) {
+			// Do nothing
+		},
+		OutputCondition: func(result interface{}) string {
+			return "success"
+		},
+	}
+
+	_, err := json.Marshal(task)
+	if err != nil {
+		t.Fatalf("Failed to marshal task to JSON: %v. This likely means a function field is missing a `json:\"-\"` tag.", err)
 	}
 }
 

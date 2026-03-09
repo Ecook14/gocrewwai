@@ -12,6 +12,7 @@ import (
 
 // GitHubTool allows agents to interact with GitHub.
 type GitHubTool struct {
+	BaseTool
 	client *github.Client
 }
 
@@ -26,14 +27,15 @@ func NewGitHubTool(token string) *GitHubTool {
 		Timeout: 30 * time.Second,
 	}
 	client := github.NewClient(httpClient).WithAuthToken(token)
-	return &GitHubTool{client: client}
+	return &GitHubTool{
+		BaseTool: BaseTool{
+			NameValue:        "GitHubTool",
+			DescriptionValue: "Interacts with GitHub. Actions: search_repos, create_issue, get_repo_info.",
+		},
+		client: client,
+	}
 }
 
-func (t *GitHubTool) Name() string { return "GitHubTool" }
-
-func (t *GitHubTool) Description() string {
-	return "Interacts with GitHub. Actions: search_repos, create_issue, get_repo_info."
-}
 
 func (t *GitHubTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	action, ok := input["action"].(string)

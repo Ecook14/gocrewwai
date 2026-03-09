@@ -6,17 +6,19 @@ import (
 )
 
 // DateTimeTool provides current date and time information.
-type DateTimeTool struct{}
+type DateTimeTool struct {
+	BaseTool
+}
 
 func NewDateTimeTool() *DateTimeTool {
-	return &DateTimeTool{}
+	return &DateTimeTool{
+		BaseTool: BaseTool{
+			NameValue:        "DateTime",
+			DescriptionValue: "Returns the current date and time.",
+		},
+	}
 }
 
-func (t *DateTimeTool) Name() string { return "DateTime" }
-
-func (t *DateTimeTool) Description() string {
-	return "Returns the current date and time."
-}
 
 func (t *DateTimeTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	return time.Now().Format(time.RFC3339), nil

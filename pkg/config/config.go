@@ -73,6 +73,7 @@ type Config struct {
 
 	// Security
 	APIKeyEnvVar string `json:"api_key_env_var"`
+	E2BAPIKey    string `json:"e2b_api_key"`
 
 	// Execution
 	MaxConcurrency int           `json:"max_concurrency"`
@@ -137,6 +138,7 @@ func (c *Config) applyEnvOverrides() {
 		"CREW_GO_LOG_FORMAT":       &c.LogFormat,
 		"CREW_GO_AUDIT_LOG_PATH":   &c.AuditLogPath,
 		"CREW_GO_API_KEY_ENV_VAR":  &c.APIKeyEnvVar,
+		"CREW_GO_E2B_API_KEY":     &c.E2BAPIKey,
 	}
 	for env, target := range envStr {
 		if val := os.Getenv(env); val != "" {

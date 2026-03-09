@@ -93,6 +93,14 @@ func (s *InMemCosineStore) Count(ctx context.Context) (int, error) {
 	return len(s.items), nil
 }
 
+// Reset clears all items from the store.
+func (s *InMemCosineStore) Reset(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.items = make([]*MemoryItem, 0)
+	return nil
+}
+
 // Close is a no-op for in-memory stores.
 func (s *InMemCosineStore) Close() error {
 	return nil

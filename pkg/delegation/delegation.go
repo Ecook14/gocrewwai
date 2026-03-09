@@ -7,6 +7,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	"github.com/Ecook14/gocrewwai/pkg/tools"
 )
 
 // Agent defines the minimal interface required for delegation targets.
@@ -41,6 +43,18 @@ func (t *DelegateWorkTool) Description() string {
 }
 
 func (t *DelegateWorkTool) RequiresReview() bool { return false }
+
+func (t *DelegateWorkTool) ArgsSchema() []tools.ArgSchema {
+	return []tools.ArgSchema{
+		{Name: "coworker", Type: "string", Description: "Role name of the coworker", Required: true},
+		{Name: "task", Type: "string", Description: "Detailed task description", Required: true},
+		{Name: "context", Type: "string", Description: "Helpful context for the task", Required: false},
+	}
+}
+
+func (t *DelegateWorkTool) CacheFunction(input map[string]interface{}) string {
+	return ""
+}
 
 func (t *DelegateWorkTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	coworkerRaw, ok := input["coworker"]
@@ -126,6 +140,18 @@ func (t *AskQuestionTool) Description() string {
 }
 
 func (t *AskQuestionTool) RequiresReview() bool { return false }
+
+func (t *AskQuestionTool) ArgsSchema() []tools.ArgSchema {
+	return []tools.ArgSchema{
+		{Name: "coworker", Type: "string", Description: "Role name of the coworker", Required: true},
+		{Name: "question", Type: "string", Description: "The question to ask", Required: true},
+		{Name: "context", Type: "string", Description: "Helpful context for the question", Required: false},
+	}
+}
+
+func (t *AskQuestionTool) CacheFunction(input map[string]interface{}) string {
+	return ""
+}
 
 func (t *AskQuestionTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	coworkerRaw, ok := input["coworker"]

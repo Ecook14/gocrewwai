@@ -35,7 +35,7 @@ func main() {
 	task := &tasks.Task{
 		Description:  "Get the current stock price and a brief description for NVDA.",
 		Agent:        analyst,
-		OutputSchema: &StockInfo{},
+		OutputJSON:    &StockInfo{},
 		MaxRetries:   3,
 	}
 

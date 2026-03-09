@@ -35,7 +35,7 @@ func main() {
 	task := &tasks.Task{
 		Description: "Identify the top AI trend for 2026. Return your answer as a JSON object with 'trend', 'impact', and 'certainty' (0-100).",
 		Agent:       agent,
-		OutputSchema: &stats,
+		OutputJSON:   &stats,
 	}
 
 	fmt.Println("🚀 Kicking off Robust Structured Output Demo...")

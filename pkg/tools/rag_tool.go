@@ -12,23 +12,23 @@ import (
 // NativeRAGTool provides Retrieval-Augmented Generation capabilities.
 // It indexes local files and allows agents to search through them.
 type NativeRAGTool struct {
+	BaseTool
 	Memory *memory.LongTermMemory
 	Dir    string
 }
 
 func NewNativeRAGTool(mem *memory.LongTermMemory, dir string) *NativeRAGTool {
 	return &NativeRAGTool{
+		BaseTool: BaseTool{
+			NameValue: "NativeRAGTool",
+			DescriptionValue: "Search through local documentation and knowledge bases. Input requires 'query' (the search term). " +
+				"Returns the most relevant snippets from the indexed files.",
+		},
 		Memory: mem,
 		Dir:    dir,
 	}
 }
 
-func (t *NativeRAGTool) Name() string { return "NativeRAGTool" }
-
-func (t *NativeRAGTool) Description() string {
-	return "Search through local documentation and knowledge bases. Input requires 'query' (the search term). " +
-		"Returns the most relevant snippets from the indexed files."
-}
 
 // Ingest indexes all files in the provided directory.
 func (t *NativeRAGTool) Ingest(ctx context.Context) error {

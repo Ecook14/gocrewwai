@@ -6,18 +6,20 @@ import (
 )
 
 // CalculatorTool provides basic mathematical operations.
-type CalculatorTool struct{}
+type CalculatorTool struct {
+	BaseTool
+}
 
 func NewCalculatorTool() *CalculatorTool {
-	return &CalculatorTool{}
+	return &CalculatorTool{
+		BaseTool: BaseTool{
+			NameValue: "Calculator",
+			DescriptionValue: "Perform basic math operations. Input requires 'expression' (e.g. '2 + 2'). " +
+				"Supports addition (+), subtraction (-), multiplication (*), and division (/).",
+		},
+	}
 }
 
-func (t *CalculatorTool) Name() string { return "Calculator" }
-
-func (t *CalculatorTool) Description() string {
-	return "Perform basic math operations. Input requires 'expression' (e.g. '2 + 2'). " +
-		"Supports addition (+), subtraction (-), multiplication (*), and division (/)."
-}
 
 func (t *CalculatorTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	exprRaw, ok := input["expression"]

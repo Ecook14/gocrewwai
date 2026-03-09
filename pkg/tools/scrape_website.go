@@ -12,20 +12,19 @@ import (
 
 // ScrapeWebsiteTool fetches text content from a simple HTTP URL.
 type ScrapeWebsiteTool struct {
+	BaseTool
 	Options map[string]interface{}
 }
 
 func NewScrapeWebsiteTool() *ScrapeWebsiteTool {
-	return &ScrapeWebsiteTool{}
+	return &ScrapeWebsiteTool{
+		BaseTool: BaseTool{
+			NameValue:        "ScrapeWebsiteTool",
+			DescriptionValue: "Scrapes text content from a provided URL. Input requires 'url' as a string.",
+		},
+	}
 }
 
-func (t *ScrapeWebsiteTool) Name() string {
-	return "ScrapeWebsiteTool"
-}
-
-func (t *ScrapeWebsiteTool) Description() string {
-	return "Scrapes text content from a provided URL. Input requires 'url' as a string."
-}
 
 func (t *ScrapeWebsiteTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	urlRaw, ok := input["url"]

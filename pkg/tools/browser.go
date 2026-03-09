@@ -20,26 +20,26 @@ const (
 
 // BrowserTool provides direct headless browser control using chromedp.
 type BrowserTool struct {
+	BaseTool
 	// Timeout for browser actions. Defaults to 30 seconds.
 	Timeout time.Duration
 }
 
 func NewBrowserTool() *BrowserTool {
 	return &BrowserTool{
-		Timeout: 30 * time.Second,
-	}
-}
-
-func (t *BrowserTool) Name() string { return "BrowserControl" }
-
-func (t *BrowserTool) Description() string {
-	return `Controls a headless browser. Supported actions:
+		BaseTool: BaseTool{
+			NameValue: "BrowserControl",
+			DescriptionValue: `Controls a headless browser. Supported actions:
 - navigate: {"url": "https://example.com"}
 - click: {"selector": "#button-id"}
 - type: {"selector": "input", "text": "hello"}
 - screenshot: {"filename": "output.png"}
-- get_text: {"selector": "body"}`
+- get_text: {"selector": "body"}`,
+		},
+		Timeout: 30 * time.Second,
+	}
 }
+
 
 func (t *BrowserTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	action, ok := input["action"].(string)

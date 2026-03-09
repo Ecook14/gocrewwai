@@ -1,0 +1,44 @@
+# Gocrewwai Crew Configuration
+# Define your entire AI crew in a single YAML file!
+
+llm:
+  provider: openai
+  model: gpt-4o
+  api_key: ${OPENAI_API_KEY}    # Auto-resolves from environment
+
+agents:
+  - role: Senior Researcher
+    goal: Find cutting-edge AI papers and breakthroughs
+    backstory: PhD in ML with 10 years of experience at top labs
+    verbose: true
+    inject_date: true
+    reasoning: true
+    max_iter: 20
+    tools:
+      - SearchWeb
+
+  - role: Technical Writer
+    goal: Write clear, engaging, and accurate blog posts
+    backstory: Award-winning tech journalist with deep AI knowledge
+    verbose: true
+
+tasks:
+  - name: research
+    description: Research the latest breakthroughs in AI agents and multi-agent systems
+    expected_output: Bullet-point summary of top 5 findings with source links
+    agent: Senior Researcher
+
+  - name: write_blog
+    description: Write a comprehensive blog post based on the research findings
+    expected_output: A 1000-word blog post in Markdown format
+    agent: Technical Writer
+    context:
+      - research       # Chain output from the research task
+    output_file: ./output/blog.md
+    markdown: true
+
+crew:
+  process: sequential
+  verbose: true
+  max_rpm: 10
+  planning: false

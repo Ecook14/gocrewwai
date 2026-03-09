@@ -54,6 +54,7 @@ func (s *WSServer) Start(port string) {
 	mux.HandleFunc("/api/create/task", s.handleCreateTask)
 	mux.HandleFunc("/api/create/mcp", s.handleCreateMCP)
 	mux.HandleFunc("/api/create/a2a", s.handleCreateA2A)
+	mux.HandleFunc("/api/config", s.handleUpdateConfig)
 
 	// Metadata Endpoints
 	mux.HandleFunc("/api/tools", s.handleListTools)
@@ -165,8 +166,10 @@ func (s *WSServer) handleCreateAgent(w http.ResponseWriter, r *http.Request) {
 		MemoryConfig struct {
 			ConnectionString string `json:"connection_string"`
 		} `json:"memory_config"`
-		Tools []string `json:"tools"`
-		Index *int     `json:"index"`
+		Tools           []string `json:"tools"`
+		AllowDelegation bool     `json:"allow_delegation"`
+		SelfHealing     bool     `json:"self_healing"`
+		Index           *int     `json:"index"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -220,6 +223,8 @@ func (s *WSServer) handleCreateAgent(w http.ResponseWriter, r *http.Request) {
 		LLMModel:  req.LLMModel,
 		LLM:       client,
 		MaxRPM:    req.MaxRPM,
+		AllowDelegation: req.AllowDelegation,
+		SelfHealing:     req.SelfHealing,
 		Verbose:   true,
 	}
 
@@ -252,6 +257,22 @@ func (s *WSServer) handleCreateAgent(w http.ResponseWriter, r *http.Request) {
 			// Default to Redis if "Remote" is selected
 			if store, err := memory.NewRedisStore([]string{connStr}, "", 0, "crew_memory:"); err == nil {
 				agent.Memory = store
+			}
+		}
+	}
+
+	// Tool Assignment (Fixing the reported issue)
+	if len(req.Tools) > 0 {
+		for _, toolName := range req.Tools {
+			if t, err := tools.GlobalRegistry.Get(toolName); err == nil {
+				agent.Tools = append(agent.Tools, t)
+			} else {
+				// Try dynamic creation if not in registry
+				if dt, err := tools.CreateTool(toolName, nil); err == nil {
+					agent.Tools = append(agent.Tools, dt)
+				} else {
+					slog.Warn("⚠️ Tool not found or failed to create", slog.String("tool", toolName))
+				}
 			}
 		}
 	}
@@ -390,13 +411,17 @@ func (s *WSServer) handleListAll(w http.ResponseWriter, r *http.Request) {
 
 	slog.Info("Syncing Dashboard Entities", slog.Int("agents", agentsCount), slog.Int("tasks", tasksCount))
 	
+	// Marshal first to ensure we don't send a partial 200 OK response
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		slog.Error("Failed to marshal entity list", slog.Any("error", err))
+		http.Error(w, "Internal Server Error: Failed to generate entity list", http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(data); err != nil {
-		slog.Error("Failed to encode entity list", slog.Any("error", err))
-		// Note: Header and Status are already sent, so we can't send http.Error here.
-		// But this is still better than Marshal failing beforehand.
-	}
+	w.Write(jsonData)
 }
 
 func (s *WSServer) handleDeleteEntity(w http.ResponseWriter, r *http.Request) {
@@ -441,9 +466,12 @@ func (s *WSServer) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Description string `json:"description"`
-		AgentRole   string `json:"agent_role"`
-		Index       *int   `json:"index"`
+		Description    string `json:"description"`
+		AgentRole      string `json:"agent_role"`
+		ExpectedOutput string `json:"expected_output"`
+		AsyncExecution bool   `json:"async_execution"`
+		Timeout        int    `json:"timeout"`
+		Index          *int   `json:"index"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -452,8 +480,11 @@ func (s *WSServer) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	task := &tasks.Task{
-		Description: req.Description,
-		AgentRole:   req.AgentRole,
+		Description:    req.Description,
+		AgentRole:      req.AgentRole,
+		ExpectedOutput: req.ExpectedOutput,
+		AsyncExecution: req.AsyncExecution,
+		Timeout:        time.Duration(req.Timeout) * time.Second,
 	}
 
 	if req.Index != nil {
@@ -519,4 +550,26 @@ func (s *WSServer) publishMetrics() {
 func Start(port string) {
 	server := NewWSServer()
 	go server.Start(port)
+}
+
+func (s *WSServer) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		ProcessType string `json:"process_type"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	telemetry.GlobalDynamicRegistry.SetProcessType(req.ProcessType)
+	slog.Info("Updated Global Process Type via UI", slog.String("process_type", req.ProcessType))
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"status":"updated"}`))
 }

@@ -414,6 +414,14 @@
                 style="padding: 0.25rem 1rem; font-size: 0.75rem; background: #10b981; color: white;"
                 onclick="resetForm('a2a'); document.getElementById('modal-create-a2a').classList.remove('hidden')">A2A
                 BRIDGE</button>
+            <select id="config-process-type" class="form-input"
+                style="margin-left: 1rem; padding: 0.25rem 0.5rem; font-size: 0.75rem; height: 32px;"
+                onchange="updateProcessType()">
+                <option value="sequential">Sequential</option>
+                <option value="hierarchical">Hierarchical</option>
+                <option value="consensual">Consensual</option>
+                <option value="graph">Graph</option>
+            </select>
             <button id="btn-start" class="btn approve"
                 style="margin-left: 1rem; padding: 0.25rem 1rem; font-size: 0.75rem;"
                 onclick="toggleExecution(true)">START</button>
@@ -509,6 +517,16 @@
                     <input type="number" id="agent-maxrpm" class="form-input" placeholder="e.g. 5" min="0">
                 </div>
             </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 0.5rem;">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input type="checkbox" id="agent-delegation" style="cursor: pointer;">
+                    <label for="agent-delegation" style="margin: 0; cursor: pointer;">Allow Delegation</label>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input type="checkbox" id="agent-selfhealing" style="cursor: pointer;">
+                    <label for="agent-selfhealing" style="margin: 0; cursor: pointer;">Self-Healing</label>
+                </div>
+            </div>
             <div class="form-group" style="margin-top: 0.5rem;">
                 <label>Tools (Select multiple)</label>
                 <div id="agent-tools-list"
@@ -550,6 +568,20 @@
                 <select id="task-agent" class="form-input">
                     <option value="">Select an Agent...</option>
                 </select>
+            </div>
+            <div class="form-group">
+                <label>Expected Output</label>
+                <input type="text" id="task-expected" class="form-input" placeholder="e.g. A 3-page markdown report">
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>Timeout (seconds)</label>
+                    <input type="number" id="task-timeout" class="form-input" placeholder="e.g. 120" value="120">
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 1.5rem;">
+                    <input type="checkbox" id="task-async" style="cursor: pointer;">
+                    <label for="task-async" style="margin: 0; cursor: pointer;">Async Execution</label>
+                </div>
             </div>
             <div class="review-actions" style="margin-top: 1rem;">
                 <button class="btn approve" onclick="submitCreateTask()">Create</button>

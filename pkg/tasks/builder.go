@@ -44,7 +44,7 @@ func (b *TaskBuilder) AsyncExecution(v bool) *TaskBuilder {
 	return b
 }
 
-func (b *TaskBuilder) OutputSchema(schema interface{}) *TaskBuilder {
+func (b *TaskBuilder) OutputSchema(schema string) *TaskBuilder {
 	b.task.OutputSchema = schema
 	return b
 }

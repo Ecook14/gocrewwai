@@ -144,6 +144,15 @@ func (s *SQLiteStore) Count(ctx context.Context) (int, error) {
 	return count, err
 }
 
+// Reset clears all data by truncating the table.
+func (s *SQLiteStore) Reset(ctx context.Context) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM memory_items`)
+	if err != nil {
+		return fmt.Errorf("failed to reset memory store: %w", err)
+	}
+	return nil
+}
+
 // PurgeExpired removes all items that have passed their TTL.
 func (s *SQLiteStore) PurgeExpired(ctx context.Context) (int64, error) {
 	result, err := s.db.ExecContext(ctx,

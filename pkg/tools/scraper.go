@@ -10,17 +10,19 @@ import (
 )
 
 // ScraperTool reads the raw text content of a web page.
-type ScraperTool struct{}
+type ScraperTool struct {
+	BaseTool
+}
 
 func NewScraperTool() *ScraperTool {
-	return &ScraperTool{}
+	return &ScraperTool{
+		BaseTool: BaseTool{
+			NameValue:        "WebScraper",
+			DescriptionValue: "Reads the text content of a URL. Useful for gathering detailed information from a specific webpage.",
+		},
+	}
 }
 
-func (t *ScraperTool) Name() string { return "WebScraper" }
-
-func (t *ScraperTool) Description() string {
-	return "Reads the text content of a URL. Useful for gathering detailed information from a specific webpage."
-}
 
 func (t *ScraperTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	urlStr, ok := input["url"].(string)

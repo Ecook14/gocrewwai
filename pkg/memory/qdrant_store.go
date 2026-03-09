@@ -236,6 +236,22 @@ func (s *QdrantStore) Count(ctx context.Context) (int, error) {
 	return result.Result.PointsCount, nil
 }
 
+func (s *QdrantStore) Reset(ctx context.Context) error {
+	url := fmt.Sprintf("%s/collections/%s", s.BaseURL, s.CollectionName)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+
+	return s.ensureCollection()
+}
+
 func (s *QdrantStore) Close() error {
 	return nil
 }

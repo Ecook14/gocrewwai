@@ -1,22 +1,14 @@
 # Quickstart Guide: Building Your First Crew 🚀
 
-Welcome to **Crew-GO**! I'm so excited you're ready to start building autonomous agents with me. Whether you're here to build a simple researcher or a massive, distributed reasoning engine, this guide will walk you through building a complete, functioning Crew from scratch.
-
-I've designed this to be as straightforward as possible, while still showing off some of the powerful Go-native features we've packed underneath the hood. Let's dive in!
+Welcome to **Gocrew**! We're thrilled you're ready to build autonomous agent teams. Whether you're building a simple researcher or a complex reasoning engine, this guide will walk you through creating a functioning Crew in minutes.
 
 ---
 
-## Phase 1: Installation & Setup
+## 🏗️ 1. Installation
 
-Before we start writing Go code, let's make sure your environment is ready.
+Gocrew recommends using our unified SDK facade for the best developer experience.
 
-### Prerequisites
-1. **Go 1.22+**: Required for modern features like Go Generics (which we use for safely parsing AI responses!).
-2. **OpenAI API Key**: (Or a compatible proxy like Groq, Ollama, or Anthropic if you change the initialized client).
-
-### Install the Framework
-Let's pull the Crew-GO library into a fresh Go module:
-
+### Initialize Your Project
 ```bash
 mkdir my-first-crew
 cd my-first-crew
@@ -24,149 +16,105 @@ go mod init my-first-crew
 go get github.com/Ecook14/gocrewwai
 ```
 
-*(If you ever want to scaffold a project automatically, we also have a CLI you can install via `go install github.com/Ecook14/gocrewwai/cmd/gocrew@latest`!)*
-
 ---
 
-## Phase 2: Writing the Code
+## ✍️ 2. Writing Your First Crew
 
-Create a `main.go` file in your new folder. We are going to build a **"Tech News Summarization Crew"**. Our team will consist of two AI agents:
-1. A **Researcher** who scours the internet for the latest tutorials.
-2. A **Writer** who takes that research and turns it into a catchy blog post.
+Create a `main.go`. We’ll build a **"Go Release Analyst"** team:
+1. **Researcher**: Finds details about the latest Go release.
+2. **Writer**: Summarizes the features for a blog post.
 
-### Step 1: Initialize the LLM "Brain"
-Every agent needs an LLM to think. Crew-GO ships with highly optimized clients out of the box.
-
+### The Code
 ```go
 package main
 
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"os"
 
-	"github.com/Ecook14/gocrewwai/pkg/agents"
-	"github.com/Ecook14/gocrewwai/pkg/crew"
-	"github.com/Ecook14/gocrewwai/pkg/llm"
-	"github.com/Ecook14/gocrewwai/pkg/tasks"
-	"github.com/Ecook14/gocrewwai/pkg/tools"
+	"github.com/Ecook14/gocrewwai/gocrew"
 )
 
 func main() {
-    // 1. Setup the LLM Client. This client inherently handles Retries, Rate Limits, and Telemetry!
-    apiKey := os.Getenv("OPENAI_API_KEY")
-    if apiKey == "" {
-        panic("OPENAI_API_KEY is required in your environment!")
-    }
-    client := llm.NewOpenAIClient(apiKey)
-```
+	// 1. Setup the Brain (LLM)
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	model := gocrew.NewOpenAI(apiKey, "gpt-4o")
 
-### Step 2: Define the Agents
-Agents are defined by their `Role`, `Goal`, and `Backstory`. We use a "Fluent Builder" pattern in Go to make this incredibly clean to read.
+	// 2. Build the Agents
+	researcher := gocrew.NewAgentBuilder().
+		Role("Technical Researcher").
+		Goal("Identify 3 key features of the latest Go 1.24 release.").
+		LLM(model).
+		Tools(gocrew.NewSearchWebTool()).
+		Verbose(true).
+		Build()
 
-*Notice how we equip the Researcher with a `SearchWebTool` below, so it isn't just generating text—it can actually run live Google searches!*
+	writer := gocrew.NewAgentBuilder().
+		Role("Tech Content Creator").
+		Goal("Write a 3-paragraph blog post summarizing the research.").
+		LLM(model).
+		Build()
 
-```go
-    // 2. Create the Researcher Agent
-    researcher := agents.NewAgentBuilder().
-        Role("Senior Tech Researcher").
-        Goal("Discover the absolute latest developments in the Go programming language.").
-        Backstory("You are a relentless tech journalist who digs deep to find cutting-edge information. You always verify your sources.").
-        LLM(client).
-        Tools(tools.NewSearchWebTool()). // Give them internet access!
-        Verbose(true).                   // Let's watch them think in the console!
-        Build()
+	// 3. Define the Mission
+	researchTask := gocrew.NewTaskBuilder().
+		Description("Search for Go 1.24 release notes and list 3 major changes.").
+		Agent(researcher).
+		Build()
 
-    // 3. Create the Writer Agent
-    writer := agents.NewAgentBuilder().
-        Role("Senior Technical Writer").
-        Goal("Craft engaging, accurate, and concise blog posts about technology.").
-        Backstory("You are an expert copywriter known for your clear and engaging tone. You never plagiarize, and you always summarize complex topics simply.").
-        LLM(client).
-        Build()
-```
+	blogTask := gocrew.NewTaskBuilder().
+		Description("Write a blog post based on the research provided.").
+		Agent(writer).
+		Context(researchTask). // Writer waits for Researcher
+		Build()
 
-### Step 3: Define the Tasks
-Agents need jobs to do. Tasks dictate exactly what each agent should accomplish. Tasks can also be chained together so one agent waits for another to finish!
+	// 4. Assemble and Kickoff
+	myCrew := gocrew.NewCrewBuilder().
+		Agents(researcher, writer).
+		Tasks(researchTask, blogTask).
+		Process(gocrew.Sequential).
+		Verbose(true).
+		Build()
 
-```go
-    // 4. Create the Research Task
-    researchTask := tasks.NewTaskBuilder().
-        Description("Search the web for news about the 'Go 1.24 Release' or 'Go memory management updates'. Gather at least 3 key links and summarize them.").
-        Agent(researcher).
-        Build()
+	result, err := myCrew.Kickoff(context.Background())
+	if err != nil {
+		fmt.Printf("Crew failed: %v\n", err)
+		return
+	}
 
-    // 5. Create the Writing Task
-    writingTask := tasks.NewTaskBuilder().
-        Description("Using the context provided by the researcher, write a catchy 3-paragraph blog post summarizing the latest Go updates.").
-        Agent(writer).
-        Context(researchTask). // Explicit dependency: The writer waits for the research to finish!
-        Build()
-```
-
-### Step 4: Assemble & Kickoff the Crew
-A `Crew` is the underlying Go execution engine that manages the flow. We will use the default `Sequential` process, meaning `researchTask` will finish entirely before `writingTask` begins.
-
-```go
-    // 6. Assemble the Crew
-    techCrew := crew.NewCrewBuilder().
-        Agents(researcher, writer).
-        Tasks(researchTask, writingTask).
-        Process(crew.Sequential).
-        Verbose(true).
-        Build()
-
-    // 7. Kickoff Execution!
-    slog.Info("🚀 Kicking off the Tech News Crew...")
-    
-    // You can use context.WithTimeout(ctx, 10*time.Minute) to enforce hard execution limits.
-    result, err := techCrew.Kickoff(context.Background())
-    if err != nil {
-        slog.Error("Crew execution failed!", slog.String("error", err.Error()))
-        os.Exit(1)
-    }
-
-    // 8. Print the Final Output
-    fmt.Println("\n==================================")
-    fmt.Println("🎉 FINAL BLOG POST 🎉")
-    fmt.Println("==================================")
-    fmt.Println(result)
+	fmt.Printf("\n--- MISSION COMPLETE ---\n%s\n", result)
 }
 ```
 
 ---
 
-## Phase 3: Watch it Run!
+## 🏃 3. Run It
 
-To execute your crew, just run:
+Set your API key and execute:
 ```bash
-export OPENAI_API_KEY="your-api-key-here"
+export OPENAI_API_KEY=your-key
 go run main.go
 ```
 
-You will see `slog` output flooding your terminal as the ReAct loop triggers, the Researcher searches the web, parses the results, and hands the context to the Writer.
-
-### Want to see the beautiful Glassmorphic Web UI?
-Watching terminal logs is fun, but observing your agents think in a real-time web dashboard is even better. 
-
-Simply import our server package into your `main.go`:
-```go
-import "github.com/Ecook14/gocrewwai/pkg/dashboard"
-```
-And add this line right before you call `techCrew.Kickoff(...)`:
-```go
-// Start the real-time websocket dashboard on port 8080!
-dashboard.Start("8080")
-```
-
-Then, pop open your browser to `http://localhost:8080/web-ui`. You can even **Stop and Start** the engine live or create entire new agents from the **Creator Studio** without restarting your Go process!
+Watch the terminal as your Researcher performs web searches and hands off the data to the Writer!
 
 ---
 
-## What's Next?
-You've successfully built your first Crew-GO application! From here, I highly recommend checking out:
-- **[Advanced Usage](advanced_usage.md)** to learn how to make agents run in parallel (Hierarchical) or extract strict JSON strings into Go Structs.
-- **[Tools Guide](features/tools.md)** to learn how to spin up Docker containers for your agents to execute their own code inside!
+## 🖥️ 4. Using the Dashboard
 
-If you build something awesome, or notice a way we can improve the framework, **please drop by the GitHub repo and submit a Pull Request!** We are building the smartest Go framework together.
+Want to watch your agents live in a stunning web interface? Gocrew has a built-in dashboard.
+
+1. Add the dashboard import: `"github.com/Ecook14/gocrewwai/pkg/dashboard"`
+2. Start the server before `Kickoff`:
+   ```go
+   dashboard.Start("8080")
+   ```
+3. Run your app and visit `http://localhost:8080/web-ui`.
+
+---
+
+## 🛠️ 5. Next Steps
+
+- **[Usage Guide](../USAGE.md)**: Explore advanced sandboxing (Docker/E2B) and configuration.
+- **[Memory Deep Dive](features/memory.md)**: Give your agents persistent long-term memory.
+- **[Tool Alignment](tools_alignment.md)**: See our full list of 24+ native tools.

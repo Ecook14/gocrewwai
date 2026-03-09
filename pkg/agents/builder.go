@@ -77,6 +77,76 @@ func (b *AgentBuilder) Cache(cache llm.Cache) *AgentBuilder {
 	return b
 }
 
+func (b *AgentBuilder) FunctionCallingLLM(client llm.Client) *AgentBuilder {
+	b.agent.FunctionCallingLLM = client
+	return b
+}
+
+func (b *AgentBuilder) SystemTemplate(t string) *AgentBuilder {
+	b.agent.SystemTemplate = t
+	return b
+}
+
+func (b *AgentBuilder) PromptTemplate(t string) *AgentBuilder {
+	b.agent.PromptTemplate = t
+	return b
+}
+
+func (b *AgentBuilder) ResponseTemplate(t string) *AgentBuilder {
+	b.agent.ResponseTemplate = t
+	return b
+}
+
+func (b *AgentBuilder) AllowCodeExecution(v bool) *AgentBuilder {
+	b.agent.AllowCodeExecution = v
+	return b
+}
+
+func (b *AgentBuilder) CodeExecutionMode(mode string) *AgentBuilder {
+	b.agent.CodeExecutionMode = mode
+	return b
+}
+
+func (b *AgentBuilder) Multimodal(v bool) *AgentBuilder {
+	b.agent.Multimodal = v
+	return b
+}
+
+func (b *AgentBuilder) InjectDate(v bool) *AgentBuilder {
+	b.agent.InjectDate = v
+	return b
+}
+
+func (b *AgentBuilder) DateFormat(format string) *AgentBuilder {
+	b.agent.DateFormat = format
+	return b
+}
+
+func (b *AgentBuilder) Reasoning(v bool) *AgentBuilder {
+	b.agent.Reasoning = v
+	return b
+}
+
+func (b *AgentBuilder) MaxReasoningAttempts(max int) *AgentBuilder {
+	b.agent.MaxReasoningAttempts = max
+	return b
+}
+
+func (b *AgentBuilder) Embedder(cfg map[string]interface{}) *AgentBuilder {
+	b.agent.EmbedderConfig = cfg
+	return b
+}
+
+func (b *AgentBuilder) KnowledgeSources(sources ...memory.KnowledgeSource) *AgentBuilder {
+	b.agent.KnowledgeSources = append(b.agent.KnowledgeSources, sources...)
+	return b
+}
+
+func (b *AgentBuilder) UseSystemPrompt(v bool) *AgentBuilder {
+	b.agent.UseSystemPrompt = v
+	return b
+}
+
 func (b *AgentBuilder) Build() *Agent {
 	return b.agent
 }

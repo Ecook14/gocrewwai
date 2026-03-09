@@ -308,6 +308,17 @@ func (s *WeaviateStore) Count(ctx context.Context) (int, error) {
 	return 0, nil
 }
 
+func (s *WeaviateStore) Reset(ctx context.Context) error {
+	path := fmt.Sprintf("/v1/schema/%s", s.ClassName)
+	resp, err := s.doRequest(ctx, http.MethodDelete, path, nil)
+	if err != nil {
+		return err
+	}
+	resp.Body.Close()
+
+	return s.ensureClass()
+}
+
 func (s *WeaviateStore) Close() error {
 	return nil
 }

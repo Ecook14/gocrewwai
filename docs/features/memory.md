@@ -1,70 +1,54 @@
-# Feature Deep Dive: Advanced Memory Architectures 🧠
+# Feature Deep Dive: Unified Memory 🧠
 
-Hey! Let's talk about memory. 
-
-If you've played with basic AI chatbots, you know their biggest flaw: they suffer from total amnesia. The second you start a new prompt, they forget everything you told them yesterday.
-
-For enterprise-grade autonomous agents, that's unacceptable. If our agents are doing research or writing code, they need to recall past lessons, remember user preferences, and reference previous task outputs. 
-
-Gocrew solves this natively through a highly robust set of interfaces inside `pkg/memory`.
+Memory allows Gocrew agents to learn over time, recall past interactions, and maintain context across complex, multi-stage workflows.
 
 ---
 
-## 📚 The Three Tiers of Memory
+## 🏗️ The Multi-Tiered Architecture
 
-We've built a three-tiered memory architecture to give our Go agents total recall without blowing up the LLM token context window.
+Gocrew uses a three-tier memory system inspired by human cognition:
 
-### 1. Short-Term Memory (Contextual)
-- **What it is:** The immediate scratchpad.
-- **How it works:** When an agent enters a 10-loop ReAct reasoning cycle, it uses short-term memory to remember exactly what tool it just called 5 seconds ago. This prevents the agent from getting stuck in an infinite loop of calling the exact same failing Google search over and over.
-
-### 2. Long-Term Memory (RAG / Vector Stores)
-- **What it is:** Persistent, infinite storage across executions and application restarts.
-- **How it works:** When you hand the agent a new Task, the Engine calculates a mathematical Vector Embedding of the task description in the background. It then natively queries your attached `memory.Store` using Cosine Similarity, grabs the most relevant past experiences, and seamlessly injects them directly into the LLM System Prompt.
-
-### 3. Entity Memory (High Precision)
-- **What it is:** Structured database facts. Long-Term memory stores giant vague walls of text. Entity Memory stores exact *Key-Value concepts*.
-- **How it works:** If an agent reads a 100-page document and notices a fact like "The CEO of Acme Corp is John Doe and he hates emails", the Agent uses an internal JSON extraction schema to transform that into clean structured data: `[{"entity": "Acme Corp CEO", "value": "John Doe", "description": "Hates emails"}]`.
-- This ensures absolute precision. When the agent later sees the word "Acme Corp", it pulls that exact JSON object into context natively.
+1. **Short-Term Memory**: The agent's current "Thought Stream" and recent task history.
+2. **Long-Term Memory**: Persistent storage (Vector DB) for recalling facts across different sessions and crews.
+3. **Entity Memory**: A specialized store for remembering specific details about objects, people, or concepts (e.g., "User prefers Python over Go").
 
 ---
 
-## 💾 Supported Memory Databases Out-Of-The-Box
+## 🛠️ Composite Scoring Logic
 
-Gocrew provides native Go adapters for the most popular vector and KV stores in the world.
+Unlike simple vector search, Gocrew uses a **Composite Scoring** algorithm to decide *which* memory to recall:
 
-- **In-Memory** (`NewInMemCosineStore`): Perfect for fast local testing and development.
-- **SQLite** (`NewSQLiteStore`): Amazing for single-binary persistent deployments that you don't want to spin up Docker for!
-- **Redis** (`NewRedisStore`): Crucial for high-speed distributed deployments if you are running Crews across multiple Kubernetes pods.
-- **ChromaDB, Pinecone, Qdrant**: Best-in-class, enterprise vector databases designed for massive RAG scale.
+| Metric | Description |
+| :--- | :--- |
+| **Recency** | How recently the memory was recorded. |
+| **Relevance** | Semantic similarity to the current task. |
+| **Importance** | How "critical" the agent flagged the memory during storage. |
+
+**Final Score = (w1 * Recency) + (w2 * Relevance) + (w3 * Importance)**
 
 ---
 
-## 💻 Code Example
+## 💾 Supported Backends
 
-Giving an agent infinite memory is as easy as passing it a database connection!
+Gocrew is database-agnostic. You can configure your memory store during crew setup:
+- **Local**: SQLite (default), In-Memory.
+- **Cloud**: Pinecone, Qdrant, Weaviate, Redis.
 
 ```go
-// 1. Connect to a local ChromaDB instance
-chromaStore, err := memory.NewChromaStore("http://localhost:8000")
-if err != nil {
-    log.Fatal("Failed to connect to memory:", err)
-}
-
-// 2. Give the agent total recall!
-analyst := agents.NewAgentBuilder().
-    Role("Data Analyst").
-    Goal("Analyze trends").
-    Memory(chromaStore). // They are now hooked up to the DB!
+agent := gocrew.NewAgentBuilder().
+    Memory(true).
+    MemoryStore(gocrew.NewSQLiteStore("memory.db")).
     Build()
 ```
 
 ---
 
-## 🤝 Help Me Build New Integrations!
+## 🔄 Memory Lifecycle
 
-Vector database technology moves incredibly fast. Do you have a favorite database that we don't support yet, like **Milvus**, **Weaviate**, or even a standard **Postgres pgvector** adapter?
+1. **Observe**: The agent performs a task.
+2. **Flag**: The agent (or engine) identifies "memorable" facts.
+3. **Store**: Facts are vectorized and assigned an importance score.
+4. **Recall**: During the next task, relevant memories are retrieved and injected into the "Context" window.
 
-Because we used clean interfaces throughout `pkg/memory`, adding a new database takes less than 100 lines of Go code. 
-
-**Please consider mapping your favorite database and submitting a Pull Request!** Let's make sure our agents can remember anything, anywhere.
+---
+**Gocrew** - Building agents that truly learn.

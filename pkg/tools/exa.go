@@ -12,6 +12,7 @@ import (
 
 // ExaTool uses the Exa.ai API (formerly Metaphor) to perform semantic, AI-native searches.
 type ExaTool struct {
+	BaseTool
 	APIKey string
 }
 
@@ -19,14 +20,15 @@ func NewExaTool(apiKey string) *ExaTool {
 	if apiKey == "" {
 		apiKey = os.Getenv("EXA_API_KEY")
 	}
-	return &ExaTool{APIKey: apiKey}
+	return &ExaTool{
+		BaseTool: BaseTool{
+			NameValue:        "ExaSearch",
+			DescriptionValue: "Performs a semantic search using Exa.ai. Returns high-quality, AI-indexed results including titles, URLs, and text snippets/highlights.",
+		},
+		APIKey: apiKey,
+	}
 }
 
-func (t *ExaTool) Name() string { return "ExaSearch" }
-
-func (t *ExaTool) Description() string {
-	return "Performs a semantic search using Exa.ai. Returns high-quality, AI-indexed results including titles, URLs, and text snippets/highlights."
-}
 
 func (t *ExaTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	query, ok := input["query"].(string)

@@ -2,7 +2,9 @@ package telemetry
 
 import (
 	"context"
-	//"fmt"
+	"fmt"
+	"log/slog"
+	"strings"
 	"sync"
 	"time"
 )
@@ -200,6 +202,7 @@ type DynamicRegistry struct {
 	pendingTasks   []interface{}
 	pendingMCP     []interface{}
 	pendingA2A     []interface{}
+	processType    string
 
 	mu sync.RWMutex
 }
@@ -332,10 +335,27 @@ func (r *DynamicRegistry) SyncTaskResult(description string, agentRole string, o
 	defer r.mu.Unlock()
 
 	for i, t := range r.Tasks {
-		// Use type assertion to check fields
-		// We'll use a map check since tasks are stored as interface{}
+		// 1. Try Rich Object Interface (pointers to Task)
+		if taskPtr, ok := t.(interface {
+			GetDescription() string
+			GetAgentRole() string
+			SetOutput(interface{})
+			SetError(error)
+			SetProcessed(bool)
+		}); ok {
+			if taskPtr.GetDescription() == description && 
+			   (agentRole == "" || strings.EqualFold(taskPtr.GetAgentRole(), agentRole)) {
+				taskPtr.SetOutput(output)
+				taskPtr.SetError(err)
+				taskPtr.SetProcessed(processed)
+				return
+			}
+		}
+
+		// 2. Fallback: Map Check (UI staged tasks)
 		if taskMap, ok := t.(map[string]interface{}); ok {
-			if taskMap["description"] == description && taskMap["agent_role"] == agentRole {
+			if taskMap["description"] == description && 
+			   (agentRole == "" || strings.EqualFold(fmt.Sprintf("%v", taskMap["agent_role"]), agentRole)) {
 				taskMap["output"] = output
 				taskMap["processed"] = processed
 				if err != nil {
@@ -345,22 +365,10 @@ func (r *DynamicRegistry) SyncTaskResult(description string, agentRole string, o
 				r.Tasks[i] = taskMap
 				return
 			}
-		} else if taskPtr, ok := t.(interface{ 
-			GetDescription() string
-			GetAgentRole() string
-			SetOutput(interface{})
-			SetError(error)
-			SetProcessed(bool)
-		}); ok {
-			// If it's a rich object (unlikely for UI staged tasks but possible for Go-defined ones)
-			if taskPtr.GetDescription() == description && taskPtr.GetAgentRole() == agentRole {
-				taskPtr.SetOutput(output)
-				taskPtr.SetError(err)
-				taskPtr.SetProcessed(processed)
-				return
-			}
 		}
 	}
+	
+	slog.Debug("SyncTaskResult: No match found for task", slog.String("desc", description), slog.String("role", agentRole))
 }
 
 func (r *DynamicRegistry) UpdateMCP(index int, client interface{}) {
@@ -379,6 +387,18 @@ func (r *DynamicRegistry) UpdateA2A(index int, bridge interface{}) {
 		r.A2ABridges[index] = bridge
 		r.pendingA2A = append(r.pendingA2A, bridge)
 	}
+}
+
+func (r *DynamicRegistry) SetProcessType(p string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.processType = p
+}
+
+func (r *DynamicRegistry) GetProcessType() string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.processType
 }
 
 func (r *DynamicRegistry) ListAll() map[string]interface{} {
@@ -400,6 +420,9 @@ func (r *DynamicRegistry) ListAll() map[string]interface{} {
 		"tasks":  tasks,
 		"mcp":    mcp,
 		"a2a":    a2a,
+		"config": map[string]interface{}{
+			"process_type": r.processType,
+		},
 	}
 }
 

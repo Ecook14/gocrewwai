@@ -35,7 +35,7 @@ func main() {
 
 	// 1. Training Mode
 	fmt.Println("🎓 Entering Training Mode (Iterations: 1)...")
-	err := myCrew.Train(context.Background(), 1)
+	err := myCrew.Train(context.Background(), 1, nil)
 	if err != nil {
 		fmt.Printf("Training Error: %v\n", err)
 		return

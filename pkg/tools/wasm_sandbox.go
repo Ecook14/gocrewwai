@@ -12,6 +12,7 @@ import (
 
 // WASMSandboxTool executes pre-compiled WASM modules in a secure local environment.
 type WASMSandboxTool struct {
+	BaseTool
 	Runtime     wazero.Runtime
 	MountedDirs map[string]string // HostPath -> GuestPath map for explicit FS access
 }
@@ -38,16 +39,15 @@ func NewWASMSandboxTool(ctx context.Context) *WASMSandboxTool {
 		Instantiate(ctx)
 
 	return &WASMSandboxTool{
+		BaseTool: BaseTool{
+			NameValue:        "WASMSandboxTool",
+			DescriptionValue: "Executes a pre-compiled WASM module. Input requires 'path' (absolute path to .wasm file).",
+		},
 		Runtime:     r,
 		MountedDirs: make(map[string]string),
 	}
 }
 
-func (t *WASMSandboxTool) Name() string { return "WASMSandboxTool" }
-
-func (t *WASMSandboxTool) Description() string {
-	return "Executes a pre-compiled WASM module. Input requires 'path' (absolute path to .wasm file)."
-}
 
 func (t *WASMSandboxTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	path, ok := input["path"].(string)

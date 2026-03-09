@@ -9,17 +9,19 @@ import (
 )
 
 // WikipediaTool allows agents to search Wikipedia.
-type WikipediaTool struct{}
+type WikipediaTool struct {
+	BaseTool
+}
 
 func NewWikipediaTool() *WikipediaTool {
-	return &WikipediaTool{}
+	return &WikipediaTool{
+		BaseTool: BaseTool{
+			NameValue:        "WikipediaTool",
+			DescriptionValue: "Searches Wikipedia for information. Action: search.",
+		},
+	}
 }
 
-func (t *WikipediaTool) Name() string { return "WikipediaTool" }
-
-func (t *WikipediaTool) Description() string {
-	return "Searches Wikipedia for information. Action: search."
-}
 
 func (t *WikipediaTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	query, ok := input["query"].(string)

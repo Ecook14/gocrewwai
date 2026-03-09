@@ -47,9 +47,9 @@ func main() {
 	// 3. Define Specialized Agents
 	
 	// A Researcher who uses Docker to run data analysis scripts securely
-	interpreter := tools.NewCodeInterpreterTool()
-	interpreter.UseDocker = true
-	interpreter.Image = "python:3.11-slim"
+	interpreter := tools.NewCodeInterpreterTool(
+		tools.WithDocker("python:3.11-slim"),
+	)
 
 	researcher := &agents.Agent{
 		Role:             "Data Scientist",

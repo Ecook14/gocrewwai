@@ -6,9 +6,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/Ecook14/gocrewwai/pkg/dashboard"
 	"github.com/Ecook14/gocrewwai/pkg/agents"
 	"github.com/Ecook14/gocrewwai/pkg/crew"
+	"github.com/Ecook14/gocrewwai/pkg/flow"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/memory"
 	"github.com/Ecook14/gocrewwai/pkg/tasks"
@@ -23,7 +23,7 @@ func main() {
 
 	if strings.HasPrefix(apiKey, "sk-or-") {
 		fmt.Println("🌐 OpenRouter Key Detected. Switching to OpenRouter Client...")
-		model = llm.NewOpenRouterClient(apiKey, "meta-llama/llama-3.1-8b-instruct:free")
+		model = llm.NewOpenRouterClient(apiKey, "")
 	} else {
 		if apiKey == "" {
 			fmt.Println("⚠️  OPENAI_API_KEY is not set. Please export it before running the demo.")

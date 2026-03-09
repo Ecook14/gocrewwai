@@ -12,18 +12,20 @@ import (
 // SearchWebTool provides web search capabilities using DuckDuckGo HTML scraping.
 // No API key required — uses the DuckDuckGo HTML endpoint directly.
 type SearchWebTool struct {
+	BaseTool
 	MaxResults int
 }
 
 func NewSearchWebTool() *SearchWebTool {
-	return &SearchWebTool{MaxResults: 5}
+	return &SearchWebTool{
+		BaseTool: BaseTool{
+			NameValue:        "SearchWebTool",
+			DescriptionValue: "Searches the web for information on a given query. Input requires 'query' as a string. Returns relevant search result snippets.",
+		},
+		MaxResults: 5,
+	}
 }
 
-func (t *SearchWebTool) Name() string { return "SearchWebTool" }
-
-func (t *SearchWebTool) Description() string {
-	return "Searches the web for information on a given query. Input requires 'query' as a string. Returns relevant search result snippets."
-}
 
 func (t *SearchWebTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	queryRaw, ok := input["query"]

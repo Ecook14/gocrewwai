@@ -36,5 +36,20 @@ type Store interface {
 
 	// Count returns the total number of stored items.
 	Count(ctx context.Context) (int, error)
+
+	// Reset clears all data in the store.
+	Reset(ctx context.Context) error
+}
+// KnowledgeSource defines the interface for external knowledge retrieval.
+type KnowledgeSource interface {
+	Query(ctx context.Context, query string) (string, error)
 }
 
+// SimpleKnowledgeSource is a text-based knowledge source.
+type SimpleKnowledgeSource struct {
+	Content string
+}
+
+func (s *SimpleKnowledgeSource) Query(ctx context.Context, query string) (string, error) {
+	return s.Content, nil
+}
