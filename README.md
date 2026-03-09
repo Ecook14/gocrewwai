@@ -1,8 +1,11 @@
-# Welcome to Gocrew! 🚀
+# Welcome to Gocrew! 🚀 (Early Alpha)
 
 Hey there! I am absolutely thrilled to introduce you to **Gocrew**, an open-source project designed to bring high-performance, strictly-typed agentic orchestration to the Go ecosystem. Inspired by the incredible work of **CrewAI, LangChain, and LangGraph**, Gocrew is built for developers who demand speed, reliability, and precision.
 
 Think of Gocrew as a framework for assembling a digital "crew." You assign each member a specific persona—like a Lead Researcher, a Senior Data Analyst, or an Expert Coder. You hand them a goal, provide them with tools, and they figure out how to communicate and collaborate to achieve that goal!
+
+> [!IMPORTANT]
+> **Status: Early Alpha.** Gocrew is in active development. While the core engine and dashboard are stable, advanced protocols like Agent-to-Agent (A2A) and complex multi-crew flows are currently being refined. We welcome early contributors, experimenters, and feedback!
 
 ---
 
@@ -130,12 +133,19 @@ Dive deep into every corner of the Gocrew ecosystem with our comprehensive featu
 
 ## 🤝 Community & Contribution
 
-We are building the most scalable AI framework for the Go community, and we need your help!
-- **Add a Tool**: Integrate your favorite SaaS or local utility in `pkg/tools`.
-- **Memory Stores**: Help us expand support for more vector databases.
-- **Dashboard Upgrades**: Contribute to our real-time visualizations in the `web-ui`.
+We are building the most scalable AI framework for the Go community, and we need your help! Since we are in **Early Alpha**, your contributions will directly shape the future of the framework.
 
-Check out our [Contributing Guide](CONTRIBUTING.md) to get started.
+### 🔥 High-Priority Roadmap
+We are specifically looking for collaborators to help with:
+- **🧬 Agent-to-Agent (A2A) Layer**: Standardizing how diverse agents communicate across different crews.
+- **🛡️ Advanced Protocols**: Implementing MCP extensions and more production-grade sandboxing.
+- **🧪 Multi-Agent Testing**: Building frameworks to evaluate agent reasoning at scale.
+- **Dashboard Upgrades**: Real-time control plane enhancements and visualizations.
+
+### How to Get Involved
+1. **Join the Movement**: Check out our [Contributing Guide](CONTRIBUTING.md).
+2. **Roadmap**: Check out [ROADMAP.md](ROADMAP.md) for current priorities.
+3. **Share Your Feedback**: Found a bug or have a feature idea? Open an issue!
 
 ---
 **Gocrew** - High-performance agentic AI, built for Go developers.
