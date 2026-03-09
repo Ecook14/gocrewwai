@@ -5,7 +5,7 @@ Hey there! I am absolutely thrilled to introduce you to **Gocrew**, an open-sour
 Think of Gocrew as a framework for assembling a digital "crew." You assign each member a specific persona—like a Lead Researcher, a Senior Data Analyst, or an Expert Coder. You hand them a goal, provide them with tools, and they figure out how to communicate and collaborate to achieve that goal!
 
 > [!IMPORTANT]
-> **Status: Early Alpha.** Gocrew is in active development. While the core engine and dashboard are stable, advanced protocols like Agent-to-Agent (A2A) and complex multi-crew flows are currently being refined. We welcome early contributors, experimenters, and feedback!
+> **Status: Early Alpha.** Gocrew is in active development. While the core engine and dashboard are stable, advanced protocols like Agent-to-Agent (A2A) and complex multi-crew flows are currently being refined. I welcome early contributors, experimenters, and feedback!
 
 ---
 
@@ -133,10 +133,10 @@ Dive deep into every corner of the Gocrew ecosystem with our comprehensive featu
 
 ## 🤝 Community & Contribution
 
-We are building the most scalable AI framework for the Go community, and we need your help! Since we are in **Early Alpha**, your contributions will directly shape the future of the framework.
+I am building the most scalable AI framework for the Go community, and I need your help! Since I am in **Early Alpha**, your contributions will directly shape the future of the framework.
 
 ### 🔥 High-Priority Roadmap
-We are specifically looking for collaborators to help with:
+I am specifically looking for collaborators to help with:
 - **🧬 Agent-to-Agent (A2A) Layer**: Standardizing how diverse agents communicate across different crews.
 - **🛡️ Advanced Protocols**: Implementing MCP extensions and more production-grade sandboxing.
 - **🧪 Multi-Agent Testing**: Building frameworks to evaluate agent reasoning at scale.
