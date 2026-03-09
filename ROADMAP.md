@@ -1,6 +1,6 @@
 # 🗺️ Gocrew Roadmap (2026)
 
-Gocrew is currently in **Early Alpha**. Our goal is to build the most performance-optimized, production-ready AI agent framework for the Go ecosystem. We welcome community collaboration to accelerate this vision.
+Gocrew is currently in **Early Alpha**. My goal is to build the most performance-optimized, production-ready AI agent framework for the Go ecosystem. I welcome community collaboration to accelerate this vision.
 
 ## 🚀 Near-Term (Alpha Focus)
 *Targeting v0.9.0*
