@@ -8,6 +8,7 @@ import (
 	"github.com/Ecook14/gocrewwai/pkg/agents"
 	"github.com/Ecook14/gocrewwai/pkg/config"
 	"github.com/Ecook14/gocrewwai/pkg/crew"
+	"github.com/Ecook14/gocrewwai/pkg/core"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/memory"
 	"github.com/Ecook14/gocrewwai/pkg/tasks"
@@ -49,7 +50,7 @@ func main() {
 
 	// 4. Crew-Level Configuration
 	myCrew := crew.NewCrew(
-		[]*agents.Agent{researcher},
+		[]core.Agent{researcher},
 		[]*tasks.Task{
 			{Description: "Analyze the current state of Go for AI agents."},
 		},

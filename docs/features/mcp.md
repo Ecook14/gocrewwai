@@ -27,7 +27,7 @@ remoteTools := mcpClient.ListTools()
 wrappedTool := tools.WrapMCPToolForCrewGo(mcpClient, remoteTools[0])
 
 // 3. Hand the dynamically discovered tool to the Agent!
-agent := agents.NewAgentBuilder().
+agent := gocrew.NewAgentBuilder().
     Role("IT Admin").
     Tools(wrappedTool).
     Build()
@@ -48,6 +48,16 @@ tools.RegisterAllToolsOnMCPServer(server, myToolRegistry)
 log.Println("Gocrew MCP Server listening on :8080")
 http.ListenAndServe(":8080", server.Handler())
 ```
+
+### 3. Native Asynchronous Transports
+The v0.9 MCP engine supports hardened, fully asynchronous background transports:
+- **StdioTransport**: Manages local subprocesses with non-blocking background reader loops.
+- **SSETransport**: Consumes Server-Sent Events natively and auto-discovers dual-channel POST endpoints.
+
+### 4. Enterprise Hardening
+- **Bidirectional Sampling**: Remote servers can request LLM completions *from* the Crew-GO agent, making the server "smarter".
+- **Resource Adapters**: Expose static internal databases, files, and schemas to agents dynamically as readable "Resources".
+- **Dynamic Prompts**: Combine MCP Prompts with Agent Backstories on-the-fly.
 
 ---
 

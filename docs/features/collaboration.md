@@ -51,4 +51,18 @@ agent := gocrew.NewAgentBuilder().
 ```
 
 ---
+
+## ☁️ Distributed Collaboration (A2A Protocol)
+
+As of v0.9, collaboration is no longer restricted to a single machine. The **A2A Protocol** allows Gocrew instances to dynamically discover and communicate with each other over the network.
+
+### Hardening Features:
+- **Zero-Trust Security**: Every inter-agent request is authenticated using Bearer tokens (`X-A2A-Auth`).
+- **Distributed Resilience**: Exponential backoffs and **Circuit Breakers** prevent cascading failures. If a remote agent goes down, the orchestrator handles it gracefully.
+- **mDNS Auto-Discovery**: Agents can advertise their capabilities and discover peers on the local network automatically.
+- **Observability Hub**: OpenTelemetry trace propagation ensures that a task seamlessly tracked across multiple physical servers.
+
+To use remote agents, simply wrap the connection in a `RemoteAgentAdapter` and inject it into your crew alongside your local agents. The `core.Agent` interface ensures they all play by the same rules.
+
+---
 **Gocrew** - Scaling intelligence through collaboration.

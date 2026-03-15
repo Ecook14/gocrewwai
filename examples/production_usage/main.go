@@ -9,6 +9,7 @@ import (
 	"github.com/Ecook14/gocrewwai/pkg/dashboard"
 	"github.com/Ecook14/gocrewwai/pkg/agents"
 	"github.com/Ecook14/gocrewwai/pkg/crew"
+	"github.com/Ecook14/gocrewwai/pkg/core"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/memory"
 	"github.com/Ecook14/gocrewwai/pkg/tasks"
@@ -82,7 +83,7 @@ func main() {
 
 	// 5. Kickoff the Crew using CONSENSUAL process
 	prodCrew := &crew.Crew{
-		Agents:  []*agents.Agent{researcher, visionAnalyst},
+		Agents:  []core.Agent{researcher, visionAnalyst},
 		Tasks:   []*tasks.Task{task1, task2},
 		Process: crew.Consensual,
 		Verbose: true,

@@ -8,9 +8,8 @@ import (
 	"log/slog"
 	"os"
 	"strings"
-	//"encoding/json"
 	"time"
-	"github.com/Ecook14/gocrewwai/pkg/agents"
+	"github.com/Ecook14/gocrewwai/pkg/core"
 	crewErrors "github.com/Ecook14/gocrewwai/pkg/errors"
 	"github.com/Ecook14/gocrewwai/pkg/guardrails"
 	"github.com/Ecook14/gocrewwai/pkg/events"
@@ -24,7 +23,7 @@ type TaskConfig struct {
 	Name               string
 	Description        string
 	ExpectedOutput     string
-	Agent              *agents.Agent
+	Agent              core.Agent
 	AgentRole          string // Optional: For late binding
 	Tools              []tools.Tool
 	AsyncExecution     bool
@@ -47,7 +46,7 @@ type Task struct {
 	Name           string `json:"name,omitempty"`
 	Description    string `json:"description"`
 	ExpectedOutput string `json:"expected_output"`
-	Agent          *agents.Agent `json:"-"`
+	Agent          core.Agent `json:"-"`
 	AgentRole      string `json:"agent_role"` // For late binding, especially from UI
 	Tools          []tools.Tool `json:"-"`
 	AsyncExecution bool `json:"-"`
@@ -154,7 +153,7 @@ func (t *Task) Execute(ctx context.Context) (interface{}, error) {
 		Source: t.Name,
 		Payload: map[string]interface{}{
 			"description": baseDescription,
-			"agent":       t.Agent.Role,
+			"agent":       t.Agent.GetRole(),
 		},
 	})
 
@@ -180,7 +179,7 @@ func (t *Task) Execute(ctx context.Context) (interface{}, error) {
 
 	// 3. Process Human-in-the-Loop (HITL) blocking
 	if t.HumanInput {
-		slog.Info("[🤖 HITL PAUSE] Agent is about to execute task", slog.String("role", t.Agent.Role), slog.String("description", baseDescription))
+		slog.Info("[🤖 HITL PAUSE] Agent is about to execute task", slog.String("role", t.Agent.GetRole()), slog.String("description", baseDescription))
 		fmt.Print("Please provide feedback or press Enter to approve as-is: ")
 
 		reader := bufio.NewReader(os.Stdin)
@@ -199,6 +198,8 @@ func (t *Task) Execute(ctx context.Context) (interface{}, error) {
 	options := make(map[string]interface{})
 	if t.OutputSchema != "" {
 		options["schema"] = t.OutputSchema
+	} else if t.OutputJSON != nil {
+		options["schema"] = t.OutputJSON
 	} else if t.OutputPydan != nil {
 		options["schema"] = t.OutputPydan
 	}
@@ -211,12 +212,6 @@ func (t *Task) Execute(ctx context.Context) (interface{}, error) {
 	var result interface{}
 	var err error
 	validator := &Validator{}
-
-	if t.OutputSchema != "" {
-		options["schema"] = t.OutputSchema
-	} else if t.OutputJSON != nil {
-		options["schema"] = t.OutputJSON
-	}
 
 	for i := 0; i < maxRetries; i++ {
 		result, err = t.Agent.Execute(ctx, baseDescription, options)
@@ -309,7 +304,7 @@ func (t *Task) Execute(ctx context.Context) (interface{}, error) {
 
 	// 5. Post-Execution HITL: Review and Edit Result
 	if t.HumanInput {
-		slog.Info("[🤖 HITL REVIEW] Agent finished task", slog.String("role", t.Agent.Role), slog.Any("result", result))
+		slog.Info("[🤖 HITL REVIEW] Agent finished task", slog.String("role", t.Agent.GetRole()), slog.Any("result", result))
 		fmt.Print("Press Enter to approve, or type 'edit' to modify the output: ")
 		
 		reader := bufio.NewReader(os.Stdin)
@@ -338,7 +333,7 @@ func (t *Task) Execute(ctx context.Context) (interface{}, error) {
 		Source: t.Name,
 		Payload: map[string]interface{}{
 			"result": result,
-			"agent":  t.Agent.Role,
+			"agent":  t.Agent.GetRole(),
 		},
 	})
 

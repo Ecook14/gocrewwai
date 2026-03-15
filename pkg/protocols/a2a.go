@@ -11,12 +11,374 @@
 package protocols
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
+	"net/url"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/gorilla/websocket"
+	"github.com/Ecook14/gocrewwai/pkg/telemetry"
+	"go.opentelemetry.io/otel/trace"
 )
+
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+	CheckOrigin: func(r *http.Request) bool {
+		return true // In production, add origin validation
+	},
+}
+
+// ---------------------------------------------------------------------------
+// A2A Client — Sending Messages
+// ---------------------------------------------------------------------------
+
+// A2AClient handles sending messages to remote agents.
+type A2AClient struct {
+	httpClient *http.Client
+	AuthToken  string
+	
+	// Simple Circuit Breaker per endpoint
+	mu       sync.Mutex
+	failures map[string]int
+	lastFail map[string]time.Time
+}
+
+func NewA2AClient(authToken string) *A2AClient {
+	return &A2AClient{
+		httpClient: &http.Client{Timeout: 60 * time.Second},
+		AuthToken:  authToken,
+		failures:   make(map[string]int),
+		lastFail:   make(map[string]time.Time),
+	}
+}
+
+// Send sends an A2AMessage to the specified endpoint and returns the response.
+func (c *A2AClient) Send(ctx context.Context, endpoint string, msg A2AMessage) (*A2AMessage, error) {
+	return c.SendWithRetry(ctx, endpoint, msg, 3)
+}
+
+// GetStatus checks the health and status of a remote agent.
+func (c *A2AClient) GetStatus(ctx context.Context, endpoint string, fromAgentID string, toAgentID string) (map[string]interface{}, error) {
+	msg := A2AMessage{
+		ID:        fmt.Sprintf("stat-%d", time.Now().UnixNano()),
+		From:      fromAgentID,
+		To:        toAgentID,
+		Type:      A2ARequest,
+		Action:    "status",
+		Timestamp: time.Now(),
+	}
+
+	resp, err := c.Send(ctx, endpoint, msg)
+	if err != nil {
+		return nil, err
+	}
+	return resp.Payload, nil
+}
+
+// SendWithRetry sends a message with exponential backoff.
+func (c *A2AClient) SendWithRetry(ctx context.Context, endpoint string, msg A2AMessage, maxRetries int) (*A2AMessage, error) {
+	var lastErr error
+	for i := 0; i < maxRetries; i++ {
+		if i > 0 {
+			backoff := time.Duration(1<<uint(i)) * time.Second
+			slog.Debug("a2a: retrying message", slog.String("id", msg.ID), slog.Duration("backoff", backoff))
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(backoff):
+			}
+		}
+
+		resp, err := c.doSend(ctx, endpoint, msg)
+		if err == nil {
+			return resp, nil
+		}
+		lastErr = err
+		
+		// Don't retry on certain errors (e.g., Auth failure)
+		if strings.Contains(err.Error(), "status 401") || strings.Contains(err.Error(), "status 403") {
+			return nil, err
+		}
+	}
+	return nil, fmt.Errorf("a2a: all retries failed: %w", lastErr)
+}
+
+// Stream initiates a streaming task delegation and returns a channel for tokens.
+func (c *A2AClient) Stream(ctx context.Context, endpoint string, msg A2AMessage) (<-chan string, error) {
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return nil, err
+	}
+	u.Scheme = "ws"
+	if strings.HasPrefix(endpoint, "https") {
+		u.Scheme = "wss"
+	}
+	u.Path = "/ws"
+
+	header := http.Header{}
+	if c.AuthToken != "" {
+		header.Set("Authorization", "Bearer "+c.AuthToken)
+	}
+
+	conn, _, err := websocket.DefaultDialer.DialContext(ctx, u.String(), header)
+	if err != nil {
+		return nil, fmt.Errorf("a2a: ws dial error: %w", err)
+	}
+
+	// Send initial task message
+	if err := conn.WriteJSON(msg); err != nil {
+		conn.Close()
+		return nil, err
+	}
+
+	tokenCh := make(chan string, 100)
+	go func() {
+		defer close(tokenCh)
+		defer conn.Close()
+		for {
+			var streamMsg A2AMessage
+			if err := conn.ReadJSON(&streamMsg); err != nil {
+				return
+			}
+			if streamMsg.Type == A2AStream {
+				token, _ := streamMsg.Payload["token"].(string)
+				tokenCh <- token
+			} else if streamMsg.Type == A2AResponse {
+				// Final result can also come via WebSocket
+				return
+			}
+		}
+	}()
+
+	return tokenCh, nil
+}
+
+func (c *A2AClient) doSend(ctx context.Context, endpoint string, msg A2AMessage) (*A2AMessage, error) {
+	if err := c.checkCircuit(endpoint); err != nil {
+		return nil, err
+	}
+
+	// Otel Trace Propagation
+	if span := telemetry.GetSpan(ctx); span != nil {
+		msg.TraceID = span.SpanContext().TraceID().String()
+	}
+
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return nil, fmt.Errorf("a2a: failed to marshal message: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewBuffer(data))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-A2A-Version", "1.0")
+	if c.AuthToken != "" {
+		req.Header.Set("Authorization", "Bearer "+c.AuthToken)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		c.markFailure(endpoint)
+		return nil, fmt.Errorf("a2a: network error: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode >= 500 {
+			c.markFailure(endpoint)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("a2a: remote error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	c.markSuccess(endpoint)
+	var response A2AMessage
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("a2a: failed to decode response: %w", err)
+	}
+
+	return &response, nil
+}
+
+func (c *A2AClient) checkCircuit(endpoint string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	
+	if c.failures[endpoint] >= 5 {
+		if time.Since(c.lastFail[endpoint]) < 30*time.Second {
+			return fmt.Errorf("a2a: circuit breaker open for %s", endpoint)
+		}
+		// Half-open: allow one request
+		c.failures[endpoint] = 4 
+	}
+	return nil
+}
+
+func (c *A2AClient) markFailure(endpoint string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.failures[endpoint]++
+	c.lastFail[endpoint] = time.Now()
+}
+
+func (c *A2AClient) markSuccess(endpoint string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.failures, endpoint)
+}
+
+// ---------------------------------------------------------------------------
+// A2A Server — Receiving Messages
+// ---------------------------------------------------------------------------
+
+// A2AServer hosts a local agent and listens for incoming messages.
+type A2AServer struct {
+	Port      int
+	Router    *A2ARouter
+	AuthToken string
+	server    *http.Server
+}
+
+func NewA2AServer(port int, router *A2ARouter, authToken string) *A2AServer {
+	return &A2AServer{
+		Port:      port,
+		Router:    router,
+		AuthToken: authToken,
+	}
+}
+
+// Start launches the A2A server in a background goroutine.
+func (s *A2AServer) Start() error {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", s.handleMessage)
+	mux.HandleFunc("/ws", s.handleWebSocket)
+
+	s.server = &http.Server{
+		Addr:    fmt.Sprintf(":%d", s.Port),
+		Handler: mux,
+	}
+
+	go func() {
+		slog.Info("🚀 A2A Server starting", slog.Int("port", s.Port))
+		if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("a2a: server error", slog.Any("error", err))
+		}
+	}()
+
+	return nil
+}
+
+func (s *A2AServer) handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		slog.Error("a2a: ws upgrade failed", slog.Any("error", err))
+		return
+	}
+	defer conn.Close()
+
+	// Initial message must be the task delegation
+	var msg A2AMessage
+	if err := conn.ReadJSON(&msg); err != nil {
+		return
+	}
+
+	// Auth Validation (same as handleMessage)
+	if s.AuthToken != "" {
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			// Subprotocols or query params could also be used for WS auth, 
+			// but here we check the initial header.
+			authHeader = r.URL.Query().Get("token")
+		}
+		if authHeader != "Bearer "+s.AuthToken && authHeader != s.AuthToken {
+			slog.Warn("a2a: ws unauthorized access attempt")
+			return
+		}
+	}
+
+	// We need a way to pass the "stream back" capability to the handler.
+	// We'll use the context for this.
+	ctx := context.WithValue(r.Context(), "a2a_ws_conn", conn)
+	
+	response, err := s.Router.Route(ctx, msg)
+	if err != nil {
+		_ = conn.WriteJSON(A2AMessage{Type: A2AError, Payload: map[string]interface{}{"error": err.Error()}})
+		return
+	}
+
+	if response != nil {
+		_ = conn.WriteJSON(response)
+	}
+}
+
+func (s *A2AServer) handleMessage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Auth Validation
+	if s.AuthToken != "" {
+		authHeader := r.Header.Get("Authorization")
+		if authHeader != "Bearer "+s.AuthToken {
+			slog.Warn("a2a: unauthorized access attempt", slog.String("remote", r.RemoteAddr))
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+	}
+
+	var msg A2AMessage
+	if err := json.NewDecoder(r.Body).Decode(&msg); err != nil {
+		http.Error(w, "Invalid message format", http.StatusBadRequest)
+		return
+	}
+
+	// Route the message
+	ctx := r.Context()
+	if msg.TraceID != "" {
+		// In a real Otel setup, we'd use a propagator, but here we simulate 
+		// by starting a new span with the context and logging the trace ID.
+		var span trace.Span
+		ctx, span = telemetry.StartSpan(ctx, "A2A."+msg.Action)
+		if span != nil {
+			defer span.End()
+			slog.Debug("📊 Joined distributed trace", slog.String("trace_id", msg.TraceID))
+		}
+	}
+
+	response, err := s.Router.Route(ctx, msg)
+	if err != nil {
+		slog.Error("a2a: routing error", slog.Any("error", err))
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if response == nil {
+		// Async acknowledgement if no immediate response
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+func (s *A2AServer) Shutdown(ctx context.Context) error {
+	if s.server != nil {
+		return s.server.Shutdown(ctx)
+	}
+	return nil
+}
 
 // ---------------------------------------------------------------------------
 // A2A Protocol — Agent-to-Agent Communication
@@ -48,7 +410,8 @@ type A2AMessage struct {
 	Action      string                 `json:"action"`       // What the sender wants (e.g., "delegate_task", "ask_question")
 	Payload     map[string]interface{} `json:"payload"`
 	CorrelationID string              `json:"correlation_id,omitempty"` // Links request ↔ response
-	Timestamp   time.Time              `json:"timestamp"`
+	TraceID       string              `json:"trace_id,omitempty"`       // OpenTelemetry Trace Context
+	Timestamp     time.Time              `json:"timestamp"`
 }
 
 // A2AMessageType categorizes inter-agent messages.
@@ -59,6 +422,7 @@ const (
 	A2AResponse A2AMessageType = "response"
 	A2AEvent    A2AMessageType = "event"
 	A2AError    A2AMessageType = "error"
+	A2AStream   A2AMessageType = "stream" // For incremental token streaming
 )
 
 // A2ATaskRequest is the payload for delegating a task to another agent.
@@ -225,4 +589,25 @@ func UnmarshalTaskRequest(payload map[string]interface{}) (*A2ATaskRequest, erro
 		return nil, err
 	}
 	return &req, nil
+}
+
+// MarshalTaskResponse converts a task response into a generic payload map.
+func MarshalTaskResponse(res A2ATaskResponse) map[string]interface{} {
+	data, _ := json.Marshal(res)
+	var result map[string]interface{}
+	json.Unmarshal(data, &result)
+	return result
+}
+
+// UnmarshalTaskResponse extracts a task response from a message payload.
+func UnmarshalTaskResponse(payload map[string]interface{}) (*A2ATaskResponse, error) {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+	var res A2ATaskResponse
+	if err := json.Unmarshal(data, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/Ecook14/gocrewwai/pkg/agents"
 	"github.com/Ecook14/gocrewwai/pkg/crew"
+	"github.com/Ecook14/gocrewwai/pkg/core"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/tasks"
 )
@@ -24,7 +25,7 @@ func main() {
 
 	// Use hierarchical mode so the manager can re-plan
 	myCrew := crew.NewCrew(
-		[]*agents.Agent{researcher},
+		[]core.Agent{researcher},
 		[]*tasks.Task{task},
 		crew.WithProcess(crew.Hierarchical),
 		crew.WithVerbose(true),

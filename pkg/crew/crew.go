@@ -8,6 +8,7 @@ import (
 	"sync"
 	
 	"github.com/Ecook14/gocrewwai/pkg/agents"
+	"github.com/Ecook14/gocrewwai/pkg/core"
 	//"github.com/Ecook14/gocrewwai/pkg/dashboard"
 	"github.com/Ecook14/gocrewwai/pkg/delegation"
 	crewErrors "github.com/Ecook14/gocrewwai/pkg/errors"
@@ -40,12 +41,12 @@ type CrewOption func(*Crew)
 
 // CrewConfig defines the parameters for creating a new Crew in a declarative style.
 type CrewConfig struct {
-	Agents         []*agents.Agent
+	Agents         []core.Agent
 	Tasks          []*tasks.Task
 	Process        ProcessType
 	Verbose        bool
 	ManagerLLM     llm.Client
-	ManagerAgent   *agents.Agent
+	ManagerAgent   core.Agent
 	OnTaskComplete func(taskIndex int, result interface{})
 	OnTaskError    func(taskIndex int, err error)
 	StateFile      string
@@ -77,7 +78,7 @@ func WithPlanning(v bool) CrewOption {
 	return func(c *Crew) { c.Planning = v }
 }
 
-func WithManager(m *agents.Agent) CrewOption {
+func WithManager(m core.Agent) CrewOption {
 	return func(c *Crew) { c.ManagerAgent = m }
 }
 
@@ -85,7 +86,7 @@ func WithStateFile(path string) CrewOption {
 	return func(c *Crew) { c.StateFile = path }
 }
 
-func NewCrew(agents []*agents.Agent, tasks []*tasks.Task, opts ...CrewOption) *Crew {
+func NewCrew(agents []core.Agent, tasks []*tasks.Task, opts ...CrewOption) *Crew {
 	c := &Crew{
 		Agents:       agents,
 		Tasks:        tasks,
@@ -126,7 +127,7 @@ func New(cfg CrewConfig) *Crew {
 
 // Crew ...
 type Crew struct {
-	Agents  []*agents.Agent
+	Agents  []core.Agent
 	Tasks   []*tasks.Task
 	Process ProcessType
 
@@ -136,7 +137,7 @@ type Crew struct {
 	ManagerLLM llm.Client
 
 	// ManagerAgent allows providing a custom manager agent for orchestration.
-	ManagerAgent *agents.Agent
+	ManagerAgent core.Agent
 
 	// Shared Configuration
 	MaxRPM         int
@@ -144,10 +145,10 @@ type Crew struct {
 	MaxCycles      int
 
 	// Callbacks
-	OnTaskComplete func(taskIndex int, result interface{})
-	OnTaskError    func(taskIndex int, err error)
-	StepCallback   func(step map[string]interface{})  // Called per agent step for collaboration tracking
-	TaskCallback   func(taskIndex int, output interface{}) // Called when any task produces output
+	OnTaskComplete func(taskIndex int, result interface{}) `json:"-"`
+	OnTaskError    func(taskIndex int, err error)          `json:"-"`
+	StepCallback   func(step map[string]interface{})       `json:"-"` // Called per agent step for collaboration tracking
+	TaskCallback   func(taskIndex int, output interface{})  `json:"-"` // Called when any task produces output
 
 	// Persistence & Logging
 	StateFile     string
@@ -204,10 +205,10 @@ func (c *Crew) Train(ctx context.Context, iterations int, inputs map[string]inte
 	if c.TrainingDir != "" {
 		store := training.NewStore(c.TrainingDir)
 		for _, agent := range c.Agents {
-			data, err := store.LoadAgentData(agent.Role)
+			data, err := store.LoadAgentData(agent.GetRole())
 			if err == nil {
 				training.ConsolidateFeedback(data)
-				store.SaveAgentData(agent.Role, data)
+				store.SaveAgentData(agent.GetRole(), data)
 			}
 		}
 	}
@@ -243,11 +244,13 @@ func (c *Crew) Kickoff(ctx context.Context) (interface{}, error) {
 
 	// Sync training settings to agents
 	for _, a := range c.Agents {
-		if c.TrainingMode {
-			a.TrainingMode = true
-		}
-		if c.TrainingDir != "" {
-			a.TrainingDir = c.TrainingDir
+		if local, ok := a.(*agents.Agent); ok {
+			if c.TrainingMode {
+				local.TrainingMode = true
+			}
+			if c.TrainingDir != "" {
+				local.TrainingDir = c.TrainingDir
+			}
 		}
 	}
 
@@ -293,8 +296,8 @@ func (c *Crew) Kickoff(ctx context.Context) (interface{}, error) {
 	// 1. Core 3 Perfection: Enforce Global MaxRPM
 	if c.MaxRPM > 0 {
 		for _, agent := range c.Agents {
-			if agent.MaxRPM == 0 || agent.MaxRPM > c.MaxRPM {
-				agent.MaxRPM = c.MaxRPM
+			if agent.GetMaxRPM() == 0 || agent.GetMaxRPM() > c.MaxRPM {
+				agent.SetMaxRPM(c.MaxRPM)
 			}
 		}
 	}
@@ -509,11 +512,20 @@ func (c *Crew) executeHierarchical(ctx context.Context) (interface{}, error) {
 	// Construct or use the provided manager agent
 	var orchestrator *agents.ManagerAgent
 	if c.ManagerAgent != nil {
-		orchestrator = &agents.ManagerAgent{Agent: *c.ManagerAgent, ManagedAgents: c.Agents}
-	} else {
+		if m, ok := c.ManagerAgent.(*agents.ManagerAgent); ok {
+			orchestrator = m
+			orchestrator.ManagedAgents = c.Agents
+		} else if local, ok := c.ManagerAgent.(*agents.Agent); ok {
+			orchestrator = &agents.ManagerAgent{Agent: *local, ManagedAgents: c.Agents}
+		}
+	}
+	
+	if orchestrator == nil {
 		model := c.ManagerLLM
 		if model == nil && len(c.Agents) > 0 {
-			model = c.Agents[0].LLM
+			if local, ok := c.Agents[0].(*agents.Agent); ok {
+				model = local.LLM
+			}
 		}
 		orchestrator = agents.NewManagerAgent(model, c.Agents)
 		orchestrator.Verbose = c.Verbose
@@ -581,11 +593,11 @@ func (c *Crew) executeHierarchical(ctx context.Context) (interface{}, error) {
 				if c.Verbose {
 					defaultLogger.Info("Manager Delegating Task",
 						slog.Int("index", index+1),
-						slog.String("assignee", strings.Clone(task.Agent.Role)))
+						slog.String("assignee", strings.Clone(task.Agent.GetRole())))
 				}
 
-				if task.Agent.StepCallback != nil {
-					task.Agent.StepCallback(map[string]interface{}{"status": "delegated_by_manager"})
+				if local, ok := task.Agent.(*agents.Agent); ok && local.StepCallback != nil {
+					local.StepCallback(map[string]interface{}{"status": "delegated_by_manager"})
 				}
 
 				res, err := task.Execute(ctx)
@@ -671,7 +683,7 @@ func (c *Crew) executeHierarchical(ctx context.Context) (interface{}, error) {
 		c.UsageMetrics = make(map[string]int)
 	}
 	for _, a := range c.Agents {
-		for k, v := range a.UsageMetrics {
+		for k, v := range a.GetUsageMetrics() {
 			c.UsageMetrics[k] += v
 		}
 	}
@@ -699,7 +711,7 @@ func (c *Crew) executeHierarchical(ctx context.Context) (interface{}, error) {
 		}
 
 		// Sync manager metrics too
-		for k, v := range orchestrator.UsageMetrics {
+		for k, v := range orchestrator.GetUsageMetrics() {
 			c.UsageMetrics[k] += v
 		}
 
@@ -755,7 +767,7 @@ func (c *Crew) executeConsensual(ctx context.Context) (string, error) {
 
 	for i, agent := range c.Agents {
 		wg.Add(1)
-		go func(idx int, a *agents.Agent) {
+		go func(idx int, a core.Agent) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
@@ -763,10 +775,10 @@ func (c *Crew) executeConsensual(ctx context.Context) (string, error) {
 			// Execute task with this specific agent
 			res, err := a.Execute(ctx, mainTask.Description, nil)
 			if err != nil {
-				errCh <- fmt.Errorf("agent %s failed: %w", a.Role, err)
+				errCh <- fmt.Errorf("agent %s failed: %w", a.GetRole(), err)
 				return
 			}
-			results[idx] = fmt.Sprintf("Agent: %s\nOutput: %v", a.Role, res)
+			results[idx] = fmt.Sprintf("Agent: %s\nOutput: %v", a.GetRole(), res)
 		}(i, agent)
 	}
 
@@ -782,11 +794,20 @@ func (c *Crew) executeConsensual(ctx context.Context) (string, error) {
 	// Consolidate into a manager synthesis prompt
 	var orchestrator *agents.ManagerAgent
 	if c.ManagerAgent != nil {
-		orchestrator = &agents.ManagerAgent{Agent: *c.ManagerAgent, ManagedAgents: c.Agents}
-	} else {
+		if m, ok := c.ManagerAgent.(*agents.ManagerAgent); ok {
+			orchestrator = m
+			orchestrator.ManagedAgents = c.Agents
+		} else if local, ok := c.ManagerAgent.(*agents.Agent); ok {
+			orchestrator = &agents.ManagerAgent{Agent: *local, ManagedAgents: c.Agents}
+		}
+	}
+	
+	if orchestrator == nil {
 		model := c.ManagerLLM
 		if model == nil && len(c.Agents) > 0 {
-			model = c.Agents[0].LLM
+			if local, ok := c.Agents[0].(*agents.Agent); ok {
+				model = local.LLM
+			}
 		}
 		orchestrator = agents.NewManagerAgent(model, c.Agents)
 	}
@@ -804,12 +825,12 @@ func (c *Crew) executeConsensual(ctx context.Context) (string, error) {
 		c.UsageMetrics = make(map[string]int)
 	}
 	for _, a := range c.Agents {
-		for k, v := range a.UsageMetrics {
+		for k, v := range a.GetUsageMetrics() {
 			c.UsageMetrics[k] += v
 		}
 	}
 	if orchestrator != nil {
-		for k, v := range orchestrator.UsageMetrics {
+		for k, v := range orchestrator.GetUsageMetrics() {
 			c.UsageMetrics[k] += v
 		}
 	}
@@ -931,11 +952,20 @@ func (c *Crew) executeReflective(ctx context.Context) (string, error) {
 	
 	var orchestrator *agents.ManagerAgent
 	if c.ManagerAgent != nil {
-		orchestrator = &agents.ManagerAgent{Agent: *c.ManagerAgent, ManagedAgents: c.Agents}
-	} else {
+		if m, ok := c.ManagerAgent.(*agents.ManagerAgent); ok {
+			orchestrator = m
+			orchestrator.ManagedAgents = c.Agents
+		} else if local, ok := c.ManagerAgent.(*agents.Agent); ok {
+			orchestrator = &agents.ManagerAgent{Agent: *local, ManagedAgents: c.Agents}
+		}
+	}
+	
+	if orchestrator == nil {
 		model := c.ManagerLLM
 		if model == nil && len(c.Agents) > 0 {
-			model = c.Agents[0].LLM
+			if local, ok := c.Agents[0].(*agents.Agent); ok {
+				model = local.LLM
+			}
 		}
 		orchestrator = agents.NewManagerAgent(model, c.Agents)
 	}
@@ -1082,14 +1112,23 @@ func (c *Crew) runPlanningPhase(ctx context.Context) error {
 	// 1. Setup Manager
 	var orchestrator *agents.ManagerAgent
 	if c.ManagerAgent != nil {
-		orchestrator = &agents.ManagerAgent{Agent: *c.ManagerAgent, ManagedAgents: c.Agents}
-	} else {
+		if m, ok := c.ManagerAgent.(*agents.ManagerAgent); ok {
+			orchestrator = m
+			orchestrator.ManagedAgents = c.Agents
+		} else if local, ok := c.ManagerAgent.(*agents.Agent); ok {
+			orchestrator = &agents.ManagerAgent{Agent: *local, ManagedAgents: c.Agents}
+		}
+	}
+	
+	if orchestrator == nil {
 		model := c.PlanningLLM
 		if model == nil {
 			model = c.ManagerLLM
 		}
 		if model == nil && len(c.Agents) > 0 {
-			model = c.Agents[0].LLM
+			if local, ok := c.Agents[0].(*agents.Agent); ok {
+				model = local.LLM
+			}
 		}
 		orchestrator = agents.NewManagerAgent(model, c.Agents)
 		orchestrator.Verbose = c.Verbose
@@ -1129,13 +1168,13 @@ func (c *Crew) RunCreatorMode(ctx context.Context) error {
 		// Sync the current task's result back to the Dashboard's master list
 		if index > 0 && index <= len(c.Tasks) {
 			task := c.Tasks[index-1]
-			telemetry.GlobalDynamicRegistry.SyncTaskResult(task.Description, task.Agent.Role, result, nil, true)
+			telemetry.GlobalDynamicRegistry.SyncTaskResult(task.Description, task.Agent.GetRole(), result, nil, true)
 		}
 	}
 	c.OnTaskError = func(index int, err error) {
 		if index > 0 && index <= len(c.Tasks) {
 			task := c.Tasks[index-1]
-			telemetry.GlobalDynamicRegistry.SyncTaskResult(task.Description, task.Agent.Role, nil, err, true)
+			telemetry.GlobalDynamicRegistry.SyncTaskResult(task.Description, task.Agent.GetRole(), nil, err, true)
 		}
 	}
 
@@ -1153,14 +1192,14 @@ func (c *Crew) RunCreatorMode(ctx context.Context) error {
 				
 				// Inject Agents first so tasks can bind to them
 				for _, a := range newAgents {
-					if agent, ok := a.(*agents.Agent); ok {
+					if agent, ok := a.(core.Agent); ok {
 						updated := false
 						// Overwrite existing agent if role matches (to capture UI updates)
 						for i, existing := range c.Agents {
-							slog.Debug("Comparing agent roles", slog.String("existing", existing.Role), slog.String("new", agent.Role))
-							if strings.TrimSpace(strings.ToLower(existing.Role)) == strings.TrimSpace(strings.ToLower(agent.Role)) {
+							slog.Debug("Comparing agent roles", slog.String("existing", existing.GetRole()), slog.String("new", agent.GetRole()))
+							if strings.TrimSpace(strings.ToLower(existing.GetRole())) == strings.TrimSpace(strings.ToLower(agent.GetRole())) {
 								c.Agents[i] = agent
-								slog.Info("📥 Dynamic Agent updated within engine", slog.String("role", agent.Role))
+								slog.Info("📥 Dynamic Agent updated within engine", slog.String("role", agent.GetRole()))
 								updated = true
 								break
 							}
@@ -1168,7 +1207,7 @@ func (c *Crew) RunCreatorMode(ctx context.Context) error {
 						// Otherwise append as a brand new agent
 						if !updated {
 							c.Agents = append(c.Agents, agent)
-							slog.Info("📥 Dynamic Agent injected", slog.String("role", agent.Role))
+							slog.Info("📥 Dynamic Agent injected", slog.String("role", agent.GetRole()))
 						}
 					}
 				}
@@ -1193,7 +1232,7 @@ func (c *Crew) RunCreatorMode(ctx context.Context) error {
 							// Try to match by role (case-insensitive)
 							if task.AgentRole != "" {
 								for _, a := range c.Agents {
-									if strings.EqualFold(strings.TrimSpace(a.Role), strings.TrimSpace(task.AgentRole)) {
+									if strings.EqualFold(strings.TrimSpace(a.GetRole()), strings.TrimSpace(task.AgentRole)) {
 										task.Agent = a
 										break
 									}
@@ -1205,7 +1244,7 @@ func (c *Crew) RunCreatorMode(ctx context.Context) error {
 								slog.Warn("⚠️ No agent match found for task. Falling back to first available agent.", 
 									slog.String("task", task.Description), 
 									slog.String("requested_role", task.AgentRole),
-									slog.String("assigned_role", c.Agents[0].Role))
+									slog.String("assigned_role", c.Agents[0].GetRole()))
 								task.Agent = c.Agents[0]
 							}
 						}
@@ -1230,7 +1269,7 @@ func (c *Crew) RunCreatorMode(ctx context.Context) error {
 
 						slog.Info("📥 Dynamic Task injected", 
 							slog.String("description", task.Description),
-							slog.String("assigned_agent", task.Agent.Role))
+							slog.String("assigned_agent", task.Agent.GetRole()))
 						c.Tasks = append(c.Tasks, task)
 					}
 				}
@@ -1263,34 +1302,39 @@ func (c *Crew) RunCreatorMode(ctx context.Context) error {
 // access to their current coworkers via DelegateWork and AskQuestion tools.
 func (c *Crew) InjectDelegationTools() {
 	for _, agent := range c.Agents {
-		if agent.AllowDelegation {
-			coworkers := make([]delegation.Agent, 0)
-			for _, other := range c.Agents {
-				if other != agent {
-					coworkers = append(coworkers, other)
-				}
+		// Only inject tools for local agents
+		localAgent, ok := agent.(*agents.Agent)
+		if !ok || !localAgent.AllowDelegation {
+			continue
+		}
+
+		coworkers := make([]core.Agent, 0)
+		for _, other := range c.Agents {
+			if other != agent {
+				coworkers = append(coworkers, other)
 			}
+		}
 
 			if len(coworkers) > 0 {
 				// Remove existing delegation tools to avoid duplicates and update coworkers
 				newTools := make([]agents.Tool, 0)
-				for _, t := range agent.Tools {
+				for _, t := range localAgent.Tools {
 					if t.Name() != "DelegateWork" && t.Name() != "AskQuestion" {
 						newTools = append(newTools, t)
 					}
 				}
-				agent.Tools = newTools
-
+				localAgent.Tools = newTools
+ 
 				// Inject fresh tools with current coworker list
-				agent.Tools = append(agent.Tools, delegation.NewDelegateWorkTool(coworkers))
-				agent.Tools = append(agent.Tools, delegation.NewAskQuestionTool(coworkers))
+				localAgent.Tools = append(localAgent.Tools, delegation.NewDelegateWorkTool(coworkers))
+				localAgent.Tools = append(localAgent.Tools, delegation.NewAskQuestionTool(coworkers))
 
 				if c.Verbose {
 					defaultLogger.Info("🔁 Delegation tools refreshed",
-						slog.String("agent", agent.Role),
+						slog.String("agent", agent.GetRole()),
 						slog.Int("coworkers", len(coworkers)))
 				}
 			}
-		}
 	}
 }
+

@@ -20,6 +20,7 @@ task := gocrew.NewTaskBuilder().
 ### Key Parameters
 
 - **Description (`string`)**: The clear, actionable instruction for the agent.
+- **Agent (`core.Agent`)**: The autonomous agent or remote adapter responsible for this task.
 - **ExpectedOutput (`string`)**: A hint to the agent about the desired format (Markdown, JSON, etc.).
 - **OutputJSON (`interface{}`)**: A pointer to a Go struct. The engine will force the LLM into JSON mode and unmarshal the result directly into your struct.
 - **Context (`[]*Task`)**: Links this task to previous ones. The outputs of these tasks will be injected into this task's prompt as background context.

@@ -8,6 +8,7 @@ import (
 	"github.com/Ecook14/gocrewwai/pkg/dashboard"
 	"github.com/Ecook14/gocrewwai/pkg/agents"
 	"github.com/Ecook14/gocrewwai/pkg/crew"
+	"github.com/Ecook14/gocrewwai/pkg/core"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/tasks"
 )
@@ -52,7 +53,7 @@ func main() {
 
 	// 3. Assemble Crew with Hierarchical Process
 	myCrew := crew.Crew{
-		Agents:  []*agents.Agent{researcher, writer},
+		Agents:  []core.Agent{researcher, writer},
 		Tasks:   []*tasks.Task{researchTask, writeTask},
 		Process: crew.Hierarchical,
 		Verbose: true,

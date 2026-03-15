@@ -22,6 +22,7 @@ const (
 	EventTaskFinished   EventType = "task_finished"
 	EventSystemLog      EventType = "system_log"
 	EventSystemMetrics  EventType = "system_metrics"
+	EventSandboxStatus  EventType = "sandbox_status"
 )
 
 // Event represents a single unit of telemetry data pushed to the dashboard.

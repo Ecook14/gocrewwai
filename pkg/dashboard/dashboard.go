@@ -15,6 +15,7 @@ import (
 	"github.com/Ecook14/gocrewwai/pkg/tasks"
 	"github.com/Ecook14/gocrewwai/pkg/telemetry"
 	"github.com/Ecook14/gocrewwai/pkg/tools"
+	"github.com/Ecook14/gocrewwai/pkg/sandbox"
 	"github.com/gorilla/websocket"
 	"github.com/Ecook14/gocrewwai/web-ui"
 	"runtime"
@@ -529,7 +530,7 @@ func (s *WSServer) publishMetrics() {
 		runtime.ReadMemStats(&m)
 
 		event := telemetry.Event{
-			Type:      "system_metrics",
+			Type:      telemetry.EventSystemMetrics,
 			Timestamp: time.Now(),
 			Payload: map[string]interface{}{
 				"memory_mb":     m.Alloc / 1024 / 1024,
@@ -538,9 +539,20 @@ func (s *WSServer) publishMetrics() {
 			},
 		}
 
+		sandboxEvent := telemetry.Event{
+			Type:      telemetry.EventSandboxStatus,
+			Timestamp: time.Now(),
+			Payload: map[string]interface{}{
+				"active_sessions":  sandbox.GlobalMonitor.ActiveSessions,
+				"total_executions": sandbox.GlobalMonitor.TotalExecutions,
+				"last_status":      sandbox.GlobalMonitor.LastStatus,
+			},
+		}
+
 		s.mu.Lock()
 		for client := range s.clients {
 			client.WriteJSON(event)
+			client.WriteJSON(sandboxEvent)
 		}
 		s.mu.Unlock()
 	}

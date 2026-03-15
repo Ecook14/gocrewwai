@@ -45,3 +45,8 @@ func StartSpan(ctx context.Context, name string) (context.Context, trace.Span) {
 	}
 	return Tracer.Start(ctx, name)
 }
+
+// GetSpan returns the current span from context.
+func GetSpan(ctx context.Context) trace.Span {
+	return trace.SpanFromContext(ctx)
+}

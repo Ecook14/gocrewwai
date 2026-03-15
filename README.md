@@ -5,7 +5,7 @@ Hey there! I am absolutely thrilled to introduce you to **Gocrew**, an open-sour
 Think of Gocrew as a framework for assembling a digital "crew." You assign each member a specific persona—like a Lead Researcher, a Senior Data Analyst, or an Expert Coder. You hand them a goal, provide them with tools, and they figure out how to communicate and collaborate to achieve that goal!
 
 > [!IMPORTANT]
-> **Status: Early Alpha.** Gocrew is in active development. While the core engine and dashboard are stable, advanced protocols like Agent-to-Agent (A2A) and complex multi-crew flows are currently being refined. I welcome early contributors, experimenters, and feedback!
+> **Status: v0.9 (Autonomous Interoperability).** Gocrew has evolved into a production-hardened framework for heterogeneous agent orchestration. With native A2A protocols, MCP Hub capabilities, and Flow 2.0 persistence, it is ready for complex, long-running digital missions.
 
 ---
 
@@ -46,7 +46,7 @@ Our agents remember everything that matters, powered by a sophisticated scoring 
 Empower your agents with 24+ native tools, including:
 - **Full Browser Automation**: Headless `Chromedp` for navigating complex React/Vue SPAs.
 - **Ingestion Engine**: Native parsing for PDF, DOCX, CSV, and TXT files.
-- **MCP Hub**: First-class support for the Model Context Protocol (MCP) and WebMCP for remote tool discovery.
+- **MCP Hub**: First-class support for the Model Context Protocol (MCP). Connect to remote tools via `HTTP`, `Stdio` (local commands), or `SSE` with native tool filtering (Allow/Block lists).
 
 ---
 
@@ -137,8 +137,8 @@ I am building the most scalable AI framework for the Go community, and I need yo
 
 ### 🔥 High-Priority Roadmap
 I am specifically looking for collaborators to help with:
-- **🧬 Agent-to-Agent (A2A) Layer**: Standardizing how diverse agents communicate across different crews.
-- **🛡️ Advanced Protocols**: Implementing MCP extensions and more production-grade sandboxing.
+- **🧬 Gocrew Flows 2.0**: Strictly-typed state machines with native checkpointing and persistence.
+- **🛡️ Distributed Execution**: Agent-as-a-Service (AaaS) for cross-node and cross-cloud crew collaboration.
 - **🧪 Multi-Agent Testing**: Building frameworks to evaluate agent reasoning at scale.
 - **Dashboard Upgrades**: Real-time control plane enhancements and visualizations.
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/Ecook14/gocrewwai/pkg/agents"
 	"github.com/Ecook14/gocrewwai/pkg/crew"
+	"github.com/Ecook14/gocrewwai/pkg/core"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/tasks"
 )
@@ -22,7 +23,7 @@ func main() {
 		Agent:       agent,
 	}
 
-	myCrew := crew.NewCrew([]*agents.Agent{agent}, []*tasks.Task{task})
+	myCrew := crew.NewCrew([]core.Agent{agent}, []*tasks.Task{task})
 
 	fmt.Println("🚀 Executing Task and generating Speech (Elite Multimodal)...")
 	result, _ := myCrew.Kickoff(context.Background())

@@ -1,6 +1,6 @@
 module github.com/Ecook14/gocrewwai
 
-go 1.24.0
+go 1.23
 
 require (
 	github.com/chromedp/chromedp v0.9.5

@@ -8,6 +8,7 @@ import (
 	"github.com/Ecook14/gocrewwai/pkg/dashboard"
 	"github.com/Ecook14/gocrewwai/pkg/agents"
 	"github.com/Ecook14/gocrewwai/pkg/crew"
+	"github.com/Ecook14/gocrewwai/pkg/core"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/tasks"
 )
@@ -36,7 +37,7 @@ func main() {
 	}
 
 	myCrew := crew.NewCrew(
-		[]*agents.Agent{writer},
+		[]core.Agent{writer},
 		[]*tasks.Task{task},
 	)
 

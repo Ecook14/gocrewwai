@@ -48,4 +48,16 @@ Guardrails are strictly-typed rules that agent output MUST pass before being acc
 - **LLM Review**: Uses a second "Critic" agent to grade the output of the first.
 
 ---
+
+## 🌐 Heterogeneous Swarms (`core.Agent`)
+
+In Gocrew v0.9, all orchestration logic utilizes the polymorphic `core.Agent` interface rather than concrete `*agents.Agent` pointers. This decouples the engine from the physical implementation of the agent.
+
+Why does this matter?
+- **Local Agents**: Your standard `gocrew.Agent` runs queries in the same process.
+- **Remote Agents**: Using the `RemoteAgentAdapter`, you can dynamically inject remote agents (running on different servers) into a local crew. To the orchestration engine, they look exactly the same!
+
+This interface standardization enables massive distributed workloads and true Agent-to-Agent (A2A) networking.
+
+---
 **Gocrew** - Built for reliable autonomy.

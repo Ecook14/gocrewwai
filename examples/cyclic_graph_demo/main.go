@@ -8,6 +8,7 @@ import (
 
 	"github.com/Ecook14/gocrewwai/pkg/agents"
 	"github.com/Ecook14/gocrewwai/pkg/crew"
+	"github.com/Ecook14/gocrewwai/pkg/core"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/tasks"
 )
@@ -57,7 +58,7 @@ func main() {
 	task2.MaxCycles = 3 // Safety limit
 
 	myCrew := crew.NewCrew(
-		[]*agents.Agent{researcher, verifier},
+		[]core.Agent{researcher, verifier},
 		[]*tasks.Task{task1, task2},
 		crew.WithProcess(crew.Graph), // Or StateMachine
 		crew.WithVerbose(true),

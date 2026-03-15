@@ -19,10 +19,10 @@ myCrew := gocrew.NewCrewBuilder().
 
 ### Key Parameters
 
-- **Agents (`[]*Agent`)**: The list of all "member" agents in the crew.
+- **Agents (`[]core.Agent`)**: The list of all "member" agents in the crew.
 - **Tasks (`[]*Task`)**: The sequence or graph of tasks to be executed.
 - **Process (`ProcessType`)**: The orchestration strategy (Sequential, Hierarchical, etc.).
-- **Manager (`*Agent`)**: (Optional) A specific agent to act as the manager in Hierarchical processes.
+- **Manager (`core.Agent`)**: (Optional) A specific agent to act as the manager in Hierarchical processes.
 - **StateFile (`string`)**: Persists the crew's state to disk, allowing for resumable executions.
 - **StepCallback**: A global hook that fires after every agent action, perfect for real-time monitoring.
 

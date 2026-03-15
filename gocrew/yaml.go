@@ -7,6 +7,7 @@ import (
 
 	"github.com/Ecook14/gocrewwai/pkg/agents"
 	"github.com/Ecook14/gocrewwai/pkg/crew"
+	"github.com/Ecook14/gocrewwai/pkg/core"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/tasks"
 	"gopkg.in/yaml.v3"
@@ -106,7 +107,7 @@ func buildCrewFromYAML(cfg *YAMLConfig) (*Crew, error) {
 
 	// 2. Build Agents
 	agentMap := make(map[string]*agents.Agent)
-	agentList := make([]*agents.Agent, 0, len(cfg.Agents))
+	agentList := make([]core.Agent, 0, len(cfg.Agents))
 
 	for _, ya := range cfg.Agents {
 		agentLLM := defaultLLM

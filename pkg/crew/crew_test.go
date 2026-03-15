@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/Ecook14/gocrewwai/pkg/agents"
+	"github.com/Ecook14/gocrewwai/pkg/core"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/tasks"
 )
@@ -30,7 +31,7 @@ func TestCrewKickoff_Sequential(t *testing.T) {
 	task := &tasks.Task{Description: "Job", Agent: agent}
 
 	c := &Crew{
-		Agents:  []*agents.Agent{agent},
+		Agents:  []core.Agent{agent},
 		Tasks:   []*tasks.Task{task},
 		Process: Sequential,
 	}
@@ -66,7 +67,7 @@ func TestCrewKickoff_Hierarchical(t *testing.T) {
 	task := &tasks.Task{Description: "Job", Agent: agent}
 
 	c := &Crew{
-		Agents:  []*agents.Agent{agent},
+		Agents:  []core.Agent{agent},
 		Tasks:   []*tasks.Task{task},
 		Process: Hierarchical,
 	}
@@ -88,7 +89,7 @@ func TestCrewKickoff_DelegationInjection(t *testing.T) {
 	task := &tasks.Task{Description: "Job", Agent: agent}
 
 	c := &Crew{
-		Agents:  []*agents.Agent{agent, {Role: "Coworker"}},
+		Agents:  []core.Agent{agent, &agents.Agent{Role: "Coworker"}},
 		Tasks:   []*tasks.Task{task},
 		Process: Sequential,
 	}
@@ -127,7 +128,7 @@ func TestCrewKickoff_Planning(t *testing.T) {
 	task := &tasks.Task{Description: "Job", Agent: agent}
 
 	c := &Crew{
-		Agents:   []*agents.Agent{agent},
+		Agents:   []core.Agent{agent},
 		Tasks:    []*tasks.Task{task},
 		Planning: true,
 		Process:  Sequential,

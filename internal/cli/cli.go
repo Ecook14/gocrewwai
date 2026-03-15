@@ -7,6 +7,7 @@ import (
 
 	"github.com/Ecook14/gocrewwai/pkg/dashboard"
 	"github.com/Ecook14/gocrewwai/pkg/agents"
+	"github.com/Ecook14/gocrewwai/pkg/core"
 	"github.com/Ecook14/gocrewwai/pkg/crew"
 	//"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/tasks"
@@ -39,7 +40,7 @@ func Run(args []string) error {
 	command := args[1]
 	switch command {
 	case "version":
-		fmt.Println("gocrew v0.8.0 (Mastery Beta)")
+		fmt.Println("gocrew v0.9.0 (Autonomous Interoperability)")
 		return nil
 	case "train":
 		return handleTrain(args[2:])
@@ -156,7 +157,7 @@ func handleKickoff(showUI bool) error {
 
 	c := crew.Crew{
 		Process: crew.Sequential,
-		Agents:  []*agents.Agent{agent},
+		Agents:  []core.Agent{agent},
 		Tasks:   []*tasks.Task{task},
 		Verbose: true,
 	}

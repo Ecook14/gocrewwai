@@ -9,6 +9,7 @@ import (
 
 	"github.com/Ecook14/gocrewwai/pkg/agents"
 	"github.com/Ecook14/gocrewwai/pkg/crew"
+	"github.com/Ecook14/gocrewwai/pkg/core"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/tasks"
 	"github.com/Ecook14/gocrewwai/pkg/tools"
@@ -72,7 +73,7 @@ func main() {
 
 	// 5. Connect the Crew Orchestra (Sequential logic)
 	marketPipeline := crew.Crew{
-		Agents:  []*agents.Agent{researcher, analyst},
+		Agents:  []core.Agent{researcher, analyst},
 		Tasks:   []*tasks.Task{scrapeTask, analyzeTask},
 		Process: crew.Sequential,
 		Verbose: true,

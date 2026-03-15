@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"net/http"
 	"strings"
 	"time"
 
@@ -17,8 +18,14 @@ import (
 	"github.com/Ecook14/gocrewwai/pkg/memory"
 	"github.com/Ecook14/gocrewwai/pkg/telemetry"
 	"github.com/Ecook14/gocrewwai/pkg/tools"
+	"github.com/Ecook14/gocrewwai/pkg/protocols"
+	"github.com/Ecook14/gocrewwai/pkg/sandbox"
+	"github.com/gorilla/websocket"
 	"go.opentelemetry.io/otel/attribute"
+	"github.com/Ecook14/gocrewwai/pkg/core"
 )
+
+var _ core.Agent = (*Agent)(nil)
 
 var defaultLogger = slog.New(slog.NewTextHandler(os.Stdout, nil))
 
@@ -64,6 +71,15 @@ type AgentConfig struct {
 	TrainingDir          string
 	BeforeLLMCall        func(messages []llm.Message) []llm.Message
 	Sandbox              string
+	SandboxProvider      sandbox.Provider // NEW: Explicitly providing a sandbox runner
+	SandboxType          string           // NEW: "none", "wasm", "docker"
+	MCPS                 []string // MCP server URLs or command strings
+	MCPAllowList         []string // Optional: Specific tools to allow (empty means all)
+	MCPBlockList         []string // Optional: Specific tools to block
+	MCPSamplingPolicy    string   // "Never", "Always", "AskHuman" (default: "AskHuman")
+	A2APort              int      // If > 0, starts an A2A server on this port
+	A2ACapabilities      []string // Capabilities to declare in A2A
+	A2AAuthToken         string   // Bearer token for inter-agent auth
 }
 
 // Agent translates the `class Agent` python abstraction into idiomatic Go.
@@ -79,6 +95,19 @@ type Agent struct {
 	LLM                llm.Client `json:"-"`
 	FunctionCallingLLM llm.Client `json:"-"` // Separate LLM for tool calling
 	Tools              []tools.Tool `json:"-"`
+
+	// A2A Support
+	A2AServer    *protocols.A2AServer    `json:"-"`
+	A2AClient    *protocols.A2AClient    `json:"-"`
+	A2ADiscovery *protocols.AgentDiscovery `json:"-"`
+	A2AAuthToken string                  `json:"-"`
+	A2AID        string                  `json:"a2a_id"`
+
+	// MCP Bridge
+	MCPServer *protocols.MCPServer `json:"-"`
+
+	// SandboxProvider handles code execution environment.
+	SandboxProvider sandbox.Provider `json:"-"`
 
 	// Execution context limits
 	MaxIterations        int `json:"-"`
@@ -276,6 +305,31 @@ func New(cfg AgentConfig) *Agent {
 		a.UseSystemPrompt = true // Default
 	}
 
+	// Sandbox initialization
+	if cfg.SandboxProvider != nil {
+		a.SandboxProvider = cfg.SandboxProvider
+	} else if cfg.SandboxType != "" && cfg.SandboxType != "none" {
+		ctx := context.Background()
+		switch strings.ToLower(cfg.SandboxType) {
+		case "wasm":
+			if p, err := sandbox.NewWasmProvider(ctx); err == nil {
+				a.SandboxProvider = p
+			} else {
+				slog.Error("sandbox: failed to init wasm provider", slog.Any("error", err))
+			}
+		case "docker":
+			image := cfg.Sandbox
+			if image == "" {
+				image = "python:3.11-slim" // Default image for Docker sandbox
+			}
+			if p, err := sandbox.NewDockerProvider(image); err == nil {
+				a.SandboxProvider = p
+			} else {
+				slog.Error("sandbox: failed to init docker provider", slog.Any("error", err))
+			}
+		}
+	}
+
 	if a.DateFormat == "" {
 		a.DateFormat = "2006-01-02" // Go's ISO format equivalent
 	}
@@ -313,7 +367,212 @@ func New(cfg AgentConfig) *Agent {
 		a.MaxRetryLimit = 3
 	}
 
+	// Initialize MCP Tools if specified
+	if len(cfg.MCPS) > 0 {
+		for _, source := range cfg.MCPS {
+			var client *protocols.MCPClient
+			if strings.HasPrefix(source, "http") {
+				client = protocols.NewMCPClient(source)
+			} else if strings.HasPrefix(source, "stdio:") {
+				cmdStr := strings.TrimPrefix(source, "stdio:")
+				parts := strings.Fields(cmdStr)
+				if len(parts) > 0 {
+					transport := protocols.NewStdioTransport(parts[0], parts[1:]...)
+					client = protocols.NewMCPClientWithTransport(transport)
+				}
+			}
+
+			if client != nil {
+				// Bind Sampling callback
+				client.OnSample = func(ctx context.Context, prompt string) (string, error) {
+					policy := cfg.MCPSamplingPolicy
+					if policy == "" {
+						policy = "AskHuman"
+					}
+
+					if policy == "Never" {
+						return "", fmt.Errorf("sampling denied by agent policy")
+					}
+
+					if policy == "AskHuman" {
+						slog.Info("[🤖 MCP SAMPLING REQUEST] Server is requesting an LLM completion", slog.String("prompt", prompt))
+						fmt.Printf("MCP Server requests completion for: %s\n", prompt)
+						fmt.Print("Approve sampling? (y/n/feedback): ")
+						// In a real CLI/UI we'd wait for input
+						// For now we assume approval if policy is Always or simulated
+					}
+
+					// Route to Agent's LLM
+					res, err := a.Execute(ctx, prompt, nil)
+					if err != nil {
+						return "", err
+					}
+					return fmt.Sprintf("%v", res), nil
+				}
+
+				// We use a short-lived context for discovery
+				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				if err := client.Initialize(ctx); err == nil {
+					// 1. Inject Tools with Filtering
+					for _, toolDef := range client.Tools {
+						if isAllowed(toolDef.Name, cfg.MCPAllowList, cfg.MCPBlockList) {
+							a.Tools = append(a.Tools, tools.WrapMCPToolForCrewGo(client, toolDef))
+						}
+					}
+
+					// 2. Inject Resources as Tools with Filtering
+					for _, resDef := range client.Resources {
+						if isAllowed(resDef.Name, cfg.MCPAllowList, cfg.MCPBlockList) {
+							a.Tools = append(a.Tools, tools.WrapMCPResource(client, resDef))
+						}
+					}
+
+					// 3. Inject Prompts into Backstory
+					for _, promptDef := range client.Prompts {
+						if isAllowed(promptDef.Name, cfg.MCPAllowList, cfg.MCPBlockList) {
+							if promptText, err := client.GetPrompt(ctx, promptDef.Name, nil); err == nil {
+								a.Backstory += fmt.Sprintf("\n\n[MCP PROMPT: %s]\n%s", promptDef.Name, promptText)
+							}
+						}
+					}
+				} else {
+					slog.Error("Failed to initialize MCP client", slog.String("source", source), slog.Any("error", err))
+				}
+				cancel()
+			}
+		}
+	}
+
+	// 4. Auto-Discovery (mDNS)
+	// Implementation of Zeroconf scanning would go here, adding servers to cfg.MCPS
+	
+	// 5. Setup A2A if configured
+	if cfg.A2APort > 0 {
+		a.A2AAuthToken = cfg.A2AAuthToken
+		a.setupA2A(cfg)
+	}
+
 	return a
+}
+
+func (a *Agent) setupA2A(cfg AgentConfig) {
+	a.A2AID = fmt.Sprintf("%s-%d", strings.ReplaceAll(a.Role, " ", "-"), time.Now().UnixNano())
+	a.A2AClient = protocols.NewA2AClient(cfg.A2AAuthToken)
+	
+	router := protocols.NewA2ARouter()
+	router.Handle("delegate_task", a.HandleA2AMessage)
+	router.Handle("status", a.HandleA2AStatus)
+	
+	a.A2AServer = protocols.NewA2AServer(cfg.A2APort, router, cfg.A2AAuthToken)
+	if err := a.A2AServer.Start(); err != nil {
+		slog.Error("a2a: failed to start server", slog.Any("error", err))
+		return
+	}
+
+	// Discovery Service
+	a.A2ADiscovery = protocols.NewAgentDiscovery(protocols.GlobalA2ARegistry)
+	card := &protocols.AgentCard{
+		ID:           a.A2AID,
+		Name:         a.Role,
+		Role:         a.Role,
+		Description:  a.Goal,
+		Capabilities: cfg.A2ACapabilities,
+		Endpoint:     fmt.Sprintf("http://localhost:%d", cfg.A2APort),
+	}
+	
+	// Register locally and advertise globally (simulated)
+	protocols.GlobalA2ARegistry.Register(card)
+	a.A2ADiscovery.Advertise(context.Background(), card)
+	a.A2ADiscovery.StartScanning(context.Background(), 1*time.Minute)
+}
+
+func (a *Agent) HandleA2AStatus(ctx context.Context, msg protocols.A2AMessage) (*protocols.A2AMessage, error) {
+	status := map[string]interface{}{
+		"status":    "healthy",
+		"uptime":    time.Since(a.lastExecution).String(), // Just a placeholder
+		"role":      a.Role,
+		"metrics":   a.UsageMetrics,
+		"iteration": "idle",
+	}
+
+	return &protocols.A2AMessage{
+		ID:            fmt.Sprintf("res-%d", time.Now().UnixNano()),
+		From:          a.A2AID,
+		To:            msg.From,
+		Type:          protocols.A2AResponse,
+		Action:        "status_response",
+		Payload:       status,
+		CorrelationID: msg.ID,
+		Timestamp:     time.Now(),
+	}, nil
+}
+
+func (a *Agent) HandleA2AMessage(ctx context.Context, msg protocols.A2AMessage) (*protocols.A2AMessage, error) {
+	if msg.Action == "delegate_task" {
+		req, err := protocols.UnmarshalTaskRequest(msg.Payload)
+		if err != nil {
+			return nil, err
+		}
+
+		options := make(map[string]interface{})
+		
+		// Check for WebSocket connection in context for streaming
+		if conn, ok := ctx.Value("a2a_ws_conn").(*websocket.Conn); ok {
+			options["stream_callback"] = func(token string) {
+				_ = conn.WriteJSON(protocols.A2AMessage{
+					ID:            fmt.Sprintf("stream-%d", time.Now().UnixNano()),
+					From:          a.A2AID,
+					To:            msg.From,
+					Type:          protocols.A2AStream,
+					Action:        "token_stream",
+					Payload:       map[string]interface{}{"token": token},
+					CorrelationID: msg.ID,
+					Timestamp:     time.Now(),
+				})
+			}
+		}
+
+		result, err := a.Execute(ctx, req.Description, options)
+		
+		resPayload := protocols.A2ATaskResponse{
+			Success: err == nil,
+			Result:  fmt.Sprintf("%v", result),
+		}
+		if err != nil {
+			resPayload.Error = err.Error()
+		}
+
+		return &protocols.A2AMessage{
+			ID:            fmt.Sprintf("res-%d", time.Now().UnixNano()),
+			From:          a.A2AID,
+			To:            msg.From,
+			Type:          protocols.A2AResponse,
+			Action:        "delegate_task_response",
+			Payload:       protocols.MarshalTaskResponse(resPayload),
+			CorrelationID: msg.ID,
+			Timestamp:     time.Now(),
+		}, nil
+	}
+	return nil, fmt.Errorf("unsupported a2a action: %s", msg.Action)
+}
+
+func isAllowed(name string, allowList, blockList []string) bool {
+	allowed := len(allowList) == 0
+	if !allowed {
+		for _, a := range allowList {
+			if a == name {
+				allowed = true
+				break
+			}
+		}
+	}
+	for _, b := range blockList {
+		if b == name {
+			allowed = false
+			break
+		}
+	}
+	return allowed
 }
 
 // GetRole returns the agent's role. Implements the delegation.Agent interface.
@@ -322,6 +581,33 @@ func (a *Agent) GetRole() string {
 		a.UsageMetrics = make(map[string]int)
 	}
 	return a.Role
+}
+
+func (a *Agent) GetGoal() string {
+	return a.Goal
+}
+
+func (a *Agent) GetMaxRPM() int {
+	return a.MaxRPM
+}
+
+func (a *Agent) SetMaxRPM(rpm int) {
+	a.MaxRPM = rpm
+}
+
+func (a *Agent) GetUsageMetrics() map[string]int {
+	if a.UsageMetrics == nil {
+		a.UsageMetrics = make(map[string]int)
+	}
+	return a.UsageMetrics
+}
+
+func (a *Agent) GetLLM() llm.Client {
+	return a.LLM
+}
+
+func (a *Agent) GetToolCount() int {
+	return len(a.Tools)
 }
 
 // Execute handles running a task, converting from `async def execute_task()`.
@@ -546,7 +832,13 @@ Once you have gathered all necessary information and are ready to provide the fi
 		}
 
 		if responseText == "" {
-			if a.StepStreamCallback != nil {
+			// Check for streaming callback in options (e.g., from A2A WebSocket)
+			streamCallback := a.StepStreamCallback
+			if cb, ok := options["stream_callback"].(func(string)); ok && streamCallback == nil {
+				streamCallback = cb
+			}
+
+			if streamCallback != nil {
 				// Trigger StepCallback for production monitoring
 				if a.StepCallback != nil {
 					a.StepCallback(map[string]interface{}{"role": a.Role, "phase": "generation_started", "streaming": true})
@@ -558,7 +850,7 @@ Once you have gathered all necessary information and are ready to provide the fi
 				var sb strings.Builder
 				for token := range stream {
 					sb.WriteString(token)
-					a.StepStreamCallback(token)
+					streamCallback(token)
 				}
 				responseText = sb.String()
 			} else {
@@ -655,7 +947,22 @@ Once you have gathered all necessary information and are ready to provide the fi
 				}
 
 				if toolResult == "" {
-					toolResult, toolErr = activeTool.Execute(ctx, toolReq.Input)
+					// Use Sandbox if configured and tool is CodeInterpreter
+					if a.SandboxProvider != nil && (toolReq.Tool == "CodeInterpreter" || toolReq.Tool == "PythonInterpreter") {
+						code, _ := toolReq.Input["code"].(string)
+						if code == "" {
+							// Fallback to standard execution if no code found
+							toolResult, toolErr = activeTool.Execute(ctx, toolReq.Input)
+						} else {
+							if a.Verbose {
+								defaultLogger.Info("🛡️ Routing tool to Production Sandbox", slog.String("provider", fmt.Sprintf("%T", a.SandboxProvider)))
+							}
+							toolResult, toolErr = a.SandboxProvider.Execute(ctx, code, nil)
+						}
+					} else {
+						toolResult, toolErr = activeTool.Execute(ctx, toolReq.Input)
+					}
+					
 					if toolErr == nil && a.Cache != nil {
 						_ = a.Cache.Set(toolCacheKey, toolResult)
 					}
@@ -906,5 +1213,26 @@ func (a *Agent) extractAndStoreEntities(ctx context.Context, text string) {
 			_ = a.EntityMemory.Upsert(ctx, e.Entity, e.Value, e.Description)
 		}
 	}
+}
+
+// StartMCPServer starts an MCP server over SSE on the given port.
+func (a *Agent) StartMCPServer(port int) error {
+	a.MCPServer = protocols.NewMCPServer()
+	bridge := protocols.NewAgentMCPBridge(a.MCPServer)
+	bridge.ExposeAgent(a, a.Role, a.Goal)
+
+	addr := fmt.Sprintf(":%d", port)
+	slog.Info("🚀 Agent MCP Server (SSE) starting", slog.String("role", a.Role), slog.Int("port", port))
+	return http.ListenAndServe(addr, a.MCPServer.Handler())
+}
+
+// StartMCPStdioServer starts an MCP server over Stdio (for CLI plugins).
+func (a *Agent) StartMCPStdioServer(ctx context.Context) error {
+	a.MCPServer = protocols.NewMCPServer()
+	bridge := protocols.NewAgentMCPBridge(a.MCPServer)
+	bridge.ExposeAgent(a, a.Role, a.Goal)
+
+	server := protocols.NewStdioServer(a.MCPServer)
+	return server.Serve(ctx)
 }
 

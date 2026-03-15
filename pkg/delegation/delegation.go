@@ -9,22 +9,16 @@ import (
 	"strings"
 
 	"github.com/Ecook14/gocrewwai/pkg/tools"
+	"github.com/Ecook14/gocrewwai/pkg/core"
 )
 
-// Agent defines the minimal interface required for delegation targets.
-// This avoids circular imports with the agents package.
-type Agent interface {
-	GetRole() string
-	Execute(ctx context.Context, taskInput string, options map[string]interface{}) (interface{}, error)
-}
-
 // DelegateWorkTool implements tools.Tool and allows an agent to delegate work
-// to a coworker agent. This is analogous to Python CrewAI's built-in delegation mechanism.
+// to a coworker agent. This is analogous to CrewAI's built-in delegation mechanism.
 type DelegateWorkTool struct {
-	Coworkers []Agent
+	Coworkers []core.Agent
 }
 
-func NewDelegateWorkTool(coworkers []Agent) *DelegateWorkTool {
+func NewDelegateWorkTool(coworkers []core.Agent) *DelegateWorkTool {
 	return &DelegateWorkTool{Coworkers: coworkers}
 }
 
@@ -84,7 +78,7 @@ func (t *DelegateWorkTool) Execute(ctx context.Context, input map[string]interfa
 	}
 
 	// Find the coworker
-	var target Agent
+	var target core.Agent
 	for _, cw := range t.Coworkers {
 		if strings.EqualFold(cw.GetRole(), coworkerRole) {
 			target = cw
@@ -118,10 +112,10 @@ func (t *DelegateWorkTool) Execute(ctx context.Context, input map[string]interfa
 // AskQuestionTool implements tools.Tool and allows an agent to ask a question
 // to a coworker agent. Similar to DelegateWork but for information gathering.
 type AskQuestionTool struct {
-	Coworkers []Agent
+	Coworkers []core.Agent
 }
 
-func NewAskQuestionTool(coworkers []Agent) *AskQuestionTool {
+func NewAskQuestionTool(coworkers []core.Agent) *AskQuestionTool {
 	return &AskQuestionTool{Coworkers: coworkers}
 }
 
@@ -181,7 +175,7 @@ func (t *AskQuestionTool) Execute(ctx context.Context, input map[string]interfac
 	}
 
 	// Find the coworker
-	var target Agent
+	var target core.Agent
 	for _, cw := range t.Coworkers {
 		if strings.EqualFold(cw.GetRole(), coworkerRole) {
 			target = cw

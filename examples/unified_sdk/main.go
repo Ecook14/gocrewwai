@@ -7,6 +7,7 @@ import (
 
 	// Single unified import! 🦾
 	"github.com/Ecook14/gocrewwai/gocrew"
+	"github.com/Ecook14/gocrewwai/pkg/core"
 )
 
 func main() {
@@ -50,7 +51,7 @@ func main() {
 	})
 
 	myCrew := gocrew.NewCrew(gocrew.CrewConfig{
-		Agents:  []*gocrew.Agent{researcher, writer},
+		Agents:  []core.Agent{researcher, writer},
 		Tasks:   []*gocrew.Task{researchTask, writeTask},
 		Process: gocrew.Sequential,
 		Verbose: true,

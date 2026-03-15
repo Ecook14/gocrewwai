@@ -5,10 +5,11 @@ Gocrew is currently in **Early Alpha**. My goal is to build the most performance
 ## 🚀 Near-Term (Alpha Focus)
 *Targeting v0.9.0*
 
-- [ ] **Agent-to-Agent (A2A) Communication**: Standardizing cross-crew delegation and peer-to-peer agent messaging.
-- [ ] **Advanced Multi-Crew Flows**: More complex combinators (`Switch`, `Map-Reduce`, `Iterate`) for the Flow engine.
-- [ ] **Enhanced Tool Sandboxing**: Improving Docker/E2B integration for seamless, zero-config code execution.
-- [ ] **Dashboard Metrics**: Real-time visualization of cost, token usage, and latency per agent/task.
+- [x] **Agent-to-Agent (A2A) Communication**: Standardizing cross-crew delegation and peer-to-peer agent messaging.
+- [x] **Advanced Multi-Crew Flows**: More complex combinators (`Switch`, `Map-Reduce`, `Iterate`) for the Flow engine.
+- [x] **Enhanced Tool Sandboxing**: Improving Docker/E2B integration for seamless, zero-config code execution.
+- [x] **Dashboard Metrics**: Real-time visualization of cost, token usage, and latency per agent/task.
+- [x] **core.Agent Interface Standardization**: Seamless interoperability for local and remote agent orchestration.
 
 ## ⚡ Mid-Term (Beta Focus)
 *Targeting v1.0.0-beta*

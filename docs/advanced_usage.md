@@ -81,17 +81,17 @@ Use `Flow` to connect multiple independent crews together into a stateful workfl
 f := gocrew.NewFlow(initialState)
 
 // Run crews in parallel
-f.AddParallelNodes([]flow.Node{
+f.AddParallelNodes([]gocrew.Node{
     researchCrew,
     financialCrew,
 })
 
 // Route based on state
-f.AddRouter(&flow.RouterNode{
-    Routes: []flow.Route{
+f.AddRouter(&gocrew.RouterNode{
+    Routes: []gocrew.Route{
         {
             Name: "alert",
-            Pred: func(s flow.State) bool { return s["risk"] > 0.8 },
+            Pred: func(s gocrew.State) bool { return s["risk"].(float64) > 0.8 },
             Node: alertCrew,
         },
     },

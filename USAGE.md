@@ -113,7 +113,31 @@ result, _ := myCrew.Kickoff(context.Background())
 
 ---
 
-## 6. Real-Time Observability (Telemetry)
+## 6. MCP Mastery: DSL & Transports
+
+Gocrew brings CrewAI-style MCP integration to Go. Connect to any MCP server via the `MCPS` field in `AgentConfig`.
+
+```go
+agent := gocrew.NewAgentBuilder().
+    Role("Universal Assistant").
+    // DSL-style MCP registration
+    MCPS([]string{
+        "http://localhost:8080/mcp",                      // Remote HTTP server
+        "stdio:npx -y @modelcontextprotocol/server-everything", // Local command (Stdio)
+    }).
+    // Optional: Filter precisely which tools this agent can use
+    MCPAllowList([]string{"echo", "calculate"}).
+    Build()
+```
+
+Supported transports:
+- **HTTP**: Standard JSON-RPC over POST.
+- **Stdio**: Local subprocesses via standard input/output.
+- **SSE**: Real-time streaming from remote servers.
+
+---
+
+## 7. Real-Time Observability (Telemetry)
 
 Gocrew emits over 40 types of lifecycle events. You can subscribe to the `GlobalBus` to pipe these into your own monitoring systems.
 

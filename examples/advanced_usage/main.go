@@ -8,6 +8,7 @@ import (
 
 	"github.com/Ecook14/gocrewwai/pkg/agents"
 	"github.com/Ecook14/gocrewwai/pkg/crew"
+	"github.com/Ecook14/gocrewwai/pkg/core"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/memory"
 	"github.com/Ecook14/gocrewwai/pkg/tasks"
@@ -67,7 +68,7 @@ func main() {
 
 	// 4. Assemble Advanced Crew
 	execCrew := crew.Crew{
-		Agents:  []*agents.Agent{researcher, writer},
+		Agents:  []core.Agent{researcher, writer},
 		Tasks:   []*tasks.Task{marketTask, contentTask},
 		Process: crew.Hierarchical, // Dynamic delegation via Manager
 		Verbose: true,

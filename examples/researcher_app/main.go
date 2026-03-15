@@ -8,6 +8,7 @@ import (
 
 	"github.com/Ecook14/gocrewwai/pkg/agents"
 	"github.com/Ecook14/gocrewwai/pkg/crew"
+	"github.com/Ecook14/gocrewwai/pkg/core"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/tasks"
 	"github.com/Ecook14/gocrewwai/pkg/tools"
@@ -64,7 +65,7 @@ func main() {
 	// 4. Form the Crew and Kickoff the execution loop
 	techCrew := crew.Crew{
 		Process: crew.Sequential,
-		Agents:  []*agents.Agent{researcher, writer},
+		Agents:  []core.Agent{researcher, writer},
 		Tasks:   []*tasks.Task{researchTask, writingTask},
 		Verbose: true,
 	}

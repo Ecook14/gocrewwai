@@ -7,6 +7,7 @@ import (
 
 	"github.com/Ecook14/gocrewwai/pkg/agents"
 	"github.com/Ecook14/gocrewwai/pkg/crew"
+	"github.com/Ecook14/gocrewwai/pkg/core"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/tasks"
 	"github.com/Ecook14/gocrewwai/pkg/tools"
@@ -34,7 +35,7 @@ func main() {
 		Agent:       developer,
 	}
 
-	myCrew := crew.NewCrew([]*agents.Agent{developer}, []*tasks.Task{task})
+	myCrew := crew.NewCrew([]core.Agent{developer}, []*tasks.Task{task})
 
 	fmt.Println("🚀 Starting Sandboxing Demo (E2B Cloud Integration)...")
 	result, err := myCrew.Kickoff(context.Background())

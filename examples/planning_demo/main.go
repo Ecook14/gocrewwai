@@ -8,6 +8,7 @@ import (
 
 	"github.com/Ecook14/gocrewwai/pkg/agents"
 	"github.com/Ecook14/gocrewwai/pkg/crew"
+	"github.com/Ecook14/gocrewwai/pkg/core"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/tasks"
 )
@@ -46,7 +47,7 @@ func main() {
 
 	// 3. Create Crew with Planning
 	myCrew := crew.NewCrew(
-		[]*agents.Agent{researcher, writer},
+		[]core.Agent{researcher, writer},
 		[]*tasks.Task{task1, task2},
 		crew.WithPlanning(true),
 		crew.WithVerbose(true),

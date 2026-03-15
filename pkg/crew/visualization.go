@@ -44,8 +44,8 @@ func GenerateDOT(c *Crew) string {
 	sb.WriteString("    color=\"#888888\";\n")
 	for i, agent := range c.Agents {
 		agentID := fmt.Sprintf("agent_%d", i)
-		toolCount := len(agent.Tools)
-		label := fmt.Sprintf("%s\\n(%d tools)", agent.Role, toolCount)
+		toolCount := agent.GetToolCount()
+		label := fmt.Sprintf("%s\\n(%d tools)", agent.GetRole(), toolCount)
 		sb.WriteString(fmt.Sprintf("    %s [label=\"%s\", fillcolor=\"#50C878\", fontcolor=white];\n", agentID, label))
 	}
 	sb.WriteString("  }\n\n")
@@ -85,7 +85,7 @@ func GenerateDOT(c *Crew) string {
 	for i, task := range c.Tasks {
 		if task.Agent != nil {
 			for j, agent := range c.Agents {
-				if agent.Role == task.Agent.Role {
+				if agent.GetRole() == task.Agent.GetRole() {
 					sb.WriteString(fmt.Sprintf("  task_%d -> agent_%d [style=dashed, label=\"assigned\", color=\"#888888\"];\n", i, j))
 					break
 				}
@@ -126,7 +126,7 @@ func GenerateTaskDependencyDOT(c *Crew) string {
 		}
 		agentRole := "unassigned"
 		if task.Agent != nil {
-			agentRole = task.Agent.Role
+			agentRole = task.Agent.GetRole()
 		}
 		label := fmt.Sprintf("{Task %d|%s|Agent: %s}", i+1, desc, agentRole)
 		sb.WriteString(fmt.Sprintf("  task_%d [label=\"%s\", fillcolor=\"#FFB347\"];\n", i, label))
@@ -179,7 +179,7 @@ func GenerateMermaidFlow(c *Crew) string {
 		sb.WriteString(fmt.Sprintf("  "+taskStyle+"\n", i, desc))
 
 		if task.Agent != nil {
-			sb.WriteString(fmt.Sprintf("  T%d -.-> A%d(\"%s\")\n", i, i, task.Agent.Role))
+			sb.WriteString(fmt.Sprintf("  T%d -.-> A%d(\"%s\")\n", i, i, task.Agent.GetRole()))
 		}
 
 		if i < len(c.Tasks)-1 {

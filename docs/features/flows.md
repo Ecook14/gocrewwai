@@ -24,7 +24,7 @@ f.AddEdge("research", "writing")
 
 - **State (`flow.State`)**: A thread-safe, generic map that holds the "truth" of the workflow as it progresses.
 - **Routers**: Dynamic nodes that decide the next path based on the current state (e.g., "If risk score > 0.8, go to AlertNode, otherwise go to ProcessNode").
-- **Persistence**: Flows can automatically save their state to a database (PostgreSQL, SQLite, etc.), allowing for long-running workflows that span days or weeks.
+- **Persistence & Checkpointing**: Flows automatically snapshot their state to disk (or a DB) after *every* node execution. If the process crashes, you can use `engine.Resume(ctx, flow)` to pick up exactly where it left off, down to the byte.
 
 ---
 
@@ -52,7 +52,7 @@ Flows natively support human feedback loops. You can insert "WaitNodes" that pau
 ## 🔄 Parallel & Branching
 
 Flows support complex topologies:
-- **Parallel Nodes**: Run multiple crews simultaneously and wait for all to finish.
+- **Parallel Nodes**: Run multiple crews or tasks simultaneously. The orchestrator spawns separate goroutines and waits for all parallel branches to resolve before moving the state machine forward. Linear scaling for autonomous throughput!
 - **Conditional Branching**: Use `AddRouter` to create intelligent forks in your workflow.
 - **Cycles**: Loop back to previous nodes for iterative refinement.
 

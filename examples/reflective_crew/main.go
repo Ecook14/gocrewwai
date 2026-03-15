@@ -7,6 +7,7 @@ import (
 
 	"github.com/Ecook14/gocrewwai/pkg/agents"
 	"github.com/Ecook14/gocrewwai/pkg/crew"
+	"github.com/Ecook14/gocrewwai/pkg/core"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/tasks"
 )
@@ -33,7 +34,7 @@ func main() {
 
 	// Use Reflective process for manager review
 	myCrew := crew.NewCrew(
-		[]*agents.Agent{writer},
+		[]core.Agent{writer},
 		[]*tasks.Task{task},
 		crew.WithProcess(crew.Reflective),
 		crew.WithVerbose(true),

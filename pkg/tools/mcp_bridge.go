@@ -2,7 +2,7 @@ package tools
 
 import (
 	"context"
-
+	"fmt"
 	"github.com/Ecook14/gocrewwai/pkg/protocols"
 )
 
@@ -80,11 +80,86 @@ func (t *mcpToolAdapter) Execute(ctx context.Context, input map[string]interface
 	return text, nil
 }
 
-// ArgsSchema returns nil for MCP tools as schema is managed by the remote server.
-func (t *mcpToolAdapter) ArgsSchema() []ArgSchema { return nil }
+// ArgsSchema returns the translated schema from the remote MCP server.
+func (t *mcpToolAdapter) ArgsSchema() []ArgSchema {
+	if t.def.InputSchema == nil {
+		return nil
+	}
+	
+	properties, ok := t.def.InputSchema["properties"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+
+	required, _ := t.def.InputSchema["required"].([]interface{})
+	isRequired := func(name string) bool {
+		for _, r := range required {
+			if s, ok := r.(string); ok && s == name {
+				return true
+			}
+		}
+		return false
+	}
+
+	var schema []ArgSchema
+	for name, details := range properties {
+		prop, _ := details.(map[string]interface{})
+		arg := ArgSchema{
+			Name:        name,
+			Description: fmt.Sprintf("%v", prop["description"]),
+			Required:    isRequired(name),
+			Type:        fmt.Sprintf("%v", prop["type"]),
+		}
+		schema = append(schema, arg)
+	}
+	return schema
+}
 
 // CacheFunction returns "" by default for MCP tools.
 func (t *mcpToolAdapter) CacheFunction(input map[string]interface{}) string { return "" }
+
+// WrapMCPResource wraps a discovered MCP resource into a specialized reader tool.
+func WrapMCPResource(client *protocols.MCPClient, def protocols.MCPResourceDefinition) Tool {
+	return &mcpResourceAdapter{
+		client: client,
+		def:    def,
+	}
+}
+
+type mcpResourceAdapter struct {
+	client *protocols.MCPClient
+	def    protocols.MCPResourceDefinition
+}
+
+func (t *mcpResourceAdapter) Name() string {
+	return fmt.Sprintf("read_%s", t.def.Name)
+}
+
+func (t *mcpResourceAdapter) Description() string {
+	return fmt.Sprintf("Reads the content of the resource: %s. Use this to inspect static data, logs, or schemas.", t.def.Description)
+}
+
+func (t *mcpResourceAdapter) RequiresReview() bool { return false }
+
+func (t *mcpResourceAdapter) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
+	contents, err := t.client.ReadResource(ctx, t.def.URI)
+	if err != nil {
+		return "", err
+	}
+
+	var result string
+	for _, c := range contents {
+		if c.Text != "" {
+			result += c.Text + "\n"
+		} else if c.Blob != "" {
+			result += "[Binary Data: " + c.Blob + "]\n"
+		}
+	}
+	return result, nil
+}
+
+func (t *mcpResourceAdapter) ArgsSchema() []ArgSchema { return nil }
+func (t *mcpResourceAdapter) CacheFunction(input map[string]interface{}) string { return "" }
 
 // RegisterAllToolsOnMCPServer registers all Gocrew tools from a registry onto an MCP server.
 func RegisterAllToolsOnMCPServer(mcpServer *protocols.MCPServer, registry *ToolRegistry) {

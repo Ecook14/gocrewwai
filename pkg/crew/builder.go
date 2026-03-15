@@ -2,6 +2,7 @@ package crew
 
 import (
 	"github.com/Ecook14/gocrewwai/pkg/agents"
+	"github.com/Ecook14/gocrewwai/pkg/core"
 	"github.com/Ecook14/gocrewwai/pkg/tasks"
 )
 
@@ -20,7 +21,9 @@ func NewCrewBuilder() *CrewBuilder {
 }
 
 func (b *CrewBuilder) Agents(a ...*agents.Agent) *CrewBuilder {
-	b.crew.Agents = append(b.crew.Agents, a...)
+	for _, agent := range a {
+		b.crew.Agents = append(b.crew.Agents, agent)
+	}
 	return b
 }
 
@@ -34,7 +37,7 @@ func (b *CrewBuilder) Process(p ProcessType) *CrewBuilder {
 	return b
 }
 
-func (b *CrewBuilder) Manager(m *agents.Agent) *CrewBuilder {
+func (b *CrewBuilder) Manager(m core.Agent) *CrewBuilder {
 	b.crew.ManagerAgent = m
 	return b
 }
