@@ -39,6 +39,7 @@ type AgentConfig struct {
 	Backstory            string
 	LLM                  llm.Client
 	Tools                []tools.Tool
+	Memory               memory.Store
 	Verbose              bool
 	AllowDelegation      bool
 	MaxIterations        int
@@ -297,6 +298,7 @@ func New(cfg AgentConfig) *Agent {
 		TrainingMode:         cfg.TrainingMode,
 		TrainingDir:          cfg.TrainingDir,
 		BeforeLLMCall:        cfg.BeforeLLMCall,
+		Memory:               cfg.Memory,
 	}
 
 	if cfg.UseSystemPrompt != nil {
@@ -416,14 +418,14 @@ func New(cfg AgentConfig) *Agent {
 					// 1. Inject Tools with Filtering
 					for _, toolDef := range client.Tools {
 						if isAllowed(toolDef.Name, cfg.MCPAllowList, cfg.MCPBlockList) {
-							a.Tools = append(a.Tools, tools.WrapMCPToolForCrewGo(client, toolDef))
+							a.Tools = append(a.Tools, protocols.WrapMCPToolForCrewGo(client, toolDef))
 						}
 					}
 
 					// 2. Inject Resources as Tools with Filtering
 					for _, resDef := range client.Resources {
 						if isAllowed(resDef.Name, cfg.MCPAllowList, cfg.MCPBlockList) {
-							a.Tools = append(a.Tools, tools.WrapMCPResource(client, resDef))
+							a.Tools = append(a.Tools, protocols.WrapMCPResource(client, resDef))
 						}
 					}
 
@@ -608,6 +610,11 @@ func (a *Agent) GetLLM() llm.Client {
 
 func (a *Agent) GetToolCount() int {
 	return len(a.Tools)
+}
+
+// Equip allows adding tools to an agent after it has been initialized.
+func (a *Agent) Equip(tools ...tools.Tool) {
+	a.Tools = append(a.Tools, tools...)
 }
 
 // Execute handles running a task, converting from `async def execute_task()`.

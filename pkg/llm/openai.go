@@ -26,6 +26,7 @@ type OpenAIOptions struct {
 type OpenAIClient struct {
 	APIKey     string
 	client     *openai.Client
+	config     openai.ClientConfig // Store config for reconfiguration
 	HTTPClient *http.Client
 }
 
@@ -54,7 +55,7 @@ func (r *retryRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 		
 		if err != nil {
 			// Network err
-		} else if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500 {
+		} else if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusForbidden || resp.StatusCode >= 500 {
 			// Only close if we are going to retry
 			if i < r.maxRetries {
 				resp.Body.Close()
@@ -64,7 +65,26 @@ func (r *retryRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 		}
 
 		if i < r.maxRetries {
-			delay := time.Duration(1<<i) * time.Second 
+			// GENERous BACKOFF: Special handling for Quota/Total Limits (403)
+			baseDelay := 1 * time.Second
+			if resp != nil && resp.StatusCode == http.StatusForbidden {
+				// Peek at body to see if it's a hard "total limit exceeded"
+				if resp.Body != nil {
+					bodyBytes, _ := io.ReadAll(resp.Body)
+					bodyStr := strings.ToLower(string(bodyBytes))
+					
+					// Re-wrap body for potential next retry or return
+					resp.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+					if strings.Contains(bodyStr, "total limit exceeded") || strings.Contains(bodyStr, "key limit exceeded") {
+						slog.Error("CRITICAL: Hard API Quota Reached. Failing fast to trigger secondary model fallback.", slog.String("provider", r.providerName))
+						return resp, nil // Exit retry loop immediately
+					}
+				}
+				baseDelay = 10 * time.Second // Shorter wait for non-fatal 403s
+			}
+
+			delay := time.Duration(1<<i) * baseDelay
 			if resp != nil {
 				if retryAfter := resp.Header.Get("Retry-After"); retryAfter != "" {
 					if parsed, pErr := time.ParseDuration(retryAfter + "s"); pErr == nil {
@@ -103,7 +123,7 @@ func NewOpenAIClient(apiKey string) *OpenAIClient {
 		Timeout: 300 * time.Second,
 		Transport: &retryRoundTripper{
 			next:         http.DefaultTransport,
-			maxRetries:   5,
+			maxRetries:   4,
 			providerName: "OpenAI",
 		},
 	}
@@ -114,8 +134,16 @@ func NewOpenAIClient(apiKey string) *OpenAIClient {
 	return &OpenAIClient{
 		APIKey:     apiKey,
 		client:     openai.NewClientWithConfig(config),
+		config:     config,
 		HTTPClient: httpClient,
 	}
+}
+
+// WithBaseURL allows reconfiguring the client's endpoint (e.g. for Ollama or local proxies).
+func (c *OpenAIClient) WithBaseURL(url string) *OpenAIClient {
+	c.config.BaseURL = url
+	c.client = openai.NewClientWithConfig(c.config)
+	return c
 }
 
 // Generate implements basic message generation with Multimodal (Vision) support.

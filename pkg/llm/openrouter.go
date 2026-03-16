@@ -5,14 +5,15 @@ import (
 	"net/http"
 	"os"
 	"time"
-
+	"fmt"
 	"github.com/sashabaranov/go-openai"
 )
 
 // OpenRouterClient leverages the OpenAI-compatible API of OpenRouter.
 type OpenRouterClient struct {
 	*OpenAIClient
-	DefaultModel string
+	DefaultModel          string
+	DefaultEmbeddingModel string
 }
 
 // NewOpenRouterClient creates a client configured for OpenRouter.
@@ -35,7 +36,8 @@ func NewOpenRouterClient(apiKey, model string) *OpenRouterClient {
 		Timeout: 300 * time.Second,
 		Transport: &retryRoundTripper{
 			next: &openRouterHeaderRoundTripper{
-				next: http.DefaultTransport,
+				next:   http.DefaultTransport,
+				APIKey: apiKey,
 			},
 			maxRetries:   5,
 			providerName: "OpenRouter",
@@ -43,22 +45,29 @@ func NewOpenRouterClient(apiKey, model string) *OpenRouterClient {
 	}
 	config.HTTPClient = httpClient
 
-	return &OpenRouterClient{
+	c := &OpenRouterClient{
 		OpenAIClient: &OpenAIClient{
 			APIKey:     apiKey,
 			client:     openai.NewClientWithConfig(config),
 			HTTPClient: httpClient,
 		},
-		DefaultModel: model,
+		DefaultModel:          model,
+		DefaultEmbeddingModel: os.Getenv("OPENROUTER_EMBEDDING_MODEL"),
 	}
+	if c.DefaultEmbeddingModel == "" {
+		c.DefaultEmbeddingModel = "nvidia/llama-nemotron-embed-vl-1b-v2:free"
+	}
+	return c
 }
 
 // openRouterHeaderRoundTripper adds required OpenRouter headers
 type openRouterHeaderRoundTripper struct {
-	next http.RoundTripper
+	next   http.RoundTripper
+	APIKey string
 }
 
 func (r *openRouterHeaderRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	req.Header.Set("Authorization", "Bearer "+r.APIKey)
 	req.Header.Set("HTTP-Referer", "https://gocrewwai.com")
 	req.Header.Set("X-OpenRouter-Title", "Gocrewwai Framework")
 	return r.next.RoundTrip(req)
@@ -110,4 +119,28 @@ func (c *OpenRouterClient) StreamGenerate(ctx context.Context, messages []Messag
 		options["model"] = c.DefaultModel
 	}
 	return c.OpenAIClient.StreamGenerate(ctx, messages, options)
+}
+
+// GenerateEmbedding overrides the base OpenAI embedding to use OpenRouter-specific free models.
+func (c *OpenRouterClient) GenerateEmbedding(ctx context.Context, text string) ([]float32, error) {
+	req := openai.EmbeddingRequest{
+		Input: []string{text},
+		Model: openai.EmbeddingModel(c.DefaultEmbeddingModel),
+	}
+
+	resp, err := c.OpenAIClient.client.CreateEmbeddings(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(resp.Data) == 0 {
+		return nil, fmt.Errorf("no embedding data returned from OpenRouter")
+	}
+
+	return resp.Data[0].Embedding, nil
+}
+// WithBaseURL allows reconfiguring the client's endpoint.
+func (c *OpenRouterClient) WithBaseURL(url string) *OpenRouterClient {
+	c.OpenAIClient.WithBaseURL(url)
+	return c
 }

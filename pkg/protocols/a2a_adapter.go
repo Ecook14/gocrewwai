@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Ecook14/gocrewwai/pkg/core"
+	"github.com/Ecook14/gocrewwai/pkg/tools"
 )
 
 var _ core.Agent = (*RemoteAgentAdapter)(nil)
@@ -47,6 +48,11 @@ func (a *RemoteAgentAdapter) GetUsageMetrics() map[string]int {
 
 func (a *RemoteAgentAdapter) GetToolCount() int {
 	return 0 // Remote tool counts shared via capability discovery phase if needed
+}
+
+// Equip satisfies core.Agent. Remote agents manage their own tools externally.
+func (a *RemoteAgentAdapter) Equip(tools ...tools.Tool) {
+	// Remote agents handle their own tools
 }
 
 func (a *RemoteAgentAdapter) Execute(ctx context.Context, input string, options map[string]interface{}) (interface{}, error) {

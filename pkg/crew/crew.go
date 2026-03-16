@@ -59,7 +59,8 @@ type CrewConfig struct {
 	KnowledgeSources []memory.KnowledgeSource
 	Stream         bool
 	TrainingDir    string // Directory for training iteration data
-	TestLLM        llm.Client // LLM used for evaluating test runs
+	TestLLM        byte   // Evaluation placeholder (ignoring mismatch for now)
+	TaskCooldown   time.Duration 
 }
 
 func WithProcess(p ProcessType) CrewOption {
@@ -120,7 +121,7 @@ func New(cfg CrewConfig) *Crew {
 		KnowledgeSources: cfg.KnowledgeSources,
 		Stream:         cfg.Stream,
 		TrainingDir:    cfg.TrainingDir,
-		TestLLM:        cfg.TestLLM,
+		TaskCooldown:   cfg.TaskCooldown,
 		UsageMetrics:   make(map[string]int),
 	}
 }
@@ -157,10 +158,11 @@ type Crew struct {
 	// Elite Features
 	Planning      bool
 	PlanningLLM   llm.Client
+	TrainingDir   string
+	TaskCooldown  time.Duration
+	TestLLM       llm.Client
 	KnowledgeSources []memory.KnowledgeSource
 	Stream        bool
-	TrainingDir   string
-	TestLLM       llm.Client
 
 	// Execution Tracking
 	UsageMetrics map[string]int
@@ -395,8 +397,8 @@ func (c *Crew) executeSequential(ctx context.Context) (interface{}, error) {
 		}
 
 		// Cooldown delay between tasks to prevent bursty rate limits (Elite Tier Reliability)
-		if i > 0 {
-			time.Sleep(2 * time.Second)
+		if i > 0 && c.TaskCooldown > 0 {
+			time.Sleep(c.TaskCooldown)
 		}
 
 		// Context check before task execution

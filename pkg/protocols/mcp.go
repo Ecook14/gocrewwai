@@ -103,7 +103,7 @@ type HTTPTransport struct {
 func NewHTTPTransport(url string) *HTTPTransport {
 	return &HTTPTransport{
 		URL:        url,
-		httpClient: &http.Client{Timeout: 30 * time.Second},
+		httpClient: &http.Client{Timeout: 10 * time.Minute},
 		Headers:    make(map[string]string),
 	}
 }
@@ -794,6 +794,7 @@ func (s *MCPServer) handleSSE(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *MCPServer) handleMessage(w http.ResponseWriter, r *http.Request) {
+	slog.Info("[📥 MCP REQUEST]", slog.String("method", r.Method), slog.String("path", r.URL.Path), slog.String("remote", r.RemoteAddr))
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return

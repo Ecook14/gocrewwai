@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"log/slog"
 	"path/filepath"
 	"strings"
 	"time"
@@ -23,9 +24,10 @@ import (
 
 // IngestionEngine takes physical files, chunks them, and saves them into the Agent's Vector Memory.
 type IngestionEngine struct {
-	Store    memory.Store
-	LLM      llm.Client // Used purely for the vector Translation
-	Splitter *TokenSplitter
+	Store          memory.Store
+	LLM            llm.Client // Used purely for the vector Translation
+	Splitter       *TokenSplitter
+	ThroughputDelay time.Duration // Mandatory delay between chunks
 }
 
 // IngestDirectory reads all supported files in a directory and loads them.
@@ -298,6 +300,14 @@ func (ie *IngestionEngine) storeChunks(ctx context.Context, source string, chunk
 		if strings.TrimSpace(chunk) == "" {
 			continue
 		}
+
+		// THROTTLE: Respect generous rate limits if delay is configured
+		if ie.ThroughputDelay > 0 && i > 0 {
+			slog.Info("Throttling ingestion...", slog.Duration("delay", ie.ThroughputDelay))
+			time.Sleep(ie.ThroughputDelay)
+		}
+
+		slog.Info("Embedding chunk...", slog.Int("index", i+1), slog.Int("total", len(chunks)), slog.String("source", source))
 
 		embedder, ok := ie.LLM.(llm.Embedder)
 		if !ok {
