@@ -11,6 +11,7 @@ import (
 	"time"
 	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/sashabaranov/go-openai"
 )
