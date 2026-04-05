@@ -1,78 +1,61 @@
-# Feature Deep Dive: Model Context Protocol (MCP) 🌐
+# Feature Deep Dive: MCP Hub ⚓🧰🌐
 
-Hey there! Let's talk about one of the most bleeding-edge, enterprise-tier features we've built into Gocrew: native support for the **Model Context Protocol (MCP)**.
-
-If you haven't heard of it yet, MCP is a massive new open-source standard created by Anthropic. Think of it like a "USB-C port for AI applications." 
-
-Instead of writing custom Go code to wrap every single API in the world (like writing a custom Jira tool, a custom Salesforce tool, etc.), MCP allows external servers to broadcast a standard definition of what tools they offer. Our agents can then discover those tools and seamlessly execute them over HTTP or JSON-RPC!
+Model Context Protocol (MCP) is the industry standard for connecting AI agents to external tools and data sources. Gocrewwai provides first-class, high-performance support for MCP, acting as a powerful **MCP Hub**.
 
 ---
 
-## 🔌 Why did we build this into Crew-GO?
+> [!IMPORTANT]
+> **Status: v1.0.0 (Stable).** Gocrewwai supports **HTTP**, **Stdio**, and **SSE (Server-Sent Events)** MCP transports with native tool filtering and validation.
 
-By adopting WebMCP and native MCP natively in `pkg/protocols/mcp.go`, **Gocrew transitions from being an isolated "script" to a fully integrated Service Mesh for AI.**
+---
 
-We've implemented this protocol in BOTH directions!
+## 🏗️ The Gocrewwai MCP Architecture
 
-### 1. The MCP Client (Agent Consumption)
-Crew-GO agents can connect to external infrastructure (e.g., a Python or Rust MCP Server running securely inside your company's VPC) to dynamically discover and execute tools they don't natively possess.
+Gocrewwai allows agents to consume tools from any remote MCP server with zero code changes.
+
+| Transport | Gocrewwai Implementation | Best Use Case |
+| :--- | :--- | :--- |
+| **Stdio** | Native local command execution | Running CLI tools or local Python scripts. |
+| **HTTP** | Standard JSON-RPC over HTTP | Connecting to remote SaaS tool APIs. |
+| **SSE** | Real-time streaming transport | Long-running connections and enterprise tool hubs. |
+
+---
+
+## 🚀 Connecting to an MCP Server (Elite Style)
+
+Using the `gocrew` SDK, you can connect an agent to a remote MCP server in seconds:
 
 ```go
-// 1. Point the client at an existing internal tools MCP server.
-mcpClient := protocols.NewMCPClient("http://internal-tools.vpc:8080/mcp")
-mcpClient.Initialize(context.Background())
+package main
 
-// 2. Use our built-in bridge to convert the remote tool into a Crew-GO Native Tool!
-remoteTools := mcpClient.ListTools()
-wrappedTool := tools.WrapMCPToolForCrewGo(mcpClient, remoteTools[0])
+import "github.com/Ecook14/gocrewwai/gocrew"
 
-// 3. Hand the dynamically discovered tool to the Agent!
-agent := gocrew.NewAgentBuilder().
-    Role("IT Admin").
-    Tools(wrappedTool).
-    Build()
+func main() {
+    // 1. Initialize MCP Client (Stdio transport)
+    mcpClient, _ := gocrew.NewMCPClient("python", "path/to/server.py")
+    defer mcpClient.Close()
+
+    // 2. Discover and Add Remote Tools to Agent
+    agent := gocrew.NewAgent(gocrew.AgentConfig{
+        Role:  "MCP-Enabled Researcher",
+        Tools: mcpClient.GetTools(), // Fetch all remote tools!
+    })
+}
 ```
 
-### 2. The MCP Server (Exposing Crew-GO Tools)
-What if you already have agents running in another framework (like LangChain, or Claude Desktop), but you want them to use Crew-GO's lightning-fast, ultra-secure WASM sandboxes or native Web Browsers?
+## 🛡️ MCP Tool Filtering & Security
 
-You can deploy your Crew-GO binary purely as a headless tool-server!
+Gocrewwai gives you granular control over which remote tools an agent is allowed to execute.
 
-```go
-server := protocols.NewMCPServer()
+### 1. Allow/Block Lists
+Explicitly define the specific MCP tools that an agent can see and use. This prevents "Tool Overload" and ensures that sensitive tools are only available to authorized agents.
 
-// Expose our amazing Go tools to the world!
-tools.RegisterAllToolsOnMCPServer(server, myToolRegistry)
+### 2. Native Validation
+All MCP tool results are automatically validated against the agent's internal reasoning loop. This prevents "Tool Hallucination" and ensures that the agent correctly understands the remote output.
 
-// Start listening for standard JSON-RPC HTTP requests
-log.Println("Gocrew MCP Server listening on :8080")
-http.ListenAndServe(":8080", server.Handler())
-```
-
-### 3. Native Asynchronous Transports
-The v0.9 MCP engine supports hardened, fully asynchronous background transports:
-- **StdioTransport**: Manages local subprocesses with non-blocking background reader loops.
-- **SSETransport**: Consumes Server-Sent Events natively and auto-discovers dual-channel POST endpoints.
-
-### 4. Enterprise Hardening
-- **Bidirectional Sampling**: Remote servers can request LLM completions *from* the Crew-GO agent, making the server "smarter".
-- **Resource Adapters**: Expose static internal databases, files, and schemas to agents dynamically as readable "Resources".
-- **Dynamic Prompts**: Combine MCP Prompts with Agent Backstories on-the-fly.
+### 3. Human-in-the-Loop
+Configure specific MCP tools (e.g., `git.delete_branch`) to require manual approval before execution via the **Dashboard**.
 
 ---
 
-## 🌟 The new WebMCP Standard
-
-We didn't stop at standard JSON-RPC servers. We also integrated the brand new **WebMCP** standard. 
-
-If a website (like an internal corporate dashboard) includes a tiny HTML `<script type="application/mcp+json">` tag describing its APIs, you can simply hand an agent our `WebMCPTool`. The agent will autonomously visit the URL, parse the HTML, discover what buttons/APIs the website allows it to push, and natively format the HTTP requests to execute them! 
-
-Zero fragile HTML scraping required.
-
----
-
-## 🤝 Let's Push the Protocol Forward!
-
-This protocol is incredibly new and evolving rapidly. If you are passionate about distributed systems, IPC, or AI interoperability, this is the perfect place to jump into the codebase.
-
-Check out `pkg/protocols/mcp.go` and `pkg/protocols/webmcp.go`. If you find ways to optimize the JSON-RPC marshaling, or if you want to add support for raw STDIO transports (for running local MCP binaries), **I am explicitly asking for your help!** Submit a Pull Request and let's build the ultimate AI mesh network.
+[Back to Delegation Guide](./agent_delegation.md) | [Next: Events](./events.md)

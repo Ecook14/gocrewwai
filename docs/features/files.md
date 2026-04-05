@@ -1,46 +1,49 @@
-# Feature Deep Dive: File Handling 📂
+# Feature Deep Dive: Files ⚓📄🖼️
 
-Gocrew provides a sophisticated, multi-modal file system designed to bridge the gap between local storage and LLM context windows.
-
----
-
-## 🏗️ Typed File Objects
-
-In Gocrew, files are not just strings. They are structured objects that understand their own content and constraints.
-
-### Supported File Types
-- **TextFile**: Standard `.txt`, `.md`, `.go`, `.py` files.
-- **PDFFile**: Handled via local parsers or LLM vision capabilities.
-- **ImageFile**: Supports JPEG, PNG (with automatic Base64 encoding for vision models).
-- **VideoFile / AudioFile**: Managed via provider-specific upload URI systems (e.g., Gemini's File API).
+Gocrewwai features advanced, multi-modal file handling capabilities. Agents can read, write, and process a wide range of file formats, including PDF, images, CSV, and structured data, with native support for **Sandboxed File Systems**.
 
 ---
 
-## 🛠️ Attaching Files to Tasks
+> [!IMPORTANT]
+> **Status: v1.0.0 (Stable).** Gocrewwai agents support **Vision-based Processing** for images and PDF tables, with strictly-to-typed extraction logic.
 
-You can provide files directly to a task context. Gocrew handles the heavy lifting of reading, chunking, or uploading based on the target LLM.
+---
+
+## 🏗️ Core File Operations (Elite Style)
+
+Gocrewwai provides specialized tools for common file operations, ensuring that agents can interact with your data safely and efficiently.
+
+| Tool | SDK Constructor | Description |
+| :--- | :--- | :--- |
+| **File Read** | `gocrew.NewFileReadTool` | Safe, chrooted reading of local text and data files. |
+| **PDF Parser** | `gocrew.NewPDFTool` | High-fidelity extraction of text, tables, and metadata. |
+| **Directory Scan** | `gocrew.NewDirectoryTool` | Batch processing of entire folder structures. |
+| **Vision Browser** | `gocrew.NewBrowserTool` | Captures and analyzes screenshots of web pages. |
+
+## 🚀 Implementing File Handling
+
+Pass the file-related tools to your agent and define a task that requires file interaction:
 
 ```go
-task := gocrew.NewTaskBuilder().
-    Description("Analyze this invoice.").
-    Files(gocrew.NewPDFFile("./invoice.pdf")).
-    Build()
+agent := gocrew.NewAgent(gocrew.AgentConfig{
+    Tools: []gocrew.Tool{gocrew.NewFileReadTool(), gocrew.NewPDFTool()},
+})
+
+task := gocrew.NewTask(gocrew.TaskConfig{
+    Description: "Read the 'report.pdf' and extract all table data into a CSV file.",
+    Agent:       agent,
+    OutputFile:  "output/results.csv", // Automatic file writing!
+})
 ```
 
----
+## 🧠 Multi-Modal Vision Processing
 
-## 🛡️ Provider Constraints
+If you are using a vision-capable model (like `gpt-4o` or `claude-3.5-sonnet`), Gocrewwai can automatically process image-based data:
 
-Different LLMs have different rules for files. Gocrew handles these automatically:
-- **OpenAI**: Automatically converts images to Base64 data URIs.
-- **Gemini**: Uses the specialized Gemini File API for large videos/PDFs to prevent context window bloat.
-- **Anthropic**: Manages document blocks according to the latest Claude specifications.
-
----
-
-## 🧹 Auto-Cleanup
-
-By default, temporary files or remote uploads are managed by Gocrew's `pkg/files` lifecycle controller. You can configure retention policies or manual cleanup if needed.
+1. **Image Injection**: Pass image URLs or base64 data into the agent's context.
+2. **Vision Reasoning**: The agent will "see" the image and incorporate it into its reasoning loop.
+3. **Table Extraction**: Gocrewwai's PDF tool can leverage vision models to extract complex tables from scanned PDF documents that traditional parsers might miss.
 
 ---
-**Gocrew** - Seamless multi-modal data orchestration.
+
+[Back to Tools Guide](./tools.md) | [Next: Production](./production.md)

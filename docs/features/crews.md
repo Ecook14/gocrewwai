@@ -1,55 +1,65 @@
-# Feature Deep Dive: Crews 👥
+# Feature Deep Dive: Crews ⚓⛴️
 
-A **Crew** represents a team of agents working together to accomplish a set of tasks. It is the top-level orchestrator that manages the flow of information and execution.
+A Crew is the core orchestration unit in Gocrewwai. It represents a collaborative group of agents working together to solve a sequence of tasks using a specific execution strategy.
 
 ---
 
-## 🏗️ The Crew Builder
+> [!IMPORTANT]
+> **Status: v1.0.0 (Stable).** Gocrewwai crews support **Sequential**, **Hierarchical**, and **Graph-based** orchestration with native **OpenTelemetry** tracing.
 
-Construct your team using the `CrewBuilder`.
+---
+
+## 🏗️ The Crew Config (Elite Style)
+
+In Gocrewwai v1.0, crews are constructed using the `CrewConfig` struct, providing a clean, declarative interface.
 
 ```go
-myCrew := gocrew.NewCrewBuilder().
-    Agents(researcher, writer).
-    Tasks(researchTask, writeTask).
-    Process(gocrew.Sequential).
-    Verbose(true).
-    Build()
+myCrew := gocrew.NewCrew(gocrew.CrewConfig{
+    Agents:      []gocrew.CoreAgent{researcher, writer},
+    Tasks:       []*gocrew.Task{researchTask, writingTask},
+    Process:     gocrew.Sequential,
+    ManagerLLM:  gpt4o, // Required only for Hierarchical orchestration
+    Verbose:     true,
+    Planning:    true,  // Enable pre-execution task planning
+})
+
+result, err := myCrew.Kickoff(ctx)
 ```
 
 ### Key Parameters
 
-- **Agents (`[]core.Agent`)**: The list of all "member" agents in the crew.
-- **Tasks (`[]*Task`)**: The sequence or graph of tasks to be executed.
-- **Process (`ProcessType`)**: The orchestration strategy (Sequential, Hierarchical, etc.).
-- **Manager (`core.Agent`)**: (Optional) A specific agent to act as the manager in Hierarchical processes.
-- **StateFile (`string`)**: Persists the crew's state to disk, allowing for resumable executions.
-- **StepCallback**: A global hook that fires after every agent action, perfect for real-time monitoring.
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| **Agents** | `[]CoreAgent` | The slice of agents participating in the crew. |
+| **Tasks** | `[]*Task` | The sequence of tasks to be performed. |
+| **Process** | `ProcessType` | The orchestration strategy (Sequential, Hierarchical, Graph). |
+| **ManagerLLM** | `LLMClient` | The LLM used for hierarchical delegation and synthesis. |
+| **Verbose** | `bool` | Enables detailed logging of the crew's orchestration steps. |
+| **MaxRPM** | `int` | Global rate limit to prevent API throttling during execution. |
+| **Planning** | `bool` | Enables a pre-execution planning phase to optimize task division. |
 
 ---
 
-## 🚦 Execution Modes (Processes)
+## 🧩 Orchestration Processes
 
-Gocrew supports several ways to organize your team's workflow:
+### ⚖️ Sequential (Default)
+Agents work in a pre-defined order, passing their results to the next task's assigned agent. This is best for linear workflows.
 
-1. **Sequential**: Tasks are executed one by one in the order they appear.
-2. **Hierarchical**: Tasks run in parallel, managed by an automated (or custom) manager agent.
-3. **Consensual**: Agents debate the task output until they reach a consensus.
-4. **StateMachine**: Tasks are executed based on conditional logic and state transitions (DAGs with cycles).
+### 👑 Hierarchical
+A **Manager Agent** is automatically created to orchestrate the team. The manager delegates tasks dynamically based on agent goals and reviews the output of each agent before moving on.
 
----
-
-## 📊 Telemetry & Observability
-
-Crews are equipped with deep telemetry. Every action, thought, and tool call is captured as an **Event** (`pkg/events`).
-- **Dashboard**: Start `dashboard.Start("8080")` to watch your crew work in real-time.
-- **GlobalBus**: Subscribe to `gocrew.GlobalBus` to pipe crew events into your own monitoring stack.
+### 📈 Graph
+Utilizes a dynamic state machine to determine the next step based on real-time task results. This enables non-linear workflows and cyclic loops.
 
 ---
 
-## 💾 Saving Progress
+## 📊 Crew Observability
 
-By setting `StateFile`, you can ensure that your crew's progress is saved. If an execution is interrupted, Gocrew can reload the state and resume from the last completed task.
+Every crew execution in Gocrewwai is automatically instrumented with **OpenTelemetry**. This includes:
+1. **Trace Spans**: Every agent thought, tool execution, and task handoff is captured as a span.
+2. **Token Metrics**: Total token usage and cost are aggregated across the entire crew run.
+3. **Execution Metadata**: Detailed logs of inputs, outputs, and internal reasoning.
 
 ---
-**Gocrew** - High-performance orchestration for agent fleets.
+
+[Back to index](../index.md) | [Next: Processes](./processes.md)

@@ -1,52 +1,61 @@
-# Feature Deep Dive: Automated Testing 🧪
+# Feature Deep Dive: Testing & Evaluation ⚓🧪🛡️
 
-Gocrew provides a specialized **Testing Framework** (`pkg/testing`) designed for evaluating agentic workflows, where output is non-deterministic and performance must be measured over multiple runs.
-
----
-
-## 🏗️ Multi-Run Evaluation
-
-Traditional unit tests are often insufficient for LLMs. Gocrew's testing system performs **Multi-Run Benchmarking**:
-
-1. **Iteration**: The test runner executes the same crew/task `N` times (e.g., 10 iterations).
-2. **Metrics Collection**: It captures latency, token usage, and tool success rates for every run.
-3. **Objective Evaluation**: A specialized `TestLLM` (usually a powerful model like GPT-4o) acts as a "Grader," scoring the output based on your specific criteria.
-4. **Statistical Aggregation**: The framework calculates the average score, variance, and failure rate across all iterations.
+Reliability is the greatest challenge in agentic AI. Gocrewwai addresses this with a native, high-performance testing and evaluation framework that allows you to measure agent reasoning and mission success at scale.
 
 ---
 
-## 🛠️ Running Tests via CLI
-
-The easiest way to test your crew is via the CLI.
-
-```bash
-# Run 10 iterations of the crew and evaluate performance
-gocrew test --n 10 --model gpt-4o
-```
+> [!IMPORTANT]
+> **Status: v1.0.0 (Stable).** Gocrewwai testing supports **Multi-run Evaluation**, **Task Scoring**, and **Regreession Tracing** via OpenTelemetry.
 
 ---
 
-## 📊 Performance Metrics
+## 🏗️ Core Testing Concepts
 
-Gocrew tests output a detailed JSON report including:
-- **Score (0-10)**: The LLM-graded quality of the final result.
-- **Consistency**: How much the results varied across runs.
-- **RPM/TPM Usage**: Real-world resource consumption.
-- **Tool Reliability**: Frequency of tool call failures or retries.
+### 1. Multi-run Evaluation
+To account for LLM non-determinism, Gocrewwai's testing engine can execute the same crew multiple times and aggregate the results. This provides a statistically significant measure of performance and reliability.
+
+### 2. Task Scoring & Grading
+Define custom "Grading Agents" whose sole job is to review and score the output of your primary agents. Gocrewwai provides a standard `pkg/testing` module for defining these evaluation criteria.
+
+### 3. Trace Comparisons
+By leveraging the native **OpenTelemetry** integration, you can compare the reasoning traces of different crew runs. This allows you to identify exactly where an agentic workflow "drifted" from the expected path.
 
 ---
 
-## 🧩 Programmatic Testing
+## 🚀 Implementing Agent Tests (Elite Style)
 
-You can also integrate Gocrew tests into your existing Go test suites.
+Using the `gocrew` SDK, you can define and run evaluations with ease:
 
 ```go
-tester := testing.NewTester(myCrew)
-report, err := tester.Run(ctx, 5) // Run 5 iterations
-if report.AverageScore < 8.0 {
-    t.Errorf("Agent performance below threshold: %f", report.AverageScore)
+package main
+
+import (
+    "github.com/Ecook14/gocrewwai/gocrew"
+    "github.com/Ecook14/gocrewwai/pkg/testing"
+)
+
+func main() {
+    // 1. Define the Evaluation Criteria
+    eval := testing.NewEvaluator(testing.EvaluatorConfig{
+        Agents:    []gocrew.CoreAgent{tester},
+        Criteria:  "The summary must be exactly 3 bullet points long.",
+        NumRuns:   10, // Run the crew 10 times
+    })
+
+    // 2. Run the Test
+    results := eval.Run(myCrew)
+    fmt.Printf("Average Score: %.2f%%\n", results.AverageScore)
 }
 ```
 
+## 🛡️ Production Safety & Regressions
+
+### 1. CI/CD Integration
+The `gocrew` CLI supports a `test` command that can be integrated into your CI/CD pipeline. These tests can fail the build if agentic performance drops below a critical threshold.
+
+### 2. Regression Tracking
+Store your evaluation results in a persistent database to track performance over time as you update your agent backstories or LLM models. Gocrewwai supports exporting these metrics directly to **Grafana** or **Datadog** via OTEL.
+
 ---
-**Gocrew** - Data-driven confidence in your agentic workflows.
+
+[Back to CLI Guide](./cli.md) | [Next: Training](./training.md)

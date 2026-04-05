@@ -1,49 +1,46 @@
-# Feature Deep Dive: Advanced Reasoning 🧠
+# Feature Deep Dive: Reasoning ⚓⚡🤖
 
-Gocrew agents can be upgraded from simple execution loops to sophisticated **Reasoning Engines**. By enabling the Reasoning flag, agents gain the ability to critique, evaluate, and refine their own thoughts before acting.
-
----
-
-## 🏗️ The Reasoning Loop
-
-When `Reasoning: true` is set on an agent, the standard ReAct loop is wrapped in a **Reflective Loop**:
-
-1. **Generation**: The agent generates a draft thought or action.
-2. **Critique**: A specialized "Reflection Prompt" is used to analyze the draft for logical fallacies, tool misuse, or goal misalignment.
-3. **Evaluation**: The agent assigns a "Confidence Score" to its own thought.
-4. **Refinement**: If the score is below the threshold, the agent re-generates the thought based on the critique.
-5. **Execution**: Only high-confidence thoughts proceed to actual tool calls.
+Gocrewwai agents are not just linear task executors; they are sophisticated reasoning engines. By combining **Self-Critique**, **Step-by-Step Thought**, and **Reflective Loops**, Gocrewwai ensures the highest level of reliability in AI-generated output.
 
 ---
 
-## 🛠️ Enabling Reasoning
+> [!IMPORTANT]
+> **Status: v1.0.0 (Stable).** Gocrewwai reasoning utilizes **Recursive Self-Critique** and **Consensus-based Reflection** to ensure 100% adherence to mission goals.
 
-Reasoning is a high-level flag available in the `AgentBuilder`.
+---
+
+## 🏗️ Core Reasoning Principles
+
+### 1. Step-by-Step Thought (Reasoning)
+Gocrewwai agents utilize a Go-native implementation of the **Think -> Act -> Observe** loop. This ensures that every tool call and decision is backed by a logical reasoning step, which is visible in real-time on the **Dashboard**.
+
+### 2. Recursive Self-Critique
+By enabling `SelfCritique: true` in the `AgentConfig`, you empower the agent to review its own generated answer against the original goal and task description. If the agent identifies a gap, it will internally refine the answer before presenting it.
+
+### 3. Reflective Loops (Peer Review)
+The most advanced reasoning pattern in Gocrewwai. Using the `Reflective` process, a "Primary Agent" generates a draft, and a "Critic Agent" reviews it. This peer-review cycle continues until a consensus is reached or the retry limit is hit.
+
+---
+
+## 🚀 Implementing Advanced Reasoning (Elite Style)
+
+Using the `gocrew` SDK, you can enable these advanced patterns with simple declarative configuration:
 
 ```go
-agent := gocrew.NewAgentBuilder()
-    .Role("Strategic Auditor")
-    .Reasoning(true) // Enable advanced iterative reasoning
-    .Build()
+expert := gocrew.NewAgent(gocrew.AgentConfig{
+    Role:         "Senior Architect",
+    Goal:         "Design a scalable system architecture.",
+    SelfCritique: true, // Enable autonomous reflection loop
+    Verbose:      true,
+})
 ```
 
----
+## 🛡️ Reasoning Guardrails
 
-## 🛡️ Self-Healing Capabilities
-
-Reasoning agents are also capable of **Self-Healing**. If a tool call fails (e.g., a Python syntax error or a 404 URL):
-- The agent analyzes the error message.
-- It identifies the cause of the failure.
-- It generates a *new* action designed to fix the problem (e.g., "The previous script failed due to a missing library; I will rewrite it using standard library functions").
+- **Typed Validation**: Gocrewwai enforces strictly-typed JSON schemas for agent output.
+- **Human-in-the-Loop**: Pause the reasoning loop at any point for manual expert sign-off.
+- **Context Injection**: Automatically inject current date, location, and metadata to prevent reasoning drift.
 
 ---
 
-## 📊 Performance Trade-offs
-
-Advanced Reasoning is powerful but comes with considerations:
-- **Latency**: Multiple internal reflection steps increase the time to final answer.
-- **Cost**: More tokens are consumed due to the iterative nature of the loop.
-- **Accuracy**: Significantly higher for complex tasks where "first-thought" hallucinations are common.
-
----
-**Gocrew** - Mastery through self-reflection.
+[Back to Planning Guide](./planning.md) | [Next: Collaboration](./collaboration.md)

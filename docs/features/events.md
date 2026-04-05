@@ -1,58 +1,52 @@
-# Feature Deep Dive: Event Lifecycle 📡
+# Feature Deep Dive: Events ⚓📢⚡
 
-Gocrew is built on a high-performance, asynchronous **Event Bus**. Every single action, thought, and tool call within the framework is broadcast as a typed event, enabling deep observability and real-time monitoring.
+Gocrewwai features a high-performance, asynchronous event system that allows you to hook into every aspect of an agent's lifecycle. Built with Go's native `chan` and `select` patterns, it ensures that your application stays responsive and informed during complex orchestrations.
 
 ---
 
-## 🏗️ The Global Event Bus
+> [!IMPORTANT]
+> **Status: v1.0.0 (Stable).** Gocrewwai events support **Real-time Callbacks**, **WebSocket Streams**, and **OpenTelemetry** audit logs.
 
-The `pkg/events` package provides a centralized message bus that you can subscribe to from anywhere in your application.
+---
+
+## 🏗️ Core Event Types
+
+Gocrewwai categorizes events based on the level of orchestration:
+
+| Category | Typical Events | Best Use Case |
+| :--- | :--- | :--- |
+| **Agent Events** | `Thought`, `Action`, `Observation` | Updating a TUI or dashboard terminal. |
+| **Task Events** | `Assigned`, `Completed`, `Failed` | Logging progress and handling task retries. |
+| **Crew Events** | `Started`, `Planning`, `Finished` | Tracking the overall mission lifecycle. |
+| **Tool Events** | `Call`, `Response`, `Error` | Monitoring high-risk tool interactions. |
+
+---
+
+## 🚀 Hooking into Events (Elite Style)
+
+Using the `gocrew` SDK, you can register global event handlers or individual step callbacks:
 
 ```go
-events.GlobalBus.Subscribe(func(ev events.Event) {
-    fmt.Printf("[%s] %s: %v\n", ev.Type, ev.Source, ev.Payload)
+agent := gocrew.NewAgent(gocrew.AgentConfig{
+    Role: "Event-Aware Researcher",
+    // 1. Step Callback (Fires on every thought/action)
+    StepCallback: func(event *gocrew.StepEvent) {
+        fmt.Printf("Agent Thought: %s\n", event.Thought)
+    },
+    // 2. Stream Callback (Fires for every new token)
+    StepStreamCallback: func(token string) {
+        fmt.Print(token) // Real-time token streaming
+    },
 })
 ```
 
----
+## 📊 Event Persistence & Auditing
 
-## 🚦 Common Event Types
-
-Gocrew emits over 40 lifecycle events. Here are the most critical ones:
-
-### Agent Events
-- **AgentTaskStarted**: When an agent begins a new mission.
-- **AgentThought**: A single reasoning step (the "inner monologue").
-- **AgentToolCall**: When an agent decides to use a tool.
-- **AgentReasoningStarted/Completed**: Tracks the Reflect -> Evaluate loop.
-
-### Task & Crew Events
-- **TaskCompleted**: Final result of a task is ready.
-- **CrewKickoffStarted**: The entire orchestration begins.
-- **CrewTaskParallelStarted**: Parallel execution branch starts in Hierarchical mode.
-
-### System Events
-- **LLMCallStarted/Completed**: Detailed timing and token usage for LLM requests.
-- **KnowledgeIngestionCompleted**: Confirmation that data is vectorized and ready.
-- **ErrorEvent**: Centralized bubbling of all non-fatal and fatal errors.
+All events generated during a crew execution are automatically:
+1. **Logged**: Available in the `Verbose` output and the **Dashboard**.
+2. **Traced**: Linked directly to the parent task and agent spans in **OpenTelemetry**.
+3. **Persisted**: (If enabled) Stored in the checkpoint database for historical audit logs.
 
 ---
 
-## 📊 Powering the Dashboard
-
-The **Glassmorphic Dashboard** is a direct consumer of the Global Event Bus. By subscribing to the bus via WebSockets, the dashboard provides:
-- **Real-time Thought Streams**: See what the agent is thinking *as it happens*.
-- **Tool Traceability**: Watch tool inputs and outputs in the browser.
-- **Progress Tracking**: Visual Gantt-style charts of task completion.
-
----
-
-## 🛠️ Custom Observers
-
-Because the bus is a simple subscription model, you can easily pipe Gocrew events into:
-- **OpenTelemetry**: For distributed tracing.
-- **Prometheus**: For monitoring token usage and latency.
-- **Slack/Discord**: For real-time notifications of task completions or errors.
-
----
-**Gocrew** - Total visibility through event-driven design.
+[Back to MCP Guide](./mcp.md) | [Next: Telemetry](./telemetry.md)

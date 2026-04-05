@@ -1,58 +1,67 @@
-# Feature Deep Dive: Tasks 📋
+# Feature Deep Dive: Tasks ⚓📋
 
-Tasks are the fundamental units of work in Gocrew. They define exactly what needs to be accomplished and which agent is responsible for the mission.
+Tasks are the specific units of work that your agents must perform. In Gocrewwai, tasks are more than just string descriptions; they are highly structured objects that manage context, schemas, and output validation.
 
 ---
 
-## 🏗️ The Task Builder
+> [!IMPORTANT]
+> **Status: v1.0.0 (Stable).** Gocrewwai tasks support advanced **Context Chaining** and **Strict JSON Output** validation out-of-the-box.
 
-Use the `TaskBuilder` (via the `gocrew` facade) to construct complex tasks with precise requirements.
+---
+
+## 🏗️ The Task Config (Elite Style)
+
+In Gocrewwai v1.0, tasks are constructed using the `TaskConfig` struct, providing a clean, declarative interface.
 
 ```go
-task := gocrew.NewTaskBuilder().
-    Description("Research the current price of Bitcoin.").
-    ExpectedOutput("A short summary with the current price in USD.").
-    Agent(researcher).
-    AsyncExecution(false).
-    Build()
+summaryTask := gocrew.NewTask(gocrew.TaskConfig{
+    Description:    "Identify the top 5 trends in AI agents for 2025.",
+    ExpectedOutput: "A high-fidelity markdown report with specific bullet points.",
+    Agent:          researcher,
+    OutputJSON:     &TrendReport{}, // Gocrew will unmarshal and validate the LLM's raw output!
+    MaxRetryLimit:  3,
+})
 ```
 
 ### Key Parameters
 
-- **Description (`string`)**: The clear, actionable instruction for the agent.
-- **Agent (`core.Agent`)**: The autonomous agent or remote adapter responsible for this task.
-- **ExpectedOutput (`string`)**: A hint to the agent about the desired format (Markdown, JSON, etc.).
-- **OutputJSON (`interface{}`)**: A pointer to a Go struct. The engine will force the LLM into JSON mode and unmarshal the result directly into your struct.
-- **Context (`[]*Task`)**: Links this task to previous ones. The outputs of these tasks will be injected into this task's prompt as background context.
-- **HumanInput (`bool`)**: Enables **Human-in-the-Loop (HITL)**. Execution will pause for manual approval or feedback before and after the task.
-- **OutputFile (`string`)**: Automatically saves the final task result to the specified path.
-- **Timeout (`time.Duration`)**: Enforces a strict time limit on the task's execution.
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| **Description** | `string` | The detailed prompt/instructions for the task. |
+| **Agent** | `CoreAgent` | The agent assigned to perform this task. |
+| **Context** | `[]*Task` | A slice of prior tasks whose results provide required context for this task. |
+| **OutputJSON** | `interface{}` | An optional Go pointer (e.g., `&MyStruct{}`) that the agent will populate as structured JSON. |
+| **OutputFile** | `string` | Path where the result will be saved (supports automatic directory creation). |
+| **Markdown** | `bool` | If true, ensures the output is formatted as valid Markdown. |
+| **MaxRetryLimit** | `int` | Number of autonomous retries if the task fails or validation fails. |
 
 ---
 
-## 🛠️ Task Execution Lifecycle
+## 🧠 Context Chaining & Piping
 
-When a task is executed by an agent, the following steps occur:
+Gocrew tasks excel at building complex, multi-stage "Logic Chains." By providing a slice of tasks to the `Context` field, the framework will:
 
-1. **Context Injection**: Outputs from dependency tasks are injected into the prompt.
-2. **HITL Review (Pre)**: If `HumanInput` is true, the user is prompted for approval/feedback.
-3. **Agent Action**: The agent runs its reasoning loop to complete the task.
-4. **Validation**: If `OutputJSON` is provided, the engine validates the result against the schema.
-5. **Guardrails**: Any task-level guardrails are executed to ensure safety/compliance.
-6. **HITL Review (Post)**: The final result is presented for human sign-off.
-7. **Persistence**: The result is saved to disk (if `OutputFile` is set) and passed to subsequent tasks.
+1. **Inject History**: Append the results of the context tasks into the current task's prompt.
+2. **Handle Dependencies**: Ensure that dependencies are resolved before the current task begins (handled by the Crew/Flow engine).
 
 ---
 
-## 🔗 Chaining Tasks
+## 🛡️ Strict JSON Outputs
 
-Gocrew makes it easy to build complex multi-agent pipelines by chaining tasks together.
+Gocrewwai solves the "Unreliable LLM" problem by enforcing strictly-typed JSON outputs. If you provide a struct pointer to `OutputJSON`:
 
-```go
-// Task A must finish before Task B starts
-taskA := gocrew.NewTaskBuilder().Description("Fetch data").Agent(agentA).Build()
-taskB := gocrew.NewTaskBuilder().Description("Analyze data").Agent(agentB).Context(taskA).Build()
-```
+1. **Schema Injection**: Gocrew informs the LLM of the exact JSON schema required.
+2. **Validation**: The engine attempts to unmarshal the response into your Go struct.
+3. **Self-Correction**: If unmarshalling fails, the engine automatically triggers a retry, providing the LLM with the specific error and asking for a fix.
 
 ---
-**Gocrew** - Structured missions for autonomous agents.
+
+## 🌅 Task Callbacks
+
+You can register custom hooks to trigger logic based on task status:
+- **`OnSuccess`**: Run logic after a task successfully completes.
+- **`OnError`**: Handle failures (e.g., alert Slack or log to a database).
+
+---
+
+[Back to index](../index.md) | [Next: Crews](./crews.md)
