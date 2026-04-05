@@ -103,15 +103,17 @@ type Task struct {
 
 // NewTask creates a new Task using positional arguments (legacy style).
 func NewTask(description string, agent core.Agent) *Task {
-	return &Task{
+	t := &Task{
 		Description: description,
 		Agent:       agent,
 	}
+	t.I18N, _ = i18n.NewI18N("en")
+	return t
 }
 
 // New creates a new Task using a declarative configuration struct (Elite Style).
 func New(cfg TaskConfig) *Task {
-	return &Task{
+	t := &Task{
 		Name:               cfg.Name,
 		Description:        cfg.Description,
 		ExpectedOutput:     cfg.ExpectedOutput,

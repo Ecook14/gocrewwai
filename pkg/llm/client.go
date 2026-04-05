@@ -68,3 +68,30 @@ func ExtractStructured[T any](ctx context.Context, client Client, messages []Mes
 	}
 	return &target, nil
 }
+
+// MapToOptions converts a generic map into a typed GenerateOptions struct.
+func MapToOptions(m map[string]interface{}) GenerateOptions {
+	opts := GenerateOptions{
+		Extra: m,
+	}
+	if m == nil {
+		return opts
+	}
+
+	if model, ok := m["model"].(string); ok {
+		opts.Model = model
+	}
+	if temp, ok := m["temperature"].(float64); ok {
+		opts.Temperature = float32(temp)
+	} else if temp, ok := m["temperature"].(float32); ok {
+		opts.Temperature = temp
+	}
+	if max, ok := m["max_tokens"].(int); ok {
+		opts.MaxTokens = max
+	}
+	if stop, ok := m["stop"].([]string); ok {
+		opts.Stop = stop
+	}
+
+	return opts
+}

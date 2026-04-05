@@ -99,6 +99,8 @@ type FlowRouter = flow.Router
 type FlowPersistence = flow.FlowPersistence
 // PersistentFlow is a flow that auto-persists state.
 type PersistentFlow = flow.PersistentFlow
+type TypedFlow[T any] = flow.TypedFlow[T]
+type TypedNode[T any] = flow.TypedNode[T]
 type HumanFeedbackConfig = flow.HumanFeedbackConfig
 
 // Knowledge Types

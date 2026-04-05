@@ -71,7 +71,7 @@ Respond ONLY with the name of the 'Role' of the agent. If it is a remote agent, 
 		slog.Info("Manager deciding on delegation (Distributed Mode)", slog.String("task", taskDescription))
 	}
 
-	response, err := m.LLM.Generate(ctx, messages, nil)
+	response, err := m.LLM.Generate(ctx, messages, llm.GenerateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("manager failed to generate delegation decision: %w", err)
 	}
@@ -195,11 +195,10 @@ Respond with the plan details.`, tasks_list)
 		slog.Info("Manager generating strategic plan")
 	}
 
-	response, err := m.LLM.Generate(ctx, messages, nil)
+	response, err := m.LLM.Generate(ctx, messages, llm.GenerateOptions{})
 	if err != nil {
 		return "", fmt.Errorf("manager failed to generate plan: %w", err)
 	}
 
 	return strings.TrimSpace(response), nil
 }
-

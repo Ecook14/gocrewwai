@@ -7,7 +7,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/Ecook14/gocrewwai/pkg/core"
 	"github.com/Ecook14/gocrewwai/pkg/tools"
 	"github.com/Ecook14/gocrewwai/pkg/api/mesh" // This will be generated from proto, placeholders for now
 )
