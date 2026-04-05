@@ -4,20 +4,23 @@ import (
 	"context"
 	"fmt"
 	"os"
+
+	"github.com/Ecook14/gocrewwai/pkg/utils"
 )
 
 // FileWriteTool allows agents to write or overwrite contents to a local file.
 type FileWriteTool struct {
 	BaseTool
-	Options map[string]interface{}
+	Chroot string
 }
 
-func NewFileWriteTool() *FileWriteTool {
+func NewFileWriteTool(chroot string) *FileWriteTool {
 	return &FileWriteTool{
 		BaseTool: BaseTool{
 			NameValue:        "FileWriteTool",
-			DescriptionValue: "Writes content to a specified file. Input requires 'file_path' as a string and 'content' as a string.",
+			DescriptionValue: "Write or overwrite contents of a file. Input: {'file_path': 'string', 'content': 'string'}.",
 		},
+		Chroot: chroot,
 	}
 }
 
@@ -40,7 +43,13 @@ func (t *FileWriteTool) Execute(ctx context.Context, input map[string]interface{
 		return "", fmt.Errorf("'content' must be a string")
 	}
 
-	err := os.WriteFile(path, []byte(content), 0644)
+	// Security: Validate path against chroot
+	safePath, err := utils.ValidatePath(path, t.Chroot)
+	if err != nil {
+		return "", err
+	}
+
+	err = os.WriteFile(safePath, []byte(content), 0644)
 	if err != nil {
 		return "", fmt.Errorf("failed to write to file '%s': %w", path, err)
 	}

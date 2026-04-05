@@ -13,9 +13,17 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/Ecook14/gocrewwai/pkg/config"
 )
 
-const e2bBaseURL = "https://api.e2b.dev"
+func getE2BBaseURL() string {
+	val := config.Get().GetToolParam("e2b", "base_url")
+	if val != "" {
+		return val
+	}
+	return "https://api.e2b.dev"
+}
 
 // CodeInterpreterOption defines a functional option for CodeInterpreterTool.
 type CodeInterpreterOption func(*CodeInterpreterTool)
@@ -188,7 +196,7 @@ func (t *CodeInterpreterTool) runE2B(ctx context.Context, lang, code string) (st
 	// 1. Create Sandbox Instance
 	createReq := e2bCreateRequest{TemplateID: "base"}
 	body, _ := json.Marshal(createReq)
-	req, err := http.NewRequestWithContext(ctx, "POST", e2bBaseURL+"/instances", bytes.NewBuffer(body))
+	req, err := http.NewRequestWithContext(ctx, "POST", getE2BBaseURL()+"/instances", bytes.NewBuffer(body))
 	if err != nil {
 		return "", err
 	}
@@ -213,7 +221,7 @@ func (t *CodeInterpreterTool) runE2B(ctx context.Context, lang, code string) (st
 
 	// Ensure cleanup
 	defer func() {
-		delReq, _ := http.NewRequestWithContext(context.Background(), "DELETE", e2bBaseURL+"/instances/"+inst.InstanceID, nil)
+		delReq, _ := http.NewRequestWithContext(context.Background(), "DELETE", getE2BBaseURL()+"/instances/"+inst.InstanceID, nil)
 		delReq.Header.Set("X-API-Key", t.E2BKey)
 		_, _ = client.Do(delReq)
 	}()
@@ -231,7 +239,7 @@ func (t *CodeInterpreterTool) runE2B(ctx context.Context, lang, code string) (st
 
 	cmdReq := e2bCommandRequest{Cmd: cmdStr}
 	cmdBody, _ := json.Marshal(cmdReq)
-	execReq, err := http.NewRequestWithContext(ctx, "POST", e2bBaseURL+"/instances/"+inst.InstanceID+"/commands", bytes.NewBuffer(cmdBody))
+	execReq, err := http.NewRequestWithContext(ctx, "POST", getE2BBaseURL()+"/instances/"+inst.InstanceID+"/commands", bytes.NewBuffer(cmdBody))
 	if err != nil {
 		return "", err
 	}

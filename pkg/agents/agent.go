@@ -23,6 +23,7 @@ import (
 	"github.com/gorilla/websocket"
 	"go.opentelemetry.io/otel/attribute"
 	"github.com/Ecook14/gocrewwai/pkg/core"
+	"github.com/Ecook14/gocrewwai/pkg/i18n"
 )
 
 var _ core.Agent = (*Agent)(nil)
@@ -81,6 +82,7 @@ type AgentConfig struct {
 	A2APort              int      // If > 0, starts an A2A server on this port
 	A2ACapabilities      []string // Capabilities to declare in A2A
 	A2AAuthToken         string   // Bearer token for inter-agent auth
+	Language             string   // NEW: Preferred language for prompts (e.g., "en", "es", "fr")
 }
 
 // Agent translates the `class Agent` python abstraction into idiomatic Go.
@@ -188,6 +190,8 @@ type Agent struct {
 	TrainingDir  string `json:"-"`
 
 	BeforeLLMCall func(messages []llm.Message) []llm.Message `json:"-"`
+
+	I18N *i18n.I18N `json:"-"`
 }
 
 // AgentOption defines a functional option for configuring an Agent.
@@ -241,7 +245,13 @@ func WithMaxRPM(rpm int) AgentOption {
 	return func(a *Agent) { a.MaxRPM = rpm }
 }
 
-func NewAgent(role, goal, backstory string, llm llm.Client, opts ...AgentOption) *Agent {
+// NewAgent creates a new Agent using a declarative configuration struct.
+func NewAgent(cfg AgentConfig) *Agent {
+	return New(cfg)
+}
+
+// NewAgentLegacy is the positional constructor for older codebases.
+func NewAgentLegacy(role, goal, backstory string, llm llm.Client, opts ...AgentOption) *Agent {
 	a := &Agent{
 		Role:          role,
 		Goal:          goal,
@@ -252,6 +262,11 @@ func NewAgent(role, goal, backstory string, llm llm.Client, opts ...AgentOption)
 	}
 	for _, opt := range opts {
 		opt(a)
+	}
+
+	// Initialize I18N
+	if a.I18N == nil {
+		a.I18N, _ = i18n.NewI18N("en")
 	}
 	return a
 }
@@ -300,6 +315,13 @@ func New(cfg AgentConfig) *Agent {
 		BeforeLLMCall:        cfg.BeforeLLMCall,
 		Memory:               cfg.Memory,
 	}
+
+	// Initialize I18N
+	lang := cfg.Language
+	if lang == "" {
+		lang = "en"
+	}
+	a.I18N, _ = i18n.NewI18N(lang)
 
 	if cfg.UseSystemPrompt != nil {
 		a.UseSystemPrompt = *cfg.UseSystemPrompt
@@ -589,6 +611,10 @@ func (a *Agent) GetGoal() string {
 	return a.Goal
 }
 
+func (a *Agent) GetBackstory() string {
+	return a.Backstory
+}
+
 func (a *Agent) GetMaxRPM() int {
 	return a.MaxRPM
 }
@@ -648,10 +674,14 @@ func (a *Agent) Execute(ctx context.Context, taskInput string, options map[strin
 		defer func() { a.lastExecution = time.Now() }()
 	}
 
-	ctx, span := telemetry.StartSpan(ctx, "Agent.Execute")
+	ctx, span := telemetry.StartSpan(ctx, "Agent.Execute: "+a.Role)
 	if span != nil {
 		defer span.End()
-		span.SetAttributes(attribute.String("agent.role", a.Role))
+		span.SetAttributes(
+			attribute.String("agent.role", a.Role),
+			attribute.String("agent.goal", a.Goal),
+			attribute.Bool("agent.reasoning", a.Reasoning),
+		)
 	}
 
 	if a.UsageMetrics == nil {
@@ -729,18 +759,24 @@ func (a *Agent) Execute(ctx context.Context, taskInput string, options map[strin
 			dateInjection = fmt.Sprintf("\nCurrent date: %s", time.Now().Format(a.DateFormat))
 		}
 
-		systemPrompt = fmt.Sprintf(`You are %s. %s%s
-Your goal is: %s
-%s
-%s
+		rolePlaying := a.I18N.Process(a.I18N.Slice("role_playing"), map[string]string{
+			"role":      a.Role,
+			"backstory": a.Backstory,
+			"goal":      a.Goal,
+		})
 
-You have access to the following tools:
-%s
+		toolNames := make([]string, 0, len(a.Tools))
+		for _, t := range a.Tools {
+			toolNames = append(toolNames, t.Name())
+		}
+		
+		toolList := a.I18N.Process(a.I18N.Slice("tools"), map[string]string{
+			"tools":      toolDescriptions,
+			"tool_names": strings.Join(toolNames, ", "),
+		})
 
-To use a tool, you MUST reply with a pure JSON object in this exact format:
-{"tool": "ToolName", "input": {"parameter_name": "parameter_value"}}
-
-Once you have gathered all necessary information and are ready to provide the final answer, do NOT return a tool JSON. Simply output your final answer text natively.%s`, a.Role, a.Backstory, dateInjection, a.Goal, knowledgeSection, fewShotSection, toolDescriptions, trainingAdvice)
+		systemPrompt = fmt.Sprintf("%s%s%s%s%s%s", 
+			rolePlaying, dateInjection, knowledgeSection, fewShotSection, toolList, trainingAdvice)
 	}
 
 	userInput := a.PromptTemplate
@@ -880,8 +916,14 @@ Once you have gathered all necessary information and are ready to provide the fi
 		}
 
 		// Elite Tier: Usage Metrics Tracking (Token Heuristic)
-		a.UsageMetrics["prompt_tokens"] += len(enrichedInput) / 4
-		a.UsageMetrics["completion_tokens"] += len(responseText) / 4
+		promptTokens := len(enrichedInput) / 4
+		completionTokens := len(responseText) / 4
+		a.UsageMetrics["prompt_tokens"] += promptTokens
+		a.UsageMetrics["completion_tokens"] += completionTokens
+
+		// Record to Global Metrics
+		telemetry.GlobalMetrics().RecordTokens(a.LLMModel, promptTokens, completionTokens)
+		telemetry.GlobalMetrics().RecordLLMCall(a.LLMModel, 0, nil) // Latency should be tracked better
 
 		// ReAct Tool Parsing
 		var toolReq struct {
@@ -939,12 +981,19 @@ Once you have gathered all necessary information and are ready to provide the fi
 					}
 				}
 
-				// Tool Execution
+				// Tool Execution (Instrumented)
 				var toolResult string
 				var toolErr error
-				toolCacheKey := ""
+				toolStartTime := time.Now()
+				
+				ctx, toolSpan := telemetry.StartSpan(ctx, "Tool: "+toolReq.Tool)
+				if toolSpan != nil {
+					toolSpan.SetAttributes(attribute.String("tool.name", toolReq.Tool))
+				}
+
+				// Check Cache (Restored)
 				if a.Cache != nil {
-					toolCacheKey = fmt.Sprintf("tool:%s|input:%v", toolReq.Tool, toolReq.Input)
+					toolCacheKey := fmt.Sprintf("tool:%s|input:%v", toolReq.Tool, toolReq.Input)
 					if cached, ok := a.Cache.Get(toolCacheKey); ok {
 						toolResult = cached
 						if a.Verbose {
@@ -958,22 +1007,25 @@ Once you have gathered all necessary information and are ready to provide the fi
 					if a.SandboxProvider != nil && (toolReq.Tool == "CodeInterpreter" || toolReq.Tool == "PythonInterpreter") {
 						code, _ := toolReq.Input["code"].(string)
 						if code == "" {
-							// Fallback to standard execution if no code found
 							toolResult, toolErr = activeTool.Execute(ctx, toolReq.Input)
 						} else {
-							if a.Verbose {
-								defaultLogger.Info("🛡️ Routing tool to Production Sandbox", slog.String("provider", fmt.Sprintf("%T", a.SandboxProvider)))
-							}
 							toolResult, toolErr = a.SandboxProvider.Execute(ctx, code, nil)
 						}
 					} else {
 						toolResult, toolErr = activeTool.Execute(ctx, toolReq.Input)
 					}
-					
+
+					// Save to Cache (Restored)
 					if toolErr == nil && a.Cache != nil {
+						toolCacheKey := fmt.Sprintf("tool:%s|input:%v", toolReq.Tool, toolReq.Input)
 						_ = a.Cache.Set(toolCacheKey, toolResult)
 					}
 				}
+				
+				if toolSpan != nil {
+					toolSpan.End()
+				}
+				telemetry.GlobalMetrics().RecordToolCall(toolReq.Tool, time.Since(toolStartTime), toolErr)
 
 				// Publish system event
 				events.GlobalBus.Publish(events.Event{
@@ -990,14 +1042,14 @@ Once you have gathered all necessary information and are ready to provide the fi
 				if toolErr != nil {
 					if a.SelfHealing && maxRetries > 0 {
 						maxRetries--
-						observation = fmt.Sprintf("Tool Error: %v. Please correct your parameters and try again.", toolErr)
+						observation = a.I18N.Process(a.I18N.Error("tool_usage_error"), map[string]string{"error": toolErr.Error()})
 						defaultLogger.Warn("Self-healing triggered", slog.String("agent", a.Role), slog.String("error", toolErr.Error()))
 					} else {
 						observation = fmt.Sprintf("Fatal Tool Error: %v", toolErr)
 						defaultLogger.Error("❌ Tool Execution Failed", slog.String("agent", a.Role), slog.String("tool", toolReq.Tool), slog.Any("error", toolErr))
 					}
 				} else {
-					observation = fmt.Sprintf("Observation: %v", toolResult)
+					observation = a.I18N.Slice("observation") + " " + fmt.Sprintf("%v", toolResult)
 					if a.Verbose {
 						defaultLogger.Info("✅ Tool Execution Success", slog.String("agent", a.Role), slog.String("tool", toolReq.Tool))
 					}
@@ -1241,5 +1293,40 @@ func (a *Agent) StartMCPStdioServer(ctx context.Context) error {
 
 	server := protocols.NewStdioServer(a.MCPServer)
 	return server.Serve(ctx)
+}
+
+// EquipMCP allows dynamic injection of MCP tools and resources into the agent.
+func (a *Agent) EquipMCP(ctx context.Context, source string) {
+	var client *protocols.MCPClient
+	if strings.HasPrefix(source, "http") {
+		client = protocols.NewMCPClient(source)
+	} else if strings.HasPrefix(source, "stdio:") {
+		cmdStr := strings.TrimPrefix(source, "stdio:")
+		parts := strings.Fields(cmdStr)
+		if len(parts) > 0 {
+			transport := protocols.NewStdioTransport(parts[0], parts[1:]...)
+			client = protocols.NewMCPClientWithTransport(transport)
+		}
+	}
+
+	if client != nil {
+		ctxDiscovery, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+		if err := client.Initialize(ctxDiscovery); err == nil {
+			for _, toolDef := range client.Tools {
+				// Prevent duplicates
+				exists := false
+				for _, et := range a.Tools {
+					if et.Name() == toolDef.Name {
+						exists = true
+						break
+					}
+				}
+				if !exists {
+					a.Tools = append(a.Tools, protocols.WrapMCPToolForCrewGo(client, toolDef))
+				}
+			}
+		}
+	}
 }
 

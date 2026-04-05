@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package mesh;
+
+option go_package = "pkg/api/mesh";
+
+// MeshService defines the inter-agent collaboration protocol.
+service MeshService {
+  // DelegateTask sends a task from one agent instance to another remote instance.
+  rpc DelegateTask (TaskRequest) returns (TaskResponse);
+  
+  // StreamStatus allows a remote instance to stream thinking updates back to the orchestrator.
+  rpc StreamStatus (StatusRequest) returns (stream StatusUpdate);
+
+  // RAG Operations (Agentic RAG)
+  rpc SearchKnowledge (SearchRequest) returns (SearchResponse);
+  rpc IndexKnowledge (IndexRequest) returns (IndexResponse);
+}
+
+message TaskRequest {
+  string task_description = 1;
+  string agent_role = 2;
+  string agent_goal = 3;
+  string context_json = 4;
+  string session_id = 5;
+}
+
+message TaskResponse {
+  string output = 1;
+  string agent_role = 2;
+  bool success = 3;
+  string error_message = 4;
+}
+
+message StatusRequest {
+  string session_id = 1;
+}
+
+message StatusUpdate {
+  string agent_role = 1;
+  string update_type = 2; // "thinking", "tool_use", "finished"
+  string message = 3;
+}
+
+message SearchRequest {
+  string query = 1;
+  int32 k = 2;
+  string collection = 3;
+  map<string, string> filters = 4;
+}
+
+message SearchResponse {
+  repeated KnowledgeSnippet snippets = 1;
+  bool success = 2;
+  string error_message = 3;
+}
+
+message KnowledgeSnippet {
+  string content = 1;
+  string source = 2;
+  float score = 3;
+  map<string, string> metadata = 4;
+}
+
+message IndexRequest {
+  string content = 1;
+  string source = 2;
+  string collection = 3;
+  map<string, string> metadata = 4;
+}
+
+message IndexResponse {
+  bool success = 1;
+  string document_id = 2;
+  string error_message = 3;
+}

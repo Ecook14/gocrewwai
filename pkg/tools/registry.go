@@ -149,11 +149,32 @@ func CreateTool(name string, config map[string]interface{}) (Tool, error) {
 		from, _ := config["from"].(string)
 		return NewEmailTool(host, port, username, password, from), nil
 	case "ShellTool":
-		return NewShellTool(), nil
+		var opts []func(*ShellTool)
+		if allowed, ok := config["allowed_commands"].([]string); ok {
+			opts = append(opts, WithAllowedCommands(allowed))
+		}
+		return NewShellTool(opts...), nil
+	case "DirectoryTool":
+		root, _ := config["root_path"].(string)
+		depth, _ := config["max_depth"].(int)
+		allowAbs, _ := config["allow_absolute"].(bool)
+		return NewDirectoryTool(root, depth, allowAbs), nil
+	case "FileEditTool":
+		chroot, _ := config["chroot"].(string)
+		return NewFileEditTool(chroot), nil
+	case "FileReadTool":
+		chroot, _ := config["chroot"].(string)
+		return NewFileReadTool(chroot), nil
+	case "FileWriteTool":
+		chroot, _ := config["chroot"].(string)
+		return NewFileWriteTool(chroot), nil
 	case "JSONTool":
 		return NewJSONTool(), nil
 	case "RegexTool":
 		return NewRegexTool(), nil
+	case "AskHumanTool":
+		enabled, _ := config["enabled"].(bool)
+		return NewAskHumanTool(enabled), nil
 	default:
 		return nil, fmt.Errorf("unsupported tool for dynamic creation: %s", name)
 	}
@@ -169,12 +190,5 @@ func (r *ToolRegistry) ListNames() []string {
 }
 
 func InitDefaultRegistry() {
-	GlobalRegistry.Register(NewArxivTool())
-	GlobalRegistry.Register(NewWikipediaTool())
-	GlobalRegistry.Register(NewCalculatorTool())
-	GlobalRegistry.Register(NewSearchWebTool())
-	GlobalRegistry.Register(NewBrowserTool())
-	GlobalRegistry.Register(NewShellTool())
-	GlobalRegistry.Register(NewFileReadTool())
-	GlobalRegistry.Register(NewFileWriteTool())
+	// Registry should now be initialized with explicit configuration from the caller.
 }

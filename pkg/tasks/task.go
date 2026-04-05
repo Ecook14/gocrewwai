@@ -15,6 +15,7 @@ import (
 	"github.com/Ecook14/gocrewwai/pkg/events"
 	"github.com/Ecook14/gocrewwai/pkg/telemetry"
 	"github.com/Ecook14/gocrewwai/pkg/tools"
+	"github.com/Ecook14/gocrewwai/pkg/i18n"
 	"path/filepath"
 )
 
@@ -39,6 +40,7 @@ type TaskConfig struct {
 	Guardrails         []guardrails.Guardrail
 	CallbackOnComplete func(result interface{})
 	Timeout            time.Duration
+	Language           string // NEW: Preferred language for task prompts/errors
 }
 
 // Task translates the `class Task` python abstraction into idiomatic Go.
@@ -95,9 +97,19 @@ type Task struct {
 
 	// Internal tracking
 	CycleCount int `json:"-"`
+
+	I18N *i18n.I18N `json:"-"`
 }
 
-// New creates a new Task using a declarative configuration struct.
+// NewTask creates a new Task using positional arguments (legacy style).
+func NewTask(description string, agent core.Agent) *Task {
+	return &Task{
+		Description: description,
+		Agent:       agent,
+	}
+}
+
+// New creates a new Task using a declarative configuration struct (Elite Style).
 func New(cfg TaskConfig) *Task {
 	return &Task{
 		Name:               cfg.Name,
@@ -120,6 +132,15 @@ func New(cfg TaskConfig) *Task {
 		CallbackOnComplete: cfg.CallbackOnComplete,
 		Timeout:            cfg.Timeout,
 	}
+
+	// Initialize I18N
+	lang := cfg.Language
+	if lang == "" {
+		lang = "en"
+	}
+	t.I18N, _ = i18n.NewI18N(lang)
+
+	return t
 }
 
 // Execute kicks off the Task lifecycle utilizing the bound Agent.
@@ -159,7 +180,7 @@ func (t *Task) Execute(ctx context.Context) (interface{}, error) {
 
 	// 1. Append expected output hint
 	if t.ExpectedOutput != "" {
-		baseDescription += "\n\nEXPECTED OUTPUT FORMAT:\n" + t.ExpectedOutput
+		baseDescription += t.I18N.Process(t.I18N.Slice("expected_output"), map[string]string{"expected_output": t.ExpectedOutput})
 	}
 
 	if t.Markdown {
@@ -168,13 +189,16 @@ func (t *Task) Execute(ctx context.Context) (interface{}, error) {
 
 	// 2. Process Task Dependency Contexts (Inject prior task outputs)
 	if len(t.Context) > 0 {
-		baseDescription += "\n\nCRITICAL CONTEXT FROM PREVIOUS TASKS:\n"
+		contextText := ""
 		for i, ctxTask := range t.Context {
 			if ctxTask.Processed && ctxTask.Output != nil {
-				baseDescription += fmt.Sprintf("--- Context Source %d ---\n%v\n", i+1, ctxTask.Output)
+				contextText += fmt.Sprintf("--- Context Source %d ---\n%v\n", i+1, ctxTask.Output)
 			}
 		}
-		baseDescription += "--------------------------\n"
+		baseDescription = t.I18N.Process(t.I18N.Slice("task_with_context"), map[string]string{
+			"task":    baseDescription,
+			"context": contextText,
+		})
 	}
 
 	// 3. Process Human-in-the-Loop (HITL) blocking

@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-
 	"github.com/Ecook14/gocrewwai/pkg/tools"
 )
 
@@ -12,10 +11,11 @@ import (
 type Agent interface {
 	GetRole() string
 	GetGoal() string
+	GetBackstory() string
 	GetMaxRPM() int
 	SetMaxRPM(int)
 	GetUsageMetrics() map[string]int
 	GetToolCount() int
-	Equip(tools ...tools.Tool)
+	Equip(t ...tools.Tool)
 	Execute(ctx context.Context, input string, options map[string]interface{}) (interface{}, error)
 }

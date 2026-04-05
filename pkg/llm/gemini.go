@@ -16,6 +16,7 @@ import (
 type GeminiClient struct {
 	APIKey     string
 	Model      string
+	BaseURL    string
 	HTTPClient *http.Client
 }
 
@@ -34,21 +35,39 @@ func NewGeminiClient(apiKey, model string) *GeminiClient {
 	return &GeminiClient{
 		APIKey: apiKey,
 		Model:  model,
+		BaseURL: "https://generativelanguage.googleapis.com/v1beta",
 		HTTPClient: &http.Client{
 			Timeout: 300 * time.Second,
 		},
 	}
 }
 
+// WithBaseURL allows reconfiguring the client's endpoint.
+func (c *GeminiClient) WithBaseURL(url string) *GeminiClient {
+	c.BaseURL = url
+	return c
+}
+
+type geminiUsage struct {
+	PromptTokens     int
+	CompletionTokens int
+	TotalTokens      int
+}
+
 // Generate implements basic message generation for Gemini.
-func (c *GeminiClient) Generate(ctx context.Context, messages []Message, options map[string]interface{}) (string, error) {
+func (c *GeminiClient) Generate(ctx context.Context, messages []Message, options GenerateOptions) (string, error) {
+	text, _, err := c.generateBase(ctx, messages, options)
+	return text, err
+}
+
+func (c *GeminiClient) generateBase(ctx context.Context, messages []Message, options GenerateOptions) (string, *geminiUsage, error) {
 	if c.APIKey == "" {
-		return "", fmt.Errorf("google Gemini API Key is required")
+		return "", nil, fmt.Errorf("google Gemini API Key is required")
 	}
 
-	model := c.Model
-	if options != nil && options["model"] != nil {
-		model = options["model"].(string)
+	model := options.Model
+	if model == "" {
+		model = c.Model
 	}
 
 	// Map internal Message to Gemini Content
@@ -88,20 +107,20 @@ func (c *GeminiClient) Generate(ctx context.Context, messages []Message, options
 	}
 
 	reqBody, _ := json.Marshal(reqPayload)
-	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", model, c.APIKey)
+	url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", c.BaseURL, model, c.APIKey)
 
 	req, _ := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("gemini api error (%d): %s", resp.StatusCode, string(respBody))
+		return "", nil, fmt.Errorf("gemini api error (%d): %s", resp.StatusCode, string(respBody))
 	}
 
 	var result struct {
@@ -112,54 +131,66 @@ func (c *GeminiClient) Generate(ctx context.Context, messages []Message, options
 				} `json:"parts"`
 			} `json:"content"`
 		} `json:"candidates"`
+		UsageMetadata struct {
+			PromptTokenCount     int `json:"promptTokenCount"`
+			CandidatesTokenCount int `json:"candidatesTokenCount"`
+			TotalTokenCount      int `json:"totalTokenCount"`
+		} `json:"usageMetadata"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", err
+		return "", nil, err
 	}
 
 	if len(result.Candidates) > 0 && len(result.Candidates[0].Content.Parts) > 0 {
-		return result.Candidates[0].Content.Parts[0].Text, nil
+		usage := &geminiUsage{
+			PromptTokens:     result.UsageMetadata.PromptTokenCount,
+			CompletionTokens: result.UsageMetadata.CandidatesTokenCount,
+			TotalTokens:      result.UsageMetadata.TotalTokenCount,
+		}
+		return result.Candidates[0].Content.Parts[0].Text, usage, nil
 	}
-	return "", fmt.Errorf("gemini returned empty content")
+	return "", nil, fmt.Errorf("gemini returned empty content")
 }
 
-// GenerateWithUsage implements Client — returns both text and usage data.
-func (c *GeminiClient) GenerateWithUsage(ctx context.Context, messages []Message, options map[string]interface{}) (string, *Usage, error) {
+// GenerateWithUsage implements Client — returns both text and token usage data.
+func (c *GeminiClient) GenerateWithUsage(ctx context.Context, messages []Message, options GenerateOptions) (string, *Usage, error) {
+	if c.APIKey == "" {
+		return "", nil, fmt.Errorf("google Gemini API Key is required")
+	}
+
+	model := options.Model
+	if model == "" {
+		model = c.Model
+	}
+
 	start := time.Now()
-	text, err := c.Generate(ctx, messages, options)
+	text, gUsage, err := c.generateBase(ctx, messages, options)
 	latency := time.Since(start).Milliseconds()
 	if err != nil {
 		return "", nil, err
 	}
 
-	model := c.Model
-	if options != nil && options["model"] != nil {
-		model = options["model"].(string)
-	}
-
-	// Approximate token count (Gemini API provides usageMetadata but we don't capture it
-	// from Generate — use word-based estimation as a fallback)
-	promptTokens := 0
-	for _, m := range messages {
-		promptTokens += len(strings.Fields(m.Content))
-	}
-	completionTokens := len(strings.Fields(text))
-
 	usage := &Usage{
-		PromptTokens:     promptTokens,
-		CompletionTokens: completionTokens,
-		TotalTokens:      promptTokens + completionTokens,
-		Model:            model,
-		Provider:         "gemini",
-		LatencyMs:        latency,
+		Model:     model,
+		Provider:  "gemini",
+		LatencyMs: latency,
+	}
+
+	if gUsage != nil {
+		usage.PromptTokens = gUsage.PromptTokens
+		usage.CompletionTokens = gUsage.CompletionTokens
+		usage.TotalTokens = gUsage.TotalTokens
 	}
 	usage.CostUSD = CalculateCost(*usage)
+
+	// Elite: Record to Global Tracker
+	GlobalTracker().Record(*usage)
 
 	return text, usage, nil
 }
 
 // GenerateStructured handles strict JSON extraction via Gemini.
-func (c *GeminiClient) GenerateStructured(ctx context.Context, messages []Message, schema interface{}, options map[string]interface{}) (interface{}, error) {
+func (c *GeminiClient) GenerateStructured(ctx context.Context, messages []Message, schema interface{}, options GenerateOptions) (interface{}, error) {
 	// Gemini supports JSON mode via generation configuration.
 	// For simplicity, we use the same system prompt pattern as Anthropic.
 	messages = append(messages, Message{
@@ -194,15 +225,75 @@ func (c *GeminiClient) GenerateStructured(ctx context.Context, messages []Messag
 	return schema, nil
 }
 
-// StreamGenerate handles real-time token output.
-func (c *GeminiClient) StreamGenerate(ctx context.Context, messages []Message, options map[string]interface{}) (<-chan string, error) {
+// StreamGenerate handles real-time token output using Gemini's streaming endpoint.
+func (c *GeminiClient) StreamGenerate(ctx context.Context, messages []Message, options GenerateOptions) (<-chan string, error) {
+	if c.APIKey == "" {
+		return nil, fmt.Errorf("google Gemini API Key is required")
+	}
+
+	model := options.Model
+	if model == "" {
+		model = c.Model
+	}
+
+	// Map messages... (similar to Generate)
+	var geminiContents []interface{}
+	for _, m := range messages {
+		geminiContents = append(geminiContents, map[string]interface{}{
+			"role":  m.Role,
+			"parts": []map[string]interface{}{{"text": m.Content}},
+		})
+	}
+
+	reqPayload := map[string]interface{}{"contents": geminiContents}
+	reqBody, _ := json.Marshal(reqPayload)
+	url := fmt.Sprintf("%s/models/%s:streamGenerateContent?key=%s", c.BaseURL, model, c.APIKey)
+
+	req, _ := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		return nil, fmt.Errorf("gemini api error (%d): %s", resp.StatusCode, string(respBody))
+	}
+
 	ch := make(chan string)
 	go func() {
+		defer resp.Body.Close()
 		defer close(ch)
-		res, err := c.Generate(ctx, messages, options)
-		if err == nil {
-			ch <- res
+
+		decoder := json.NewDecoder(resp.Body)
+		// Gemini returns a JSON array of objects
+		if _, err := decoder.Token(); err != nil { // consume '['
+			return
+		}
+
+		for decoder.More() {
+			var chunk struct {
+				Candidates []struct {
+					Content struct {
+						Parts []struct {
+							Text string `json:"text"`
+						} `json:"parts"`
+					} `json:"content"`
+				} `json:"candidates"`
+			}
+			if err := decoder.Decode(&chunk); err != nil {
+				return
+			}
+			for _, cand := range chunk.Candidates {
+				for _, part := range cand.Content.Parts {
+					ch <- part.Text
+				}
+			}
 		}
 	}()
+
 	return ch, nil
 }

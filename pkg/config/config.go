@@ -4,225 +4,233 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/Ecook14/gocrewwai/pkg/llm"
+	"github.com/joho/godotenv"
 )
 
-// FrameworkConfig holds framework-wide defaults and feature flags.
-type FrameworkConfig struct {
-	TelemetryEnabled bool
-	DefaultTimeout   int
-	LoggingLevel     string // "info", "debug", "warn", "error"
-}
-
-// Global defaults
-var DefaultConfig = FrameworkConfig{
-	TelemetryEnabled: false,
-	DefaultTimeout:   30,
-	LoggingLevel:     "info",
-}
-
-// AgentOverrides specific overrides for an individual agent
-type AgentOverrides struct {
-	AllowDelegation bool
-	MemoryEnabled   bool
-	SelfHealing     bool
-	MaxIterations   int
-}
-
-// CrewConfig specific overrides for a crew
-type CrewConfig struct {
-	Verbose        bool
-	ProcessTimeout int
-	MemoryBackend  string // "sqlite", "redis", "chroma"
-}
-
-// ---------------------------------------------------------------------------
-// Expanded Configuration — Environment-Aware, Validatable
-// ---------------------------------------------------------------------------
-
-// Config holds all Crew-GO runtime settings with env override support.
+// Config represents the unified application configuration.
 type Config struct {
-	mu sync.RWMutex
+	LLM           LLMConfig               `json:"llm"`
+	Providers     map[string]Provider     `json:"providers"`
+	Routing       RoutingConfig           `json:"routing"`
+	Orchestration OrchestrationConfig     `json:"orchestration"`
+	MCPServers    map[string]MCPServer    `json:"mcp_servers"`
+	Tools         map[string]interface{}  `json:"tools"`
+	Memory        MemoryConfig            `json:"memory"`
+	Models        map[string]ModelConfig  `json:"models"`
+	Persistence   PersistenceConfig       `json:"persistence"`
+	Observability ObservabilityConfig     `json:"observability"`
+	Security      SecurityConfig          `json:"security"`
+	HITL          HITLConfig              `json:"hitl"`
+}
 
-	// LLM Settings
+type LLMConfig struct {
 	DefaultModel    string        `json:"default_model"`
-	DefaultProvider string        `json:"default_provider"`
-	RequestTimeout  time.Duration `json:"request_timeout"`
+	FailoverModel   string        `json:"failover_model"`
+	FailoverEnabled bool          `json:"failover_enabled"`
 	MaxRetries      int           `json:"max_retries"`
-
-	// Rate Limiting
-	RateLimitRPM int `json:"rate_limit_rpm"` // Requests per minute
-	RateLimitTPM int `json:"rate_limit_tpm"` // Tokens per minute
-
-	// Memory
-	MemoryBackend string        `json:"memory_backend"` // "sqlite", "redis", "chroma", "qdrant", "pinecone", "weaviate", "memory"
-	MemoryDBPath  string        `json:"memory_db_path"`
-	MemoryTTL     time.Duration `json:"memory_ttl"`
-
-	// Server
-	ServerAddr     string `json:"server_addr"`
-	MetricsEnabled bool   `json:"metrics_enabled"`
-
-	// Logging
-	LogLevel     string `json:"log_level"`  // "debug", "info", "warn", "error"
-	LogFormat    string `json:"log_format"` // "json", "text"
-	AuditLogPath string `json:"audit_log_path"`
-
-	// Security
-	APIKeyEnvVar string `json:"api_key_env_var"`
-	E2BAPIKey    string `json:"e2b_api_key"`
-
-	// Execution
-	MaxConcurrency int           `json:"max_concurrency"`
-	TaskTimeout    time.Duration `json:"task_timeout"`
-	Verbose        bool          `json:"verbose"`
+	Timeout         time.Duration `json:"-"`
+	TimeoutStr      string        `json:"timeout"`
+	PricingTTL      time.Duration `json:"-"`
+	PricingTTLStr   string        `json:"pricing_ttl"`
+	MaxBudgetUSD    float64       `json:"max_budget_usd"`
 }
 
-// NewDefaultConfig returns production-ready defaults.
-func NewDefaultConfig() *Config {
-	return &Config{
-		DefaultModel:    "gpt-4o",
-		DefaultProvider: "openai",
-		RequestTimeout:  60 * time.Second,
-		MaxRetries:      3,
-		RateLimitRPM:    60,
-		RateLimitTPM:    100000,
-		MemoryBackend:   "sqlite",
-		MemoryDBPath:    "./crew_memory.db",
-		MemoryTTL:       24 * time.Hour,
-		ServerAddr:      ":9090",
-		MetricsEnabled:  true,
-		LogLevel:        "info",
-		LogFormat:       "json",
-		MaxConcurrency:  10,
-		TaskTimeout:     5 * time.Minute,
-		Verbose:         false,
+type Provider struct {
+	Name    string `json:"name"`
+	BaseURL string `json:"base_url"`
+	APIKey  string `json:"api_key"`
+}
+
+type ModelConfig struct {
+	ProviderID      string  `json:"provider_id"`
+	ModelID         string  `json:"model_id"`
+	Name            string  `json:"name"`
+	PromptPrice     float64 `json:"prompt_price_per_token"`
+	CompletionPrice float64 `json:"completion_price_per_token"`
+}
+
+type RoutingConfig struct {
+	Default        string `json:"default"`
+	Vision         string `json:"vision"`
+	RAG           string `json:"rag"`
+	LongContext    string `json:"long_context"`
+	CodeGeneration string `json:"code_generation"`
+}
+
+type OrchestrationConfig struct {
+	SupervisorModel  string `json:"supervisor_model"`
+	ResearcherModel  string `json:"researcher_model"`
+	ArchitectModel   string `json:"architect_model"`
+	ImplementerModel string `json:"implementer_model"`
+}
+
+type MCPServer struct {
+	Command string   `json:"command"`
+	Args    []string `json:"args"`
+}
+
+type MemoryConfig struct {
+	ChromaTimeout    time.Duration `json:"-"`
+	ChromaTimeoutStr string        `json:"chroma_timeout"`
+	EmbeddingModel   string        `json:"embedding_model"`
+}
+
+type PersistenceConfig struct {
+	Sessions SessionConfig        `json:"sessions"`
+	Cache    PersistenceCacheConfig `json:"cache"`
+}
+
+type SessionConfig struct {
+	Driver             string        `json:"driver"`
+	ConnectionString   string        `json:"connection_string"`
+	CheckpointInterval time.Duration `json:"-"`
+	CheckpointIntervalStr string    `json:"checkpoint_interval"`
+}
+
+type PersistenceCacheConfig struct {
+	Type  string      `json:"type"` // "file", "redis", "sql"
+	Redis RedisConfig `json:"redis"`
+}
+
+type RedisConfig struct {
+	Addr     string        `json:"addr"`
+	Password string        `json:"password"`
+	DB       int           `json:"db"`
+	TTL      time.Duration `json:"-"`
+	TTLStr   string        `json:"ttl"`
+}
+
+type ObservabilityConfig struct {
+	Enabled     bool             `json:"enabled"`
+	ServiceName string           `json:"service_name"`
+	Prometheus  PrometheusConfig `json:"prometheus"`
+	Splunk      SplunkConfig     `json:"splunk"`
+	Tracing     TracingConfig    `json:"tracing"`
+}
+
+type PrometheusConfig struct {
+	Enabled bool `json:"enabled"`
+	Port    int  `json:"port"`
+}
+
+type SplunkConfig struct {
+	Enabled  bool   `json:"enabled"`
+	Endpoint string `json:"endpoint"`
+	Token    string `json:"token"`
+}
+
+type TracingConfig struct {
+	SamplingRate float64 `json:"sampling_rate"`
+	Exporter     string  `json:"exporter"` // "otlp", "stdout"
+}
+
+type SecurityConfig struct {
+	ShellAllowList []string `json:"shell_allow_list"`
+	FileChroot     string   `json:"file_chroot"`
+	NetworkEgress  string   `json:"network_egress"`
+	MaxFileSizeMB  int      `json:"max_file_size_mb"`
+}
+
+type HITLConfig struct {
+	Enabled        bool   `json:"enabled"`
+	DefaultMode    string `json:"default_mode"` // "prompt", "registry"
+	TimeoutSeconds int    `json:"timeout_seconds"`
+}
+
+var (
+	instance *Config
+	once     sync.Once
+)
+
+// Get returns the global configuration singleton.
+func Get() *Config {
+	once.Do(func() {
+		instance = loadConfig()
+	})
+	return instance
+}
+
+func loadConfig() *Config {
+	_ = godotenv.Load()
+
+	path := os.Getenv("CREW_CONFIG_PATH")
+	if path == "" {
+		path = "config.json"
 	}
-}
 
-// LoadFromFile reads config from a JSON file, then applies env overrides.
-func LoadFromFile(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read config file: %w", err)
+		fmt.Printf("Warning: Failed to read config file at %s: %v\nUsing defaults.\n", path, err)
+		return &Config{}
 	}
 
-	cfg := NewDefaultConfig()
-	if err := json.Unmarshal(data, cfg); err != nil {
-		return nil, fmt.Errorf("failed to parse config: %w", err)
+	// Expand environment variables
+	expanded := os.ExpandEnv(string(data))
+
+	cfg := &Config{
+		Tools:      make(map[string]interface{}),
+		Models:     make(map[string]ModelConfig),
+		MCPServers: make(map[string]MCPServer),
+		Providers:  make(map[string]Provider),
+	}
+	if err := json.Unmarshal([]byte(expanded), cfg); err != nil {
+		fmt.Printf("Warning: Failed to parse config JSON: %v\n", err)
+		_ = json.Unmarshal(data, cfg)
 	}
 
-	cfg.applyEnvOverrides()
-	return cfg, nil
-}
+	// Double check API keys if expansion failed
+	for k, p := range cfg.Providers {
+		if p.APIKey == "" || p.APIKey == "${"+strings.ToUpper(k)+"_API_KEY}" {
+			envKey := strings.ToUpper(k) + "_API_KEY"
+			if val := os.Getenv(envKey); val != "" {
+				p.APIKey = val
+				cfg.Providers[k] = p
+			}
+		}
+	}
 
-// LoadFromEnv creates config purely from environment variables over defaults.
-func LoadFromEnv() *Config {
-	cfg := NewDefaultConfig()
-	cfg.applyEnvOverrides()
+	// Parse durations
+	if cfg.LLM.TimeoutStr != "" {
+		cfg.LLM.Timeout, _ = time.ParseDuration(cfg.LLM.TimeoutStr)
+	}
+	if cfg.LLM.PricingTTLStr != "" {
+		cfg.LLM.PricingTTL, _ = time.ParseDuration(cfg.LLM.PricingTTLStr)
+	}
+	if cfg.Memory.ChromaTimeoutStr != "" {
+		cfg.Memory.ChromaTimeout, _ = time.ParseDuration(cfg.Memory.ChromaTimeoutStr)
+	}
+	if cfg.Persistence.Sessions.CheckpointIntervalStr != "" {
+		cfg.Persistence.Sessions.CheckpointInterval, _ = time.ParseDuration(cfg.Persistence.Sessions.CheckpointIntervalStr)
+	}
+	if cfg.Persistence.Cache.Redis.TTLStr != "" {
+		cfg.Persistence.Cache.Redis.TTL, _ = time.ParseDuration(cfg.Persistence.Cache.Redis.TTLStr)
+	}
+
+	// Elite: Push pricing and budget data to llm package to avoid circular imports
+	llm.SetGlobalBudget(cfg.LLM.MaxBudgetUSD)
+	for name, model := range cfg.Models {
+		if model.PromptPrice > 0 || model.CompletionPrice > 0 {
+			llm.SetModelPricing(name, llm.ModelPricing{
+				PromptPricePerToken:     model.PromptPrice,
+				CompletionPricePerToken: model.CompletionPrice,
+			})
+		}
+	}
+
 	return cfg
 }
 
-// applyEnvOverrides applies CREW_GO_* environment variable overrides.
-func (c *Config) applyEnvOverrides() {
-	envStr := map[string]*string{
-		"CREW_GO_DEFAULT_MODEL":    &c.DefaultModel,
-		"CREW_GO_DEFAULT_PROVIDER": &c.DefaultProvider,
-		"CREW_GO_MEMORY_BACKEND":   &c.MemoryBackend,
-		"CREW_GO_MEMORY_DB_PATH":   &c.MemoryDBPath,
-		"CREW_GO_SERVER_ADDR":      &c.ServerAddr,
-		"CREW_GO_LOG_LEVEL":        &c.LogLevel,
-		"CREW_GO_LOG_FORMAT":       &c.LogFormat,
-		"CREW_GO_AUDIT_LOG_PATH":   &c.AuditLogPath,
-		"CREW_GO_API_KEY_ENV_VAR":  &c.APIKeyEnvVar,
-		"CREW_GO_E2B_API_KEY":     &c.E2BAPIKey,
-	}
-	for env, target := range envStr {
-		if val := os.Getenv(env); val != "" {
-			*target = val
+// GetToolParam returns a tool-specific configuration parameter.
+func (c *Config) GetToolParam(tool, key string) string {
+	if params, ok := c.Tools[tool].(map[string]interface{}); ok {
+		if val, ok := params[key].(string); ok {
+			return val
 		}
 	}
-
-	envInt := map[string]*int{
-		"CREW_GO_RATE_LIMIT_RPM":  &c.RateLimitRPM,
-		"CREW_GO_RATE_LIMIT_TPM":  &c.RateLimitTPM,
-		"CREW_GO_MAX_RETRIES":     &c.MaxRetries,
-		"CREW_GO_MAX_CONCURRENCY": &c.MaxConcurrency,
-	}
-	for env, target := range envInt {
-		if val := os.Getenv(env); val != "" {
-			if n, err := strconv.Atoi(val); err == nil {
-				*target = n
-			}
-		}
-	}
-
-	envDur := map[string]*time.Duration{
-		"CREW_GO_REQUEST_TIMEOUT": &c.RequestTimeout,
-		"CREW_GO_TASK_TIMEOUT":    &c.TaskTimeout,
-		"CREW_GO_MEMORY_TTL":      &c.MemoryTTL,
-	}
-	for env, target := range envDur {
-		if val := os.Getenv(env); val != "" {
-			if d, err := time.ParseDuration(val); err == nil {
-				*target = d
-			}
-		}
-	}
-
-	envBool := map[string]*bool{
-		"CREW_GO_METRICS_ENABLED": &c.MetricsEnabled,
-		"CREW_GO_VERBOSE":         &c.Verbose,
-	}
-	for env, target := range envBool {
-		if val := os.Getenv(env); val != "" {
-			*target = strings.EqualFold(val, "true") || val == "1"
-		}
-	}
-}
-
-// Get returns a thread-safe snapshot.
-func (c *Config) Get() Config {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return *c
-}
-
-// SaveToFile persists the config as formatted JSON.
-func (c *Config) SaveToFile(path string) error {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	data, err := json.MarshalIndent(c, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, data, 0644)
-}
-
-// Validate checks for common configuration errors.
-func (c *Config) Validate() error {
-	if c.MaxConcurrency < 1 {
-		return fmt.Errorf("max_concurrency must be >= 1")
-	}
-	if c.MaxRetries < 0 {
-		return fmt.Errorf("max_retries must be >= 0")
-	}
-	if c.RateLimitRPM < 1 {
-		return fmt.Errorf("rate_limit_rpm must be >= 1")
-	}
-	validBackends := map[string]bool{
-		"sqlite": true, "redis": true, "chroma": true,
-		"qdrant": true, "pinecone": true, "weaviate": true, "memory": true,
-	}
-	if !validBackends[c.MemoryBackend] {
-		return fmt.Errorf("unsupported memory_backend: %s", c.MemoryBackend)
-	}
-	validLevels := map[string]bool{"debug": true, "info": true, "warn": true, "error": true}
-	if !validLevels[c.LogLevel] {
-		return fmt.Errorf("unsupported log_level: %s", c.LogLevel)
-	}
-	return nil
+	return ""
 }

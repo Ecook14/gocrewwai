@@ -12,10 +12,16 @@ import (
 	"time"
 )
 
+type anthropicMsg struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
 // AnthropicClient provides a native implementation for Anthropic Claude.
 type AnthropicClient struct {
 	APIKey     string
 	Model      string
+	BaseURL    string
 	HTTPClient *http.Client
 }
 
@@ -34,21 +40,28 @@ func NewAnthropicClient(apiKey, model string) *AnthropicClient {
 	return &AnthropicClient{
 		APIKey: apiKey,
 		Model:  model,
+		BaseURL: "https://api.anthropic.com/v1",
 		HTTPClient: &http.Client{
 			Timeout: 300 * time.Second,
 		},
 	}
 }
 
+// WithBaseURL allows reconfiguring the client's endpoint.
+func (c *AnthropicClient) WithBaseURL(url string) *AnthropicClient {
+	c.BaseURL = url
+	return c
+}
+
 // Generate implements basic message generation for Claude.
-func (c *AnthropicClient) Generate(ctx context.Context, messages []Message, options map[string]interface{}) (string, error) {
+func (c *AnthropicClient) Generate(ctx context.Context, messages []Message, options GenerateOptions) (string, error) {
 	if c.APIKey == "" {
 		return "", fmt.Errorf("anthropic API Key is required")
 	}
 
-	model := c.Model
-	if options != nil && options["model"] != nil {
-		model = options["model"].(string)
+	model := options.Model
+	if model == "" {
+		model = c.Model
 	}
 
 	// Map internal Message to Anthropic Message
@@ -77,7 +90,7 @@ func (c *AnthropicClient) Generate(ctx context.Context, messages []Message, opti
 		"max_tokens": 4096,
 	})
 
-	req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.anthropic.com/v1/messages", bytes.NewBuffer(reqBody))
+	req, _ := http.NewRequestWithContext(ctx, "POST", c.BaseURL+"/messages", bytes.NewBuffer(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("x-api-key", c.APIKey)
 	req.Header.Set("anthropic-version", "2023-06-01")
@@ -109,14 +122,14 @@ func (c *AnthropicClient) Generate(ctx context.Context, messages []Message, opti
 }
 
 // GenerateWithUsage implements Client — returns both text and token usage data.
-func (c *AnthropicClient) GenerateWithUsage(ctx context.Context, messages []Message, options map[string]interface{}) (string, *Usage, error) {
+func (c *AnthropicClient) GenerateWithUsage(ctx context.Context, messages []Message, options GenerateOptions) (string, *Usage, error) {
 	if c.APIKey == "" {
 		return "", nil, fmt.Errorf("anthropic API Key is required")
 	}
 
-	model := c.Model
-	if options != nil && options["model"] != nil {
-		model = options["model"].(string)
+	model := options.Model
+	if model == "" {
+		model = c.Model
 	}
 
 	type anthropicMsg struct {
@@ -144,7 +157,7 @@ func (c *AnthropicClient) GenerateWithUsage(ctx context.Context, messages []Mess
 		"max_tokens": 4096,
 	})
 
-	req, _ := http.NewRequestWithContext(ctx, "POST", "https://api.anthropic.com/v1/messages", bytes.NewBuffer(reqBody))
+	req, _ := http.NewRequestWithContext(ctx, "POST", c.BaseURL+"/messages", bytes.NewBuffer(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("x-api-key", c.APIKey)
 	req.Header.Set("anthropic-version", "2023-06-01")
@@ -185,6 +198,9 @@ func (c *AnthropicClient) GenerateWithUsage(ctx context.Context, messages []Mess
 	}
 	usage.CostUSD = CalculateCost(*usage)
 
+	// Elite: Record to Global Tracker
+	GlobalTracker().Record(*usage)
+
 	if len(result.Content) > 0 {
 		return result.Content[0].Text, usage, nil
 	}
@@ -192,7 +208,7 @@ func (c *AnthropicClient) GenerateWithUsage(ctx context.Context, messages []Mess
 }
 
 // GenerateStructured handles strict JSON extraction via Anthropic.
-func (c *AnthropicClient) GenerateStructured(ctx context.Context, messages []Message, schema interface{}, options map[string]interface{}) (interface{}, error) {
+func (c *AnthropicClient) GenerateStructured(ctx context.Context, messages []Message, schema interface{}, options GenerateOptions) (interface{}, error) {
 	// Anthropic works best with system prompts for structured data.
 	messages = append(messages, Message{
 		Role:    "system",
@@ -220,16 +236,89 @@ func (c *AnthropicClient) GenerateStructured(ctx context.Context, messages []Mes
 	return schema, nil
 }
 
-// StreamGenerate handles real-time token output.
-func (c *AnthropicClient) StreamGenerate(ctx context.Context, messages []Message, options map[string]interface{}) (<-chan string, error) {
-	// For simplicity, implement synchronous fallback or a simplified SSE stream in the future.
+// StreamGenerate handles real-time token output using SSE.
+func (c *AnthropicClient) StreamGenerate(ctx context.Context, messages []Message, options GenerateOptions) (<-chan string, error) {
+	if c.APIKey == "" {
+		return nil, fmt.Errorf("anthropic API Key is required")
+	}
+
+	model := options.Model
+	if model == "" {
+		model = c.Model
+	}
+
+	var anthropicMessages []anthropicMsg
+	systemPrompt := ""
+	for _, m := range messages {
+		if m.Role == "system" {
+			systemPrompt = m.Content
+			continue
+		}
+		anthropicMessages = append(anthropicMessages, anthropicMsg{
+			Role:    m.Role,
+			Content: m.Content,
+		})
+	}
+
+	reqBody, _ := json.Marshal(map[string]interface{}{
+		"model":      model,
+		"system":     systemPrompt,
+		"messages":   anthropicMessages,
+		"max_tokens": 4096,
+		"stream":     true,
+	})
+
+	req, _ := http.NewRequestWithContext(ctx, "POST", c.BaseURL+"/messages", bytes.NewBuffer(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-api-key", c.APIKey)
+	req.Header.Set("anthropic-version", "2023-06-01")
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		return nil, fmt.Errorf("anthropic api error (%d): %s", resp.StatusCode, string(respBody))
+	}
+
 	ch := make(chan string)
 	go func() {
+		defer resp.Body.Close()
 		defer close(ch)
-		res, err := c.Generate(ctx, messages, options)
-		if err == nil {
-			ch <- res
+
+		reader := io.Reader(resp.Body)
+		buf := make([]byte, 4096)
+		for {
+			n, err := reader.Read(buf)
+			if err != nil {
+				return
+			}
+			chunk := string(buf[:n])
+			lines := strings.Split(chunk, "\n")
+			for _, line := range lines {
+				if strings.HasPrefix(line, "data: ") {
+					data := strings.TrimPrefix(line, "data: ")
+					if data == "[DONE]" {
+						return
+					}
+					var event struct {
+						Type  string `json:"type"`
+						Delta struct {
+							Text string `json:"text"`
+						} `json:"delta"`
+					}
+					if err := json.Unmarshal([]byte(data), &event); err == nil {
+						if event.Type == "content_block_delta" {
+							ch <- event.Delta.Text
+						}
+					}
+				}
+			}
 		}
 	}()
+
 	return ch, nil
 }

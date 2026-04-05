@@ -26,6 +26,7 @@ type OpenAIOptions struct {
 // OpenAIClient implements the Client interface for OpenAI connectivity.
 type OpenAIClient struct {
 	APIKey     string
+	Model      string
 	client     *openai.Client
 	config     openai.ClientConfig // Store config for reconfiguration
 	HTTPClient *http.Client
@@ -119,6 +120,8 @@ func NewOpenAIClient(apiKey string) *OpenAIClient {
 		apiKey = os.Getenv("OPENAI_API_KEY")
 	}
 
+	model := "gpt-4o" // Default model
+
 	// Robust networking with explicit timeouts and retry backoff.
 	httpClient := &http.Client{
 		Timeout: 300 * time.Second,
@@ -134,6 +137,7 @@ func NewOpenAIClient(apiKey string) *OpenAIClient {
 
 	return &OpenAIClient{
 		APIKey:     apiKey,
+		Model:      model,
 		client:     openai.NewClientWithConfig(config),
 		config:     config,
 		HTTPClient: httpClient,
@@ -148,41 +152,22 @@ func (c *OpenAIClient) WithBaseURL(url string) *OpenAIClient {
 }
 
 // Generate implements basic message generation with Multimodal (Vision) support.
-func (c *OpenAIClient) Generate(ctx context.Context, messages []Message, options map[string]interface{}) (string, error) {
+func (c *OpenAIClient) Generate(ctx context.Context, messages []Message, options GenerateOptions) (string, error) {
 	if c.APIKey == "" {
 		return "", fmt.Errorf("OpenAI API Key is required")
 	}
 
-	var oaiMessages []openai.ChatCompletionMessage
-	for _, m := range messages {
-		if len(m.Images) > 0 {
-			parts := []openai.ChatMessagePart{
-				{Type: openai.ChatMessagePartTypeText, Text: m.Content},
-			}
-			for _, img := range m.Images {
-				parts = append(parts, openai.ChatMessagePart{
-					Type: openai.ChatMessagePartTypeImageURL,
-					ImageURL: &openai.ChatMessageImageURL{
-						URL:    img,
-						Detail: openai.ImageURLDetailAuto,
-					},
-				})
-			}
-			oaiMessages = append(oaiMessages, openai.ChatCompletionMessage{
-				Role:         m.Role,
-				MultiContent: parts,
-			})
-		} else {
-			oaiMessages = append(oaiMessages, openai.ChatCompletionMessage{
-				Role:    m.Role,
-				Content: m.Content,
-			})
-		}
+	model := options.Model
+	if model == "" {
+		model = c.Model
 	}
 
-	model := openai.GPT4o
-	if options != nil && options["model"] != nil {
-		model = options["model"].(string)
+	var oaiMessages []openai.ChatCompletionMessage
+	for _, m := range messages {
+		oaiMessages = append(oaiMessages, openai.ChatCompletionMessage{
+			Role:    m.Role,
+			Content: m.Content,
+		})
 	}
 
 	req := openai.ChatCompletionRequest{
@@ -199,41 +184,22 @@ func (c *OpenAIClient) Generate(ctx context.Context, messages []Message, options
 }
 
 // GenerateWithUsage implements Client — returns both text and token usage data.
-func (c *OpenAIClient) GenerateWithUsage(ctx context.Context, messages []Message, options map[string]interface{}) (string, *Usage, error) {
+func (c *OpenAIClient) GenerateWithUsage(ctx context.Context, messages []Message, options GenerateOptions) (string, *Usage, error) {
 	if c.APIKey == "" {
 		return "", nil, fmt.Errorf("OpenAI API Key is required")
 	}
 
-	var oaiMessages []openai.ChatCompletionMessage
-	for _, m := range messages {
-		if len(m.Images) > 0 {
-			parts := []openai.ChatMessagePart{
-				{Type: openai.ChatMessagePartTypeText, Text: m.Content},
-			}
-			for _, img := range m.Images {
-				parts = append(parts, openai.ChatMessagePart{
-					Type: openai.ChatMessagePartTypeImageURL,
-					ImageURL: &openai.ChatMessageImageURL{
-						URL:    img,
-						Detail: openai.ImageURLDetailAuto,
-					},
-				})
-			}
-			oaiMessages = append(oaiMessages, openai.ChatCompletionMessage{
-				Role:         m.Role,
-				MultiContent: parts,
-			})
-		} else {
-			oaiMessages = append(oaiMessages, openai.ChatCompletionMessage{
-				Role:    m.Role,
-				Content: m.Content,
-			})
-		}
+	model := options.Model
+	if model == "" {
+		model = c.Model
 	}
 
-	model := openai.GPT4o
-	if options != nil && options["model"] != nil {
-		model = options["model"].(string)
+	var oaiMessages []openai.ChatCompletionMessage
+	for _, m := range messages {
+		oaiMessages = append(oaiMessages, openai.ChatCompletionMessage{
+			Role:    m.Role,
+			Content: m.Content,
+		})
 	}
 
 	req := openai.ChatCompletionRequest{
@@ -258,13 +224,21 @@ func (c *OpenAIClient) GenerateWithUsage(ctx context.Context, messages []Message
 	}
 	usage.CostUSD = CalculateCost(*usage)
 
+	// Elite: Record to Global Tracker
+	GlobalTracker().Record(*usage)
+
 	return resp.Choices[0].Message.Content, usage, nil
 }
 
 // GenerateStructured implements generation with structured JSON schema outputs.
-func (c *OpenAIClient) GenerateStructured(ctx context.Context, messages []Message, schema interface{}, options map[string]interface{}) (interface{}, error) {
+func (c *OpenAIClient) GenerateStructured(ctx context.Context, messages []Message, schema interface{}, options GenerateOptions) (interface{}, error) {
 	if c.APIKey == "" {
 		return nil, fmt.Errorf("OpenAI API Key is required")
+	}
+
+	model := options.Model
+	if model == "" {
+		model = c.Model
 	}
 
 	var oaiMessages []openai.ChatCompletionMessage
@@ -273,17 +247,6 @@ func (c *OpenAIClient) GenerateStructured(ctx context.Context, messages []Messag
 			Role:    m.Role,
 			Content: m.Content,
 		})
-	}
-
-	// For simple schema matching, tell OpenAI to return JSON object
-	oaiMessages = append(oaiMessages, openai.ChatCompletionMessage{
-		Role:    "system",
-		Content: "You must return your output precisely in valid JSON format matching the requested structure.",
-	})
-
-	model := openai.GPT4o
-	if options != nil && options["model"] != nil {
-		model = options["model"].(string)
 	}
 
 	req := openai.ChatCompletionRequest{
@@ -307,9 +270,14 @@ func (c *OpenAIClient) GenerateStructured(ctx context.Context, messages []Messag
 }
 
 // StreamGenerate provides real-time token output via a channel for OpenAI.
-func (c *OpenAIClient) StreamGenerate(ctx context.Context, messages []Message, options map[string]interface{}) (<-chan string, error) {
+func (c *OpenAIClient) StreamGenerate(ctx context.Context, messages []Message, options GenerateOptions) (<-chan string, error) {
 	if c.APIKey == "" {
 		return nil, fmt.Errorf("OpenAI API Key is required")
+	}
+
+	model := options.Model
+	if model == "" {
+		model = c.Model
 	}
 
 	var oaiMessages []openai.ChatCompletionMessage
@@ -318,11 +286,6 @@ func (c *OpenAIClient) StreamGenerate(ctx context.Context, messages []Message, o
 			Role:    m.Role,
 			Content: m.Content,
 		})
-	}
-
-	model := openai.GPT4o
-	if options != nil && options["model"] != nil {
-		model = options["model"].(string)
 	}
 
 	req := openai.ChatCompletionRequest{

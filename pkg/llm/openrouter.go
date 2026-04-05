@@ -74,34 +74,25 @@ func (r *openRouterHeaderRoundTripper) RoundTrip(req *http.Request) (*http.Respo
 }
 
 // Generate overrides the base OpenAI Generate to inject the default model if not provided.
-func (c *OpenRouterClient) Generate(ctx context.Context, messages []Message, options map[string]interface{}) (string, error) {
-	if options == nil {
-		options = make(map[string]interface{})
-	}
-	if options["model"] == nil {
-		options["model"] = c.DefaultModel
+func (c *OpenRouterClient) Generate(ctx context.Context, messages []Message, options GenerateOptions) (string, error) {
+	if options.Model == "" {
+		options.Model = c.DefaultModel
 	}
 	return c.OpenAIClient.Generate(ctx, messages, options)
 }
 
 // GenerateStructured overrides the base OpenAI GenerateStructured to inject the default model if not provided.
-func (c *OpenRouterClient) GenerateStructured(ctx context.Context, messages []Message, schema interface{}, options map[string]interface{}) (interface{}, error) {
-	if options == nil {
-		options = make(map[string]interface{})
-	}
-	if options["model"] == nil {
-		options["model"] = c.DefaultModel
+func (c *OpenRouterClient) GenerateStructured(ctx context.Context, messages []Message, schema interface{}, options GenerateOptions) (interface{}, error) {
+	if options.Model == "" {
+		options.Model = c.DefaultModel
 	}
 	return c.OpenAIClient.GenerateStructured(ctx, messages, schema, options)
 }
 
 // GenerateWithUsage overrides the base to inject the default model and provider.
-func (c *OpenRouterClient) GenerateWithUsage(ctx context.Context, messages []Message, options map[string]interface{}) (string, *Usage, error) {
-	if options == nil {
-		options = make(map[string]interface{})
-	}
-	if options["model"] == nil {
-		options["model"] = c.DefaultModel
+func (c *OpenRouterClient) GenerateWithUsage(ctx context.Context, messages []Message, options GenerateOptions) (string, *Usage, error) {
+	if options.Model == "" {
+		options.Model = c.DefaultModel
 	}
 	text, usage, err := c.OpenAIClient.GenerateWithUsage(ctx, messages, options)
 	if usage != nil {
@@ -111,12 +102,9 @@ func (c *OpenRouterClient) GenerateWithUsage(ctx context.Context, messages []Mes
 }
 
 // StreamGenerate overrides the base OpenAI StreamGenerate to inject the default model if not provided.
-func (c *OpenRouterClient) StreamGenerate(ctx context.Context, messages []Message, options map[string]interface{}) (<-chan string, error) {
-	if options == nil {
-		options = make(map[string]interface{})
-	}
-	if options["model"] == nil {
-		options["model"] = c.DefaultModel
+func (c *OpenRouterClient) StreamGenerate(ctx context.Context, messages []Message, options GenerateOptions) (<-chan string, error) {
+	if options.Model == "" {
+		options.Model = c.DefaultModel
 	}
 	return c.OpenAIClient.StreamGenerate(ctx, messages, options)
 }
