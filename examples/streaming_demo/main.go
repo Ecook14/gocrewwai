@@ -5,43 +5,45 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/Ecook14/gocrewwai/gocrew"
 	"github.com/Ecook14/gocrewwai/pkg/dashboard"
-	"github.com/Ecook14/gocrewwai/pkg/agents"
-	"github.com/Ecook14/gocrewwai/pkg/crew"
-	"github.com/Ecook14/gocrewwai/pkg/core"
-	"github.com/Ecook14/gocrewwai/pkg/llm"
-	"github.com/Ecook14/gocrewwai/pkg/tasks"
 )
 
 func main() {
 	apiKey := os.Getenv("OPENAI_API_KEY")
-	model := llm.NewOpenAIClient(apiKey)
-
-	// Define an agent with a streaming callback
-	writer := agents.NewAgent(
-		"Poet",
-		"Write a short, beautiful haiku about Go programming.",
-		"A minimalist poet",
-		model,
-		agents.WithVerbose(true),
-	)
-
-	// Set the streaming callback to print tokens in real-time
-	writer.StepStreamCallback = func(token string) {
-		fmt.Print(token)
+	if apiKey == "" {
+		fmt.Println("❌ Error: Please set OPENAI_API_KEY environment variable.")
+		return
 	}
 
-	task := &tasks.Task{
+	model := gocrew.NewOpenAI(apiKey, "gpt-4o")
+
+	// 1. Define an agent with a streaming callback (Elite Style)
+	writer := gocrew.NewAgent(gocrew.AgentConfig{
+		Role:      "Poet",
+		Goal:      "Write a short, beautiful haiku about Go programming.",
+		Backstory: "A minimalist poet who understands concurrency and pointers.",
+		LLM:       model,
+		Verbose:   true,
+		StepStreamCallback: func(token string) {
+			fmt.Print(token)
+		},
+	})
+
+	// 2. Define a simple Task (Elite Style)
+	task := gocrew.NewTask(gocrew.TaskConfig{
 		Description: "Write a haiku about Go.",
 		Agent:       writer,
-	}
+	})
 
-	myCrew := crew.NewCrew(
-		[]core.Agent{writer},
-		[]*tasks.Task{task},
-	)
+	// 3. Assemble and Kickoff the Crew (Elite Style)
+	myCrew := gocrew.NewCrew(gocrew.CrewConfig{
+		Agents:  []gocrew.CoreAgent{writer},
+		Tasks:   []*gocrew.Task{task},
+		Verbose: true,
+	})
 
-	fmt.Println("🚀 Starting Streaming Demo (Tokens should appear one by one):")
+	fmt.Println("🚀 Starting GOCREW Streaming Demo (Tokens should appear one by one):")
 	
 	dashboard.Start("8081")
 	fmt.Println("🖥️  Dashboard active at http://localhost:8081/web-ui - Watch the tokens stream!")

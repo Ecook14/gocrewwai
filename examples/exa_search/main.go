@@ -5,42 +5,46 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Ecook14/gocrewwai/pkg/agents"
-	"github.com/Ecook14/gocrewwai/pkg/crew"
-	"github.com/Ecook14/gocrewwai/pkg/core"
-	"github.com/Ecook14/gocrewwai/pkg/llm"
-	"github.com/Ecook14/gocrewwai/pkg/tasks"
-	"github.com/Ecook14/gocrewwai/pkg/tools"
+	"github.com/Ecook14/gocrewwai/gocrew"
 )
 
 func main() {
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	exaKey := os.Getenv("EXA_API_KEY")
-	model := llm.NewOpenAIClient(apiKey)
-
-	// Exa Search Tool
-	exa := tools.NewExaTool(exaKey)
-
-	researcher := agents.NewAgent(
-		"Exa Researcher",
-		"Find high-quality research papers or articles about LLM reasoning architectures.",
-		"Advanced AI analyst",
-		model,
-		agents.WithTools([]agents.Tool{exa}),
-	)
-
-	task := &tasks.Task{
-		Description: "Use Exa search to find 3 groundbreaking papers on 'Chain of Thought' reasoning and summarize their URLs.",
-		Agent:       researcher,
+	if apiKey == "" || exaKey == "" {
+		fmt.Println("❌ Error: Please set OPENAI_API_KEY and EXA_API_KEY environment variables.")
+		return
 	}
 
-	myCrew := crew.NewCrew(
-		[]core.Agent{researcher},
-		[]*tasks.Task{task},
-		crew.WithVerbose(true),
-	)
+	model := gocrew.NewOpenAI(apiKey, "gpt-4o")
 
-	fmt.Println("🚀 Starting Exa AI Search Demo...")
+	// 1. Exa Search Tool via SDK
+	exa := gocrew.NewExaTool(exaKey)
+
+	// 2. Define Agent (Elite Style)
+	researcher := gocrew.NewAgent(gocrew.AgentConfig{
+		Role:      "Exa Researcher",
+		Goal:      "Find high-quality research papers or articles about LLM reasoning architectures.",
+		Backstory: "Advanced AI analyst specializing in vector-indexed search.",
+		LLM:       model,
+		Tools:     []gocrew.Tool{exa},
+		Verbose:   true,
+	})
+
+	// 3. Define Task (Elite Style)
+	task := gocrew.NewTask(gocrew.TaskConfig{
+		Description: "Use Exa search to find 3 groundbreaking papers on 'Chain of Thought' reasoning and summarize their URLs.",
+		Agent:       researcher,
+	})
+
+	// 4. Assemble and Kickoff Crew (Elite Style)
+	myCrew := gocrew.NewCrew(gocrew.CrewConfig{
+		Agents:  []gocrew.CoreAgent{researcher},
+		Tasks:   []*gocrew.Task{task},
+		Verbose: true,
+	})
+
+	fmt.Println("🚀 Starting Exa AI Search Demo (Elite Style)...")
 	result, err := myCrew.Kickoff(context.Background())
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
