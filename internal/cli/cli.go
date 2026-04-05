@@ -8,6 +8,7 @@ import (
 	"os/exec"
 
 	"github.com/Ecook14/gocrewwai/gocrew"
+	"github.com/Ecook14/gocrewwai/pkg/core"
 	"github.com/Ecook14/gocrewwai/pkg/dashboard"
 	"github.com/Ecook14/gocrewwai/pkg/telemetry"
 )
@@ -195,7 +196,7 @@ func handleKickoff(showUI bool) error {
 	})
 
 	c := gocrew.NewCrew(gocrew.CrewConfig{
-		Agents:  []gocrew.Agent{agent},
+		Agents:  []core.Agent{agent},
 		Tasks:   []*gocrew.Task{task},
 		Process: gocrew.Sequential,
 		Verbose: true,

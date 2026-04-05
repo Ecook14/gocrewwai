@@ -857,7 +857,7 @@ func (a *Agent) Execute(ctx context.Context, taskInput string, options map[strin
 		// If a strict final schema is requested, disable autonomous looping
 		if options != nil && options["schema"] != nil {
 			mappedSchema := options["schema"]
-			response, err := a.LLM.GenerateStructured(ctx, messages, mappedSchema, options)
+			response, err := a.LLM.GenerateStructured(ctx, messages, mappedSchema, llm.MapToOptions(options))
 			return response, err
 		}
 
@@ -886,7 +886,7 @@ func (a *Agent) Execute(ctx context.Context, taskInput string, options map[strin
 				if a.StepCallback != nil {
 					a.StepCallback(map[string]interface{}{"role": a.Role, "phase": "generation_started", "streaming": true})
 				}
-				stream, err := a.LLM.StreamGenerate(ctx, messages, options)
+				stream, err := a.LLM.StreamGenerate(ctx, messages, llm.MapToOptions(options))
 				if err != nil {
 					return nil, crewErrors.NewAgentError(strings.Clone(strings.TrimSpace(a.Role)), i+1, fmt.Errorf("%w: %v", crewErrors.ErrLLMFailed, err))
 				}
@@ -905,7 +905,7 @@ func (a *Agent) Execute(ctx context.Context, taskInput string, options map[strin
 					a.StepCallback(map[string]interface{}{"role": a.Role, "phase": "generation_started", "streaming": false})
 				}
 				var err error
-				responseText, err = llmClient.Generate(ctx, messages, options)
+				responseText, err = llmClient.Generate(ctx, messages, llm.MapToOptions(options))
 				if err != nil {
 					return nil, crewErrors.NewAgentError(strings.Clone(strings.TrimSpace(a.Role)), i+1, fmt.Errorf("%w: %v", crewErrors.ErrLLMFailed, err))
 				}
@@ -1099,7 +1099,7 @@ func (a *Agent) Execute(ctx context.Context, taskInput string, options map[strin
 			critique, err := a.LLM.Generate(ctx, []llm.Message{
 				{Role: "system", Content: "You are a critical self-reviewer."},
 				{Role: "user", Content: critiquePrompt},
-			}, nil)
+			}, llm.GenerateOptions{})
 			
 			if err == nil && !strings.Contains(strings.ToUpper(critique), "APPROVED") {
 				if a.Verbose {
@@ -1255,7 +1255,7 @@ func (a *Agent) extractAndStoreEntities(ctx context.Context, text string) {
 	response, err := a.LLM.Generate(ctx, []llm.Message{
 		{Role: "system", Content: "You are a precise data extractor."},
 		{Role: "user", Content: prompt},
-	}, nil)
+	}, llm.GenerateOptions{})
 
 	if err != nil {
 		return

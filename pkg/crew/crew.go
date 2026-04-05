@@ -11,6 +11,7 @@ import (
 	"github.com/Ecook14/gocrewwai/pkg/core"
 	//"github.com/Ecook14/gocrewwai/pkg/dashboard"
 	"github.com/Ecook14/gocrewwai/pkg/delegation"
+	"github.com/Ecook14/gocrewwai/pkg/config"
 	crewErrors "github.com/Ecook14/gocrewwai/pkg/errors"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/events"
@@ -18,6 +19,7 @@ import (
 	"github.com/Ecook14/gocrewwai/pkg/tasks"
 	"github.com/Ecook14/gocrewwai/pkg/telemetry"
 	"github.com/Ecook14/gocrewwai/pkg/training"
+	"go.opentelemetry.io/otel/attribute"
 	"os"
 	"time"
 )
@@ -59,7 +61,7 @@ type CrewConfig struct {
 	KnowledgeSources []memory.KnowledgeSource
 	Stream         bool
 	TrainingDir    string // Directory for training iteration data
-	TestLLM        byte   // Evaluation placeholder (ignoring mismatch for now)
+	TestLLM        llm.Client // Internal evaluation LLM for elite tier verification
 	TaskCooldown   time.Duration 
 }
 
@@ -100,47 +102,6 @@ func NewCrew(agents []core.Agent, tasks []*tasks.Task, opts ...CrewOption) *Crew
 	return c
 }
 
-// NewCrew is a legacy-compatible constructor for creating a new Crew.
-func NewCrew(agents []core.Agent, tasks []*tasks.Task, options ...CrewOption) *Crew {
-	c := &Crew{
-		Agents:       agents,
-		Tasks:        tasks,
-		Process:      Sequential,
-		UsageMetrics: make(map[string]int),
-	}
-	for _, opt := range options {
-		opt(c)
-	}
-	return c
-}
-
-// WithVerbose is a legacy-compatible option for enabling verbose logging.
-func WithVerbose(v bool) CrewOption {
-	return func(c *Crew) {
-		c.Verbose = v
-	}
-}
-
-// WithProcess is a legacy-compatible option for setting the process type.
-func WithProcess(p ProcessType) CrewOption {
-	return func(c *Crew) {
-		c.Process = p
-	}
-}
-
-// WithPlanning is a legacy-compatible option for enabling the planning phase.
-func WithPlanning(p bool) CrewOption {
-	return func(c *Crew) {
-		c.Planning = p
-	}
-}
-
-// WithManager is a legacy-compatible option for setting a custom manager agent.
-func WithManager(m core.Agent) CrewOption {
-	return func(c *Crew) {
-		c.ManagerAgent = m
-	}
-}
 
 // New creates a new Crew using a declarative configuration struct (Elite Style).
 func New(cfg CrewConfig) *Crew {
@@ -164,6 +125,7 @@ func New(cfg CrewConfig) *Crew {
 		Stream:         cfg.Stream,
 		TrainingDir:    cfg.TrainingDir,
 		TaskCooldown:   cfg.TaskCooldown,
+		TestLLM:        cfg.TestLLM,
 		UsageMetrics:   make(map[string]int),
 	}
 }
@@ -509,7 +471,7 @@ func (c *Crew) executeSequential(ctx context.Context) (interface{}, error) {
 			// Instrument Task Execution
 			ctx, taskSpan := telemetry.StartSpan(ctx, "Task.Execute: "+task.Description)
 			result, err := task.Execute(ctx)
-			taskSpan.Attribute(semconv.MessageIDKey.String(fmt.Sprintf("%d", i+1)))
+			taskSpan.SetAttributes(attribute.String("crew.task_index", fmt.Sprintf("%d", i+1)))
 			taskSpan.End()
 			
 			if err != nil {

@@ -19,7 +19,7 @@ type testClient struct {
 	mu       sync.Mutex
 }
 
-func (tc *testClient) Generate(ctx context.Context, messages []Message, options map[string]interface{}) (string, error) {
+func (tc *testClient) Generate(ctx context.Context, messages []Message, options GenerateOptions) (string, error) {
 	tc.mu.Lock()
 	tc.calls++
 	tc.mu.Unlock()
@@ -33,16 +33,16 @@ func (tc *testClient) Generate(ctx context.Context, messages []Message, options 
 	return tc.response, tc.err
 }
 
-func (tc *testClient) GenerateWithUsage(ctx context.Context, messages []Message, options map[string]interface{}) (string, *Usage, error) {
+func (tc *testClient) GenerateWithUsage(ctx context.Context, messages []Message, options GenerateOptions) (string, *Usage, error) {
 	resp, err := tc.Generate(ctx, messages, options)
 	return resp, &Usage{PromptTokens: 10, CompletionTokens: 5, TotalTokens: 15}, err
 }
 
-func (tc *testClient) GenerateStructured(ctx context.Context, messages []Message, schema interface{}, options map[string]interface{}) (interface{}, error) {
+func (tc *testClient) GenerateStructured(ctx context.Context, messages []Message, schema interface{}, options GenerateOptions) (interface{}, error) {
 	return tc.Generate(ctx, messages, options)
 }
 
-func (tc *testClient) StreamGenerate(ctx context.Context, messages []Message, options map[string]interface{}) (<-chan string, error) {
+func (tc *testClient) StreamGenerate(ctx context.Context, messages []Message, options GenerateOptions) (<-chan string, error) {
 	ch := make(chan string, 1)
 	ch <- tc.response
 	close(ch)
@@ -59,7 +59,7 @@ func TestMiddleware_Passthrough(t *testing.T) {
 	inner := &testClient{response: "hello"}
 	client := WrapClient(inner)
 
-	result, err := client.Generate(context.Background(), []Message{{Role: "user", Content: "test"}}, nil)
+	result, err := client.Generate(context.Background(), []Message{{Role: "user", Content: "test"}}, GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -72,7 +72,7 @@ func TestMiddleware_Timeout(t *testing.T) {
 	inner := &testClient{response: "slow", delay: 500 * time.Millisecond}
 	client := WrapClient(inner, WithTimeout(50*time.Millisecond))
 
-	_, err := client.Generate(context.Background(), []Message{{Role: "user", Content: "test"}}, nil)
+	_, err := client.Generate(context.Background(), []Message{{Role: "user", Content: "test"}}, GenerateOptions{})
 	if err == nil {
 		t.Error("Expected timeout error")
 	}
@@ -82,7 +82,7 @@ func TestMiddleware_TimeoutSuccess(t *testing.T) {
 	inner := &testClient{response: "fast", delay: 10 * time.Millisecond}
 	client := WrapClient(inner, WithTimeout(1*time.Second))
 
-	result, err := client.Generate(context.Background(), []Message{{Role: "user", Content: "test"}}, nil)
+	result, err := client.Generate(context.Background(), []Message{{Role: "user", Content: "test"}}, GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -101,14 +101,14 @@ func TestMiddleware_RateLimit(t *testing.T) {
 
 	// First 3 should be instant
 	for i := 0; i < 3; i++ {
-		_, err := client.Generate(ctx, []Message{{Role: "user", Content: "test"}}, nil)
+		_, err := client.Generate(ctx, []Message{{Role: "user", Content: "test"}}, GenerateOptions{})
 		if err != nil {
 			t.Fatalf("Call %d failed: %v", i, err)
 		}
 	}
 
 	// 4th should be delayed
-	_, err := client.Generate(ctx, []Message{{Role: "user", Content: "test"}}, nil)
+	_, err := client.Generate(ctx, []Message{{Role: "user", Content: "test"}}, GenerateOptions{})
 	if err != nil {
 		t.Fatalf("4th call failed: %v", err)
 	}
@@ -127,13 +127,13 @@ func TestMiddleware_RateLimitContextCancel(t *testing.T) {
 
 	ctx := context.Background()
 	// Use up the single token
-	_, _ = client.Generate(ctx, []Message{{Role: "user", Content: "first"}}, nil)
+	_, _ = client.Generate(ctx, []Message{{Role: "user", Content: "first"}}, GenerateOptions{})
 
 	// Second call with short deadline should fail
 	ctx2, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
 	defer cancel()
 
-	_, err := client.Generate(ctx2, []Message{{Role: "user", Content: "second"}}, nil)
+	_, err := client.Generate(ctx2, []Message{{Role: "user", Content: "second"}}, GenerateOptions{})
 	if err == nil {
 		t.Error("Expected rate limit context cancellation error")
 	}
@@ -148,7 +148,7 @@ func TestMiddleware_Logging(t *testing.T) {
 
 	_, _ = client.Generate(context.Background(),
 		[]Message{{Role: "user", Content: "hello world"}},
-		map[string]interface{}{"model": "gpt-4o"},
+		GenerateOptions{Model: "gpt-4o"},
 	)
 
 	logOutput := buf.String()
@@ -171,7 +171,7 @@ func TestMiddleware_LoggingWithUsage(t *testing.T) {
 	client := WrapClient(inner, WithLogging(logger))
 
 	_, _, _ = client.GenerateWithUsage(context.Background(),
-		[]Message{{Role: "user", Content: "test"}}, nil)
+		[]Message{{Role: "user", Content: "test"}}, GenerateOptions{})
 
 	logOutput := buf.String()
 	if !strings.Contains(logOutput, "prompt_tokens") {
@@ -196,16 +196,16 @@ func TestMiddleware_AllMethods(t *testing.T) {
 	ctx := context.Background()
 
 	// Verify all methods work through middleware
-	if _, err := client.Generate(ctx, nil, nil); err != nil {
+	if _, err := client.Generate(ctx, []Message{}, GenerateOptions{}); err != nil {
 		t.Errorf("Generate failed: %v", err)
 	}
-	if _, _, err := client.GenerateWithUsage(ctx, nil, nil); err != nil {
+	if _, _, err := client.GenerateWithUsage(ctx, []Message{}, GenerateOptions{}); err != nil {
 		t.Errorf("GenerateWithUsage failed: %v", err)
 	}
-	if _, err := client.GenerateStructured(ctx, nil, nil, nil); err != nil {
+	if _, err := client.GenerateStructured(ctx, []Message{}, nil, GenerateOptions{}); err != nil {
 		t.Errorf("GenerateStructured failed: %v", err)
 	}
-	if _, err := client.StreamGenerate(ctx, nil, nil); err != nil {
+	if _, err := client.StreamGenerate(ctx, []Message{}, GenerateOptions{}); err != nil {
 		t.Errorf("StreamGenerate failed: %v", err)
 	}
 }
@@ -238,7 +238,7 @@ func TestMiddleware_CombinedOptions(t *testing.T) {
 	)
 
 	result, err := client.Generate(context.Background(),
-		[]Message{{Role: "user", Content: "test"}}, nil)
+		[]Message{{Role: "user", Content: "test"}}, GenerateOptions{})
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}

@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/Ecook14/gocrewwai/pkg/llm"
 )
 
 // Guardrail defines the interface for all validation middleware.
@@ -158,10 +160,12 @@ func (g *ToxicityGuardrail) Validate(output string) error {
 
 // LLMReviewGuardrail uses a secondary LLM call to validate the primary agent's output.
 // This is the gold standard for "Elite" guardrailing.
+type Reviewer interface {
+	Generate(ctx context.Context, messages []llm.Message, options llm.GenerateOptions) (string, error)
+}
+
 type LLMReviewGuardrail struct {
-	Reviewer interface {
-		Generate(ctx context.Context, messages []interface{}, options map[string]interface{}) (string, error)
-	}
+	Reviewer Reviewer
 	Criteria string
 }
 
@@ -173,12 +177,12 @@ func (g *LLMReviewGuardrail) Validate(output string) error {
 	ctx := context.Background()
 	prompt := fmt.Sprintf("Review the following agent output based on these criteria: %s\n\nOutput: %s\n\nReturn 'PASS' if it satisfies the criteria, otherwise return a reason for failure.", g.Criteria, output)
 	
-	messages := []interface{}{
-		map[string]string{"role": "system", "content": "You are a strict output validator."},
-		map[string]string{"role": "user", "content": prompt},
+	msgList := []llm.Message{
+		{Role: "system", Content: "You are a strict output validator."},
+		{Role: "user", Content: prompt},
 	}
 
-	review, err := g.Reviewer.Generate(ctx, messages, nil)
+	review, err := g.Reviewer.Generate(ctx, msgList, llm.GenerateOptions{})
 	if err != nil {
 		return fmt.Errorf("llm review failed: %w", err)
 	}

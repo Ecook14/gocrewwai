@@ -4,8 +4,8 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
-	"sync"
 	"strings"
+	"sync"
 )
 
 //go:embed translations/*.json

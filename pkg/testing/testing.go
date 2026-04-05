@@ -57,7 +57,7 @@ FEEDBACK: [1-2 sentences explaining the score]`, taskDesc, expected, output)
 	response, err := e.LLM.Generate(ctx, []llm.Message{
 		{Role: "system", Content: "You are an expert AI quality assurance judge."},
 		{Role: "user", Content: prompt},
-	}, nil)
+	}, llm.GenerateOptions{})
 
 	if err != nil {
 		return 0, "", err

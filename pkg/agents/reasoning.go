@@ -47,7 +47,7 @@ func (a *Agent) runReasoningLoop(ctx context.Context, messages []llm.Message, op
 
 		currentMessages = append(currentMessages, llm.Message{Role: "user", Content: prompt})
 		
-		response, err := a.LLM.Generate(ctx, currentMessages, options)
+		response, err := a.LLM.Generate(ctx, currentMessages, llm.MapToOptions(options))
 		if err != nil {
 			return "", err
 		}
