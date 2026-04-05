@@ -6,11 +6,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/Ecook14/gocrewwai/pkg/agents"
-	"github.com/Ecook14/gocrewwai/pkg/crew"
-	"github.com/Ecook14/gocrewwai/pkg/core"
-	"github.com/Ecook14/gocrewwai/pkg/llm"
-	"github.com/Ecook14/gocrewwai/pkg/tasks"
+	"github.com/Ecook14/gocrewwai/gocrew"
 )
 
 func main() {
@@ -21,23 +17,30 @@ func main() {
 		return
 	}
 
-	model := llm.NewOpenAIClient(apiKey)
+	model := gocrew.NewOpenAI(apiKey, "gpt-4o")
 
-	// 2. Define a simple Agent
-	researcher := agents.NewAgent(agents.AgentConfig{
+	// 2. Define a simple Agent (Elite Style)
+	researcher := gocrew.NewAgent(gocrew.AgentConfig{
 		Role:      "Technical Researcher",
 		Goal:      "Summarize the key benefits of using Go for AI agents.",
 		Backstory: "Expert Go developer turned AI architect.",
 		LLM:       model,
 	})
 
-	// 3. Define a simple Task
-	task := tasks.NewTask("Write a 3-bullet point summary of why Go is great for AI.", researcher)
+	// 3. Define a simple Task (Elite Style)
+	task := gocrew.NewTask(gocrew.TaskConfig{
+		Description: "Write a 3-bullet point summary of why Go is great for AI.",
+		Agent:       researcher,
+	})
 
-	// 4. Assemble and Kickoff the Crew
-	quickCrew := crew.NewCrew([]core.Agent{researcher}, []*tasks.Task{task}, crew.WithVerbose(true))
+	// 4. Assemble and Kickoff the Crew (Elite Style)
+	quickCrew := gocrew.NewCrew(gocrew.CrewConfig{
+		Agents:  []gocrew.CoreAgent{researcher},
+		Tasks:   []*gocrew.Task{task},
+		Verbose: true,
+	})
 
-	fmt.Println("🚀 CREW-GO QUICKSTART INITIATED...")
+	fmt.Println("🚀 GOCREW QUICKSTART INITIATED (Elite Style)...")
 	result, err := quickCrew.Kickoff(context.Background())
 	if err != nil {
 		log.Fatalf("❌ Execution failed: %v", err)

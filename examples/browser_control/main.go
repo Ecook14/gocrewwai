@@ -5,45 +5,50 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Ecook14/gocrewwai/pkg/agents"
-	"github.com/Ecook14/gocrewwai/pkg/crew"
-	"github.com/Ecook14/gocrewwai/pkg/core"
-	"github.com/Ecook14/gocrewwai/pkg/llm"
-	"github.com/Ecook14/gocrewwai/pkg/tasks"
-	"github.com/Ecook14/gocrewwai/pkg/tools"
+	"github.com/Ecook14/gocrewwai/gocrew"
 )
 
 func main() {
 	apiKey := os.Getenv("OPENAI_API_KEY")
-	model := llm.NewOpenAIClient(apiKey)
-
-	browser := tools.NewBrowserTool()
-
-	browserAgent := agents.NewAgent(
-		"Web Automator",
-		"Browse the internet purposefully.",
-		"An agent that can use a real browser.",
-		model,
-		agents.WithTools([]agents.Tool{browser}),
-	)
-
-	task := &tasks.Task{
-		Description: "Navigate to 'https://news.ycombinator.com', find the top story, and return its title.",
-		Agent:       browserAgent,
+	if apiKey == "" {
+		fmt.Println("❌ Error: Please set OPENAI_API_KEY environment variable.")
+		return
 	}
 
-	myCrew := crew.NewCrew(
-		[]core.Agent{browserAgent},
-		[]*tasks.Task{task},
-		crew.WithVerbose(true),
-	)
+	model := gocrew.NewOpenAI(apiKey, "gpt-4o")
 
-	fmt.Println("🚀 Starting Browser Control Demo (Requires Chrome/Chromium installed)...")
+	// 1. Browser Tool via SDK
+	browser := gocrew.NewBrowserTool()
+
+	// 2. Define Agent (Elite Style)
+	browserAgent := gocrew.NewAgent(gocrew.AgentConfig{
+		Role:      "Web Automator",
+		Goal:      "Browse the internet purposefully to extract specific information.",
+		Backstory: "An advanced agent capable of real-time multi-modal web navigation and element interaction.",
+		LLM:       model,
+		Tools:     []gocrew.Tool{browser},
+		Verbose:   true,
+	})
+
+	// 3. Define Task (Elite Style)
+	task := gocrew.NewTask(gocrew.TaskConfig{
+		Description: "Navigate to 'https://news.ycombinator.com', find the top story, and return its title.",
+		Agent:       browserAgent,
+	})
+
+	// 4. Assemble and Kickoff the Crew (Elite Style)
+	myCrew := gocrew.NewCrew(gocrew.CrewConfig{
+		Agents:  []gocrew.CoreAgent{browserAgent},
+		Tasks:   []*gocrew.Task{task},
+		Verbose: true,
+	})
+
+	fmt.Println("🚀 Starting GOCREW Browser Control Demo (Elite Style)...")
 	result, err := myCrew.Kickoff(context.Background())
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		return
 	}
 
-	fmt.Printf("\nBrowser result: %s\n", result)
+	fmt.Printf("\n✨ Browser Result Summary:\n%s\n", result)
 }

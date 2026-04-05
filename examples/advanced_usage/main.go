@@ -6,13 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/Ecook14/gocrewwai/pkg/agents"
-	"github.com/Ecook14/gocrewwai/pkg/crew"
-	"github.com/Ecook14/gocrewwai/pkg/core"
-	"github.com/Ecook14/gocrewwai/pkg/llm"
-	"github.com/Ecook14/gocrewwai/pkg/memory"
-	"github.com/Ecook14/gocrewwai/pkg/tasks"
-	"github.com/Ecook14/gocrewwai/pkg/tools"
+	"github.com/Ecook14/gocrewwai/gocrew"
 )
 
 func main() {
@@ -22,60 +16,60 @@ func main() {
 		return
 	}
 
-	model := llm.NewOpenAIClient(apiKey)
+	model := gocrew.NewOpenAI(apiKey, "gpt-4o")
 
-	// 1. Setup Persistent Memory
-	sqliteStore, err := memory.NewSQLiteStore("crew_memory.db")
+	// 1. Setup Persistent Memory via SDK
+	sqliteStore, err := gocrew.NewSQLiteStore("crew_memory.db")
 	if err != nil {
 		fmt.Printf("Failed to setup persistent memory: %v\n", err)
 		return
 	}
 	defer sqliteStore.Close()
 
-
-	// 2. Define Advanced Agents
-	researcher := &agents.Agent{
+	// 2. Define Advanced Agents (Elite Style)
+	researcher := gocrew.NewAgent(gocrew.AgentConfig{
 		Role:             "Strategic Researcher",
 		Goal:             "Deeply analyze market trends and provide data-driven insights.",
 		Backstory:        "Expert in synthesis and trend forecasting with a decade of experience.",
 		LLM:              model,
-		Tools:            []tools.Tool{tools.NewSearchWebTool(), tools.NewCalculatorTool()},
+		Tools:            []gocrew.Tool{gocrew.NewSearchWebTool(), gocrew.NewCalculatorTool()},
 		AllowDelegation:  true,
 		Memory:           sqliteStore,
 		Verbose:          true,
-	}
+	})
 
-	writer := &agents.Agent{
+	writer := gocrew.NewAgent(gocrew.AgentConfig{
 		Role:             "Technical Storyteller",
 		Goal:             "Translate complex research into engaging, actionable content.",
 		Backstory:        "Award-winning writer known for making technology relatable.",
 		LLM:              model,
 		Memory:           sqliteStore,
 		Verbose:          true,
-	}
+	})
 
-	// 3. Define Parallel Tasks
-	marketTask := &tasks.Task{
+	// 3. Define Parallel Tasks (Elite Style)
+	marketTask := gocrew.NewTask(gocrew.TaskConfig{
 		Description: "Analyze the current 2024 GPU market trends and calculate the YoY growth of the top 3 players.",
 		Agent:       researcher,
-	}
+	})
 
-	contentTask := &tasks.Task{
+	contentTask := gocrew.NewTask(gocrew.TaskConfig{
 		Description: "Craft a technical summary of the GPU market for an executive audience.",
 		Agent:       writer,
-		Context:     []*tasks.Task{marketTask},
-	}
+		Context:     []*gocrew.Task{marketTask},
+	})
 
-	// 4. Assemble Advanced Crew
-	execCrew := crew.Crew{
-		Agents:  []core.Agent{researcher, writer},
-		Tasks:   []*tasks.Task{marketTask, contentTask},
-		Process: crew.Hierarchical, // Dynamic delegation via Manager
+	// 4. Assemble Advanced Crew (Elite Style)
+	execCrew := gocrew.NewCrew(gocrew.CrewConfig{
+		Agents:  []gocrew.CoreAgent{researcher, writer},
+		Tasks:   []*gocrew.Task{marketTask, contentTask},
+		Process: gocrew.Hierarchical, // Dynamic delegation via Manager
+		ManagerLLM: model,
 		Verbose: true,
-	}
+	})
 
 	// 5. Execution with Orchestration
-	fmt.Println("🚀 ## Starting Advanced Level Crew Execution ##")
+	fmt.Println("🚀 ## Starting Advanced Level Crew Execution (Elite Style) ##")
 	start := time.Now()
 	ctx := context.WithValue(context.Background(), "timestamp", start.Unix())
 	

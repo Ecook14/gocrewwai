@@ -18,6 +18,7 @@ import (
 
 	"github.com/Ecook14/gocrewwai/pkg/agents"
 	"github.com/Ecook14/gocrewwai/pkg/crew"
+	"github.com/Ecook14/gocrewwai/pkg/core"
 	"github.com/Ecook14/gocrewwai/pkg/events"
 	"github.com/Ecook14/gocrewwai/pkg/files"
 	"github.com/Ecook14/gocrewwai/pkg/flow"
@@ -36,6 +37,7 @@ import (
 // Agent Types
 type Agent = agents.Agent
 type AgentConfig = agents.AgentConfig
+type CoreAgent = core.Agent
 
 // Task Types
 type Task = tasks.Task
@@ -48,7 +50,7 @@ type CrewConfig = crew.CrewConfig
 // LLM Types
 type LLMClient = llm.Client
 type LLMMessage = llm.Message
-type LLMOptions = llm.Options
+type LLMOptions = llm.GenerateOptions
 
 // Tool Types
 type Tool = tools.Tool
@@ -315,6 +317,46 @@ func NewDirectoryTool(root string, depth int, allowAbs bool) tools.Tool {
 // NewAskHumanTool creates a tool for requesting human approval.
 func NewAskHumanTool(enabled bool) tools.Tool {
 	return tools.NewAskHumanTool(enabled)
+}
+
+// NewExaTool creates an Exa AI search tool.
+func NewExaTool(apiKey string) tools.Tool {
+	return tools.NewExaTool(apiKey)
+}
+
+// NewArxivTool creates an Arxiv search tool.
+func NewArxivTool() tools.Tool {
+	return tools.NewArxivTool()
+}
+
+// NewWikipediaTool creates a Wikipedia search tool.
+func NewWikipediaTool() tools.Tool {
+	return tools.NewWikipediaTool()
+}
+
+// NewFileCache creates a file-based LLM cache.
+func NewFileCache(dir string) *llm.FileCache {
+	return llm.NewFileCache(dir)
+}
+
+// NewRedisCache creates a Redis-backed LLM cache.
+func NewRedisCache(addr, password string, db int, ttl time.Duration) (*llm.RedisCache, error) {
+	return llm.NewRedisCache(addr, password, db, ttl)
+}
+
+// NewSQLiteStore initializes a new SQLite database for persistent memory.
+func NewSQLiteStore(dbPath string) (*memory.SQLiteStore, error) {
+	return memory.NewSQLiteStore(dbPath)
+}
+
+// NewCalculatorTool creates a new calculator tool.
+func NewCalculatorTool() *tools.CalculatorTool {
+	return tools.NewCalculatorTool()
+}
+
+// NewBrowserTool creates an automated browser navigation tool.
+func NewBrowserTool() tools.Tool {
+	return tools.NewBrowserTool()
 }
 
 // ============================================================

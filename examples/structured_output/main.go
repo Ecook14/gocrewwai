@@ -5,12 +5,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/Ecook14/gocrewwai/gocrew"
 	"github.com/Ecook14/gocrewwai/pkg/dashboard"
-	"github.com/Ecook14/gocrewwai/pkg/agents"
-	"github.com/Ecook14/gocrewwai/pkg/crew"
-	"github.com/Ecook14/gocrewwai/pkg/core"
-	"github.com/Ecook14/gocrewwai/pkg/llm"
-	"github.com/Ecook14/gocrewwai/pkg/tasks"
 )
 
 type StockInfo struct {
@@ -22,30 +18,38 @@ type StockInfo struct {
 
 func main() {
 	apiKey := os.Getenv("OPENAI_API_KEY")
-	model := llm.NewOpenAIClient(apiKey)
-
-	analyst := agents.NewAgent(
-		"Stock Analyst",
-		"Analyze stock prices",
-		"Financial expert",
-		model,
-		agents.WithVerbose(true),
-	)
-
-	// Define a task with a specific OutputSchema
-	task := &tasks.Task{
-		Description:  "Get the current stock price and a brief description for NVDA.",
-		Agent:        analyst,
-		OutputJSON:    &StockInfo{},
-		MaxRetries:   3,
+	if apiKey == "" {
+		fmt.Println("❌ Error: Please set OPENAI_API_KEY environment variable.")
+		return
 	}
 
-	myCrew := crew.NewCrew(
-		[]core.Agent{analyst},
-		[]*tasks.Task{task},
-	)
+	model := gocrew.NewOpenAI(apiKey, "gpt-4o")
 
-	fmt.Println("🚀 Executing Structured Output Task...")
+	// 1. Define Agent (Elite Style)
+	analyst := gocrew.NewAgent(gocrew.AgentConfig{
+		Role:      "Stock Analyst",
+		Goal:      "Analyze stock prices and provide structured summaries.",
+		Backstory: "A precision-focused financial analyst with deep expertise in market data.",
+		LLM:       model,
+		Verbose:   true,
+	})
+
+	// 2. Define a task with a specific OutputJSON (Elite Style)
+	task := gocrew.NewTask(gocrew.TaskConfig{
+		Description:    "Get the current stock price and a brief description for NVDA.",
+		Agent:          analyst,
+		OutputJSON:     &StockInfo{},
+		MaxRetryLimit:  3,
+	})
+
+	// 3. Assemble and Kickoff the Crew (Elite Style)
+	myCrew := gocrew.NewCrew(gocrew.CrewConfig{
+		Agents:  []gocrew.CoreAgent{analyst},
+		Tasks:   []*gocrew.Task{task},
+		Verbose: true,
+	})
+
+	fmt.Println("🚀 Executing GOCREW Structured Output Task (Elite Style)...")
 	
 	dashboard.Start("8081")
 	fmt.Println("🖥️  Dashboard active at http://localhost:8081/web-ui")
@@ -56,14 +60,14 @@ func main() {
 		return
 	}
 
-	// Result should be an instance of StockInfo
+	// 4. Result should be an instance of StockInfo
 	if info, ok := result.(*StockInfo); ok {
-		fmt.Printf("\nSuccessfully Parsed Structured Output:\n")
+		fmt.Printf("\n✨ Successfully Parsed Structured Output:\n")
 		fmt.Printf("Symbol: %s\nPrice: %.2f %s\nDesc: %s\n", info.Symbol, info.Price, info.Currency, info.Description)
 	} else {
 		fmt.Printf("\nRaw Result: %v\n", result)
 	}
 
-	fmt.Println("✅ Demo finished. Keep the dashboard open to review the logs!")
+	fmt.Println("\n✅ Demo finished. Keep the dashboard open to review the logs!")
 	select {}
 }
