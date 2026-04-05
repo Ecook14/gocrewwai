@@ -1,30 +1,39 @@
-# Feature Deep Dive: Autonomous Agents 🤖
+# Feature Deep Dive: Autonomous Agents ⚓🤖
 
 Gocrew agents are stateful, goal-oriented entities designed for reliable orchestration. They are more than just LLM wrappers; they are autonomous loops with memory and tools.
 
 ---
 
-## 🏗️ The Agent Builder
+> [!IMPORTANT]
+> **Status: v1.0.0 (Stable).** Gocrewwai agents utilize a declarative, strictly-to-typed configuration pattern that ensures compile-time safety and predictable orchestration.
 
-Construct agents fluently using the `AgentBuilder`.
+---
+
+## 🏗️ The Agent Config (Elite Style)
+
+In Gocrewwai v1.0, agents are constructed using the `AgentConfig` struct, providing a clean, declarative interface.
 
 ```go
-agent := gocrew.NewAgentBuilder().
-    Role("Strategic Advisor").
-    Goal("Formulate high-level project goals").
-    Backstory("Ex-consultant with a focus on efficiency.").
-    LLM(model).
-    Build()
+agent := gocrew.NewAgent(gocrew.AgentConfig{
+    Role:            "Strategic Advisor",
+    Goal:            "Formulate high-level project goals",
+    Backstory:       "Ex-consultant with a focus on efficiency.",
+    LLM:             model,
+    Verbose:         true,
+    AllowDelegation: true,
+})
 ```
 
 ### Key Parameters
 
-- **Reasoning (`bool`)**: Enables the **Reflect -> Evaluate -> Refine** loop. The agent will internally critique its own thoughts before taking action.
-- **SelfHealing (`bool`)**: Allows the agent to autonomously fix tool errors (e.g., if a Python script crashes, the agent reads the traceback and tries to fix the code).
-- **Sandbox (`string`)**: Defines the execution environment for code tools. Options: `"local"`, `"docker"`, `"e2b"`, `"wasm"`.
-- **InjectDate (`bool`)**: Automatically injects the current system date into the prompt to prevent "knowledge cutoff" hallucinations.
-- **MaxRPM (`int`)**: Enforces rate limiting at the individual agent level to prevent API token exhaustion.
-- **AllowDelegation (`bool`)**: Determines if this agent can ask coworkers for help or delegate sub-tasks.
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| **SelfCritique** | `bool` | Enables the **Reflect -> Evaluate -> Refine** loop. The agent will internally critique its own thoughts before taking action. |
+| **SelfHealing** | `bool` | Allows the agent to autonomously fix tool errors (e.g., if a Python script crashes, the agent reads the traceback and tries to fix the code). |
+| **Sandbox** | `string` | Defines the execution environment for code tools. Options: `"local"`, `"docker"`, `"e2b"`, `"wasm"`. |
+| **InjectDate** | `bool` | Automatically injects the current system date into the prompt to prevent "knowledge cutoff" hallucinations. |
+| **MaxRPM** | `int` | Enforces rate limiting at the individual agent level to prevent API token exhaustion. |
+| **AllowDelegation** | `bool` | Determines if this agent can ask coworkers for help or delegate sub-tasks. |
 
 ---
 
@@ -49,9 +58,9 @@ Guardrails are strictly-typed rules that agent output MUST pass before being acc
 
 ---
 
-## 🌐 Heterogeneous Swarms (`core.Agent`)
+## 🌐 Heterogeneous Swarms (`gocrew.CoreAgent`)
 
-In Gocrew v0.9, all orchestration logic utilizes the polymorphic `core.Agent` interface rather than concrete `*agents.Agent` pointers. This decouples the engine from the physical implementation of the agent.
+In Gocrew v1.0, all orchestration logic utilizes the polymorphic `gocrew.CoreAgent` interface (aliased to `core.Agent`). This decouples the engine from the physical implementation of the agent.
 
 Why does this matter?
 - **Local Agents**: Your standard `gocrew.Agent` runs queries in the same process.
@@ -60,4 +69,5 @@ Why does this matter?
 This interface standardization enables massive distributed workloads and true Agent-to-Agent (A2A) networking.
 
 ---
-**Gocrew** - Built for reliable autonomy.
+
+[Back to index](../index.md) | [Next: Tasks](./tasks.md)

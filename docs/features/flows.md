@@ -1,60 +1,60 @@
-# Feature Deep Dive: Gocrew Flows 🌊
+# Feature Deep Dive: Flows ⚓🌊
 
-Flows allow you to orchestrate complex, multi-crew workflows with ease. While a `Crew` manages agents, a **Flow** manages crews, routing, and state.
-
----
-
-## 🏗️ The Flow Structure
-
-A Flow is a state machine where each node can be a simple function, a task, or an entire `Crew`.
-
-```go
-f := gocrew.NewFlow(initialState)
-
-// Define steps
-f.AddNode("research", researchCrew)
-f.AddNode("writing", writingCrew)
-
-// Define connections
-f.SetEntryPoint("research")
-f.AddEdge("research", "writing")
-```
-
-### Key Components
-
-- **State (`flow.State`)**: A thread-safe, generic map that holds the "truth" of the workflow as it progresses.
-- **Routers**: Dynamic nodes that decide the next path based on the current state (e.g., "If risk score > 0.8, go to AlertNode, otherwise go to ProcessNode").
-- **Persistence & Checkpointing**: Flows automatically snapshot their state to disk (or a DB) after *every* node execution. If the process crashes, you can use `engine.Resume(ctx, flow)` to pick up exactly where it left off, down to the byte.
+Flows in Gocrewwai represent the highest level of orchestration. They allow you to build complex state machines and multi-step workflows that can span across multiple crews, with native support for durable persistence and type-safe state management.
 
 ---
 
-## 🚦 Typed Flows (`flow.TypedFlow`)
+> [!IMPORTANT]
+> **Status: v1.0.0 (Stable).** Gocrewwai Flows 2.0 utilize Go Generics for **Typed State** management and support **Durable Checkpointing** to SQLite or Redis.
 
-For maximum Go safety, you can use `TypedFlow`, which uses Go generics to ensure your state always matches your custom struct.
+---
+
+## 🏗️ The Typed Flow (Elite Style)
+
+In Gocrewwai v1.0, flows are built using a revolutionary, typed approach that ensures the source of truth for your data is always consistent.
 
 ```go
+package main
+
+import "github.com/Ecook14/gocrewwai/gocrew"
+
 type MyState struct {
-    Query  string
-    Result string
+    Topic   string
+    Result  string
+    IsDraft bool
 }
 
-f := flow.NewTypedFlow[MyState](initialState)
+func main() {
+    // 1. Initialize Flow with Initial State and Persistence
+    flow := gocrew.NewTypedFlow(MyState{Topic: "AI Agents", IsDraft: true})
+    flow.SetPersistence(sqliteStore)
+
+    // 2. Add Processing Nodes
+    flow.AddNode("research", func(ctx context.Context, s *MyState) error {
+        // Run a crew here and update state
+        s.Result = "Research Completed"
+        return nil
+    })
+
+    // 3. Kickoff Flow
+    flow.Start(ctx)
+}
 ```
 
+## 🧠 Flow 2.0 Feature Highlights
+
+### 💾 1. Durable Persistence (Checkpoints)
+Flows automatically save their state after every node execution. If a process crashes or is interrupted, you can resume precisely from the last successful node using a `ThreadID`.
+
+### 👤 2. Human-in-the-Loop (HITL)
+Add `HumanInterrupt` nodes to your flow to pause execution for manual review. This is essential for workflows that require expert sign-off on AI-generated content.
+
+### 📈 3. Graph-Based Routing
+Use router nodes to determine the "Next" execution step based on real-time state. This enables complex, non-linear workflows and cyclic reasoning loops.
+
+### 📊 4. Real-Time Dashboard Integration
+Every flow execution is visually tracked on the Glassmorphic Dashboard, allowing you to watch the state move through the nodes and inspect data at every step.
+
 ---
 
-## 🛡️ Human-in-the-Loop (HITL)
-
-Flows natively support human feedback loops. You can insert "WaitNodes" that pause execution and wait for an external signal (from the Dashboard or an API call) before proceeding.
-
----
-
-## 🔄 Parallel & Branching
-
-Flows support complex topologies:
-- **Parallel Nodes**: Run multiple crews or tasks simultaneously. The orchestrator spawns separate goroutines and waits for all parallel branches to resolve before moving the state machine forward. Linear scaling for autonomous throughput!
-- **Conditional Branching**: Use `AddRouter` to create intelligent forks in your workflow.
-- **Cycles**: Loop back to previous nodes for iterative refinement.
-
----
-**Gocrew** - Multi-crew orchestration with industrial-grade reliability.
+[Back to Processes Guide](./processes.md) | [Next: LLMs](./llms.md)

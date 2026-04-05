@@ -14,36 +14,38 @@ Explore the core components and features of the Gocrewwai framework through our 
 - **[Migration Guide](./MIGRATION.md)**: Moving from CrewAI, LangChain, or LangGraph.
 
 ### 🧩 Core Components
-- **[Agents](./AGENTS.md)**: Roles, Goals, Backstories, and autonomous capabilities.
-- **[Tasks](./TASKS.md)**: Description, Expected Output, and Structured JSON.
-- **[Crews](./CREWS.md)**: Sequential, Hierarchical, and Graph orchestration.
+- **[Agents](./features/agents.md)**: Roles, Goals, Backstories, and autonomous capabilities.
+- **[Tasks](./features/tasks.md)**: Assignments, context-piping, and output schemas.
+- **[Crews](./features/crews.md)**: Sequential, Hierarchical, and Graph orchestration.
+- **[Processes](./features/processes.md)**: Linear vs. Hierarchical vs. Consensus-based logic.
 
 ### 🧠 Intelligence & Memory
-- **[LLM Providers](./LLM_PROVIDERS.md)**: Multi-provider integration (OpenAI, Anthropic, Gemini, etc.).
-- **[Caching](./LLM_PROVIDERS.md#high-performance-caching)**: File and Redis-backed LLM response caching.
-- **[Memory Stores](./MEMORY.md)**: Persistent vector-indexed memory (SQLite, Redis, Chroma).
+- **[LLM Providers](./features/llms.md)**: Provider configurations and advanced options.
+- **[Memory Stores](./features/memory.md)**: Short-term, Long-term, and Entity storage.
+- **[Knowledge (RAG)](./features/knowledge.md)**: RAG, vector embeddings, and external data.
 - **[Persistence & Time-Travel](./PERSISTENCE.md)**: Durable execution, checkpoints, and state recovery.
 
 ### 🛠️ Extensibility & Resilience
-- **[Built-in Tools](./TOOLS.md)**: Search, Browser, Calculator, Code Interpreter, and more.
-- **[Custom Tools](./TOOLS.md#creating-custom-tools)**: Wrap any Go function as an agent capability.
+- **[Built-in Tools](./features/tools.md)**: Search, Browser, Calculator, Code Interpreter, and more.
 - **[Tool Error Handling](./TOOL_ERROR_HANDLING.md)**: Robust tool usage and autonomous retries.
-- **[Knowledge (RAG)](./KNOWLEDGE.md)**: Retrieval-Augmented Generation with PDF and Web sources.
+- **[MCP Hub](./features/mcp.md)**: First-class support for the Model Context Protocol.
 
 ### 🌊 Advanced Orchestration
-- **[Flows](./FLOWS.md)**: State management, Multi-step workflows, and Human-in-the-loop.
+- **[Flows](./features/flows.md)**: Multi-crew orchestration and state machines.
 - **[Human-in-the-Loop](./HUMAN_IN_THE_LOOP.md)**: Manual approvals, interrupts, and dashboard integration.
 - **[Self-Correction](./SELF_CORRECTION.md)**: Reflective agent loops and autonomous reasoning patterns.
 
 ### 📊 Operations & Production
-- **[Observability](./OBSERVABILITY.md)**: Native OpenTelemetry tracing and performance monitoring.
+- **[Observability](./features/telemetry.md)**: Native OpenTelemetry tracing and performance monitoring.
+- **[Production Guide](./features/production.md)**: Sandboxing, scaling, and enterprise patterns.
+- **[CLI Reference](./features/cli.md)**: Scaffolding, management, and replays.
 
 ---
 
-## 💎 Why Gocrewwai?
+## 💎 Elite Performance Features
+- **[Planning](./features/planning.md)**: Intelligent task decomposition.
+- **[Collaboration](./features/collaboration.md)**: Delegation and coworker communication.
+- **[Testing](./features/testing.md)**: Automated multi-run evaluation frameworks.
+- **[Training](./features/training.md)**: Human-in-the-loop advice persistence.
 
-- **⚡ Blazing Fast**: Native Goroutines for parallel agent execution.
-- **🛡️ Strictly Typed**: Full compile-time safety across all agents and tasks.
-- **⚓ Unified SDK**: A single ergonomic import (`gocrew`) for all your needs.
-
-Join the high-performance AI revolution with Gocrewwai! 🚀⚓🛡️
+Join the high-performance AI revolution with Gocrewwai! 🚀⚓🛡️🏆🏁

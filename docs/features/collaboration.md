@@ -1,68 +1,49 @@
-# Feature Deep Dive: Collaboration & Delegation 🤝
+# Feature Deep Dive: Collaboration ⚓🤝
 
-Gocrew agents are not isolated entities. They are designed to work together, sharing information and delegating sub-tasks to coworkers to achieve complex goals.
-
----
-
-## 🏗️ How Collaboration Works
-
-Collaboration is managed by the `Crew` engine and the agents' internal `delegation` tools.
-
-### 1. Coworker Awareness
-When a crew is initialized, every agent is aware of its "coworkers" (the other agents in the crew). If `AllowDelegation` is enabled, the agent gains access to two special tools:
-- **DelegateWorkTool**: Allows the agent to hand off a specific sub-task to a coworker.
-- **AskQuestionTool**: Allows the agent to query a coworker for information without delegating the entire task.
-
-### 2. Information Sharing
-Agents share a unified event bus and can reference the outputs of previous tasks via the `Context` parameter. This ensures that every agent has the latest "truth" about the project state.
+Gocrewwai is built on the principle that multi-agent collaboration is superior to a single monolithic agent. Our framework provides several native mechanisms for agents to work together, share information, and review each other's output.
 
 ---
 
-## 🎯 Task Delegation Logic
-
-Delegation follows the **Request -> Execution -> Report** pattern:
-
-1. **Strategic Choice**: An agent (or a Manager in Hierarchical mode) decides that a specific sub-task is better suited for a coworker's role and tools.
-2. **The Handoff**: The agent calls the `DelegateWorkTool` with the coworker's name and the sub-task description.
-3. **Execution**: The coworker executes the sub-task as if it were a primary mission.
-4. **Integration**: The result is returned to the original agent, who integrates the findings into their own reasoning loop.
+> [!IMPORTANT]
+> **Status: v1.0.0 (Stable).** Gocrewwai collaboration features include **Autonomous Delegation**, **Peer-Review Loops**, and **Shared Memory State**.
 
 ---
 
-## 🚦 Constraints & Controls
+## 🏗️ Core Collaboration Patterns
 
-To prevent infinite loops and runaway costs, delegation is strictly controlled:
+### 1. Unified Delegation
+By enabling `AllowDelegation: true` in an agent's config, you empower it to ask its coworkers for help. If an agent identifies a task it cannot solve alone, it will:
+- **Analyze**: Determine which coworker has the required goal/backstory.
+- **Request**: Send a sub-task to that coworker.
+- **Synthesize**: Incorporate the coworker's result into its own final answer.
 
-- **AllowDelegation (`bool`)**: A simple flag on the `Agent` to enable/disable this feature.
-- **MaxIterations**: Limits the total number of reasoning steps (including delegations).
-- **Hierarchical Processes**: In this mode, delegation is managed by a centralized `ManagerAgent` for maximum efficiency and parallel execution.
+### 2. The Hierarchical Process
+In **Hierarchical** mode, collaboration is managed by an automated "Manager Agent." The manager is responsible for:
+- **Strategy**: Assigning tasks to the right agents.
+- **Quality Control**: Reviewing agent output and asking for refinements if necessary.
+- **Handoffs**: Ensuring data flows correctly between agents.
+
+### 3. Shared Memory & Knowledge
+All agents in a crew share a common **Knowledge Base** (RAG) and can access the crew's **Shared Memory**. This ensures that even if two agents work on different tasks, they have a consistent understanding of the project's state.
 
 ---
 
-## 🛠️ Code Example
-
-Enabling delegation is a single flag in the `AgentBuilder`.
+## 🚀 Implementing Collaborative Crews (Elite Style)
 
 ```go
-agent := gocrew.NewAgentBuilder().
-    Role("Lead Architect").
-    AllowDelegation(true). // Enable collaboration!
-    Build()
+myCrew := gocrew.NewCrew(gocrew.CrewConfig{
+    Agents:      []gocrew.CoreAgent{researcher, analyst, writer},
+    Process:     gocrew.Hierarchical,
+    ManagerLLM:  gpt4o,
+})
 ```
 
----
+## 🛡️ Collaboration Guardrails
 
-## ☁️ Distributed Collaboration (A2A Protocol)
-
-As of v0.9, collaboration is no longer restricted to a single machine. The **A2A Protocol** allows Gocrew instances to dynamically discover and communicate with each other over the network.
-
-### Hardening Features:
-- **Zero-Trust Security**: Every inter-agent request is authenticated using Bearer tokens (`X-A2A-Auth`).
-- **Distributed Resilience**: Exponential backoffs and **Circuit Breakers** prevent cascading failures. If a remote agent goes down, the orchestrator handles it gracefully.
-- **mDNS Auto-Discovery**: Agents can advertise their capabilities and discover peers on the local network automatically.
-- **Observability Hub**: OpenTelemetry trace propagation ensures that a task seamlessly tracked across multiple physical servers.
-
-To use remote agents, simply wrap the connection in a `RemoteAgentAdapter` and inject it into your crew alongside your local agents. The `core.Agent` interface ensures they all play by the same rules.
+- **Max Delegation Depth**: Prevent infinite "ask-your-coworker" loops by setting a limit.
+- **Human-in-the-Loop**: Require manual approval for delegation requests or coworker handoffs.
+- **Strict Output Validation**: Ensure that data passed between agents adheres to your defined JSON schemas.
 
 ---
-**Gocrew** - Scaling intelligence through collaboration.
+
+[Back to Reasoning Guide](./reasoning.md) | [Next: Delegation](./agent_delegation.md)

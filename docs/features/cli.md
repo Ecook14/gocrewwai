@@ -1,56 +1,59 @@
-# Feature Deep Dive: Gocrew CLI ⚡
+# Feature Deep Dive: Gocrew CLI ⚓💻🚀
 
-The `gocrew` CLI is the primary gateway for project management, scaffolding, and advanced operations like training and testing.
-
----
-
-## 🏗️ Core Commands
-
-### `gocrew create`
-Generates a production-ready project structure based on modern Gocrew standards.
-- Sets up `pkg/`, `cmd/`, and `internal/` directories.
-- Creates a sample `main.go` using the unified SDK.
-
-### `gocrew kickoff`
-Executes your crew. 
-- **`--ui`**: Launches the real-time observability dashboard.
-- **`--verbose`**: Outputs the full agent thought stream to the terminal.
+The Gocrewwai CLI (`gocrew`) is the primary interface for scaffolding projects, managing agentic missions, and launching the real-time **Dashboard**. Built with Go's native binary capabilities, it ensures a lightning-fast and reliable management experience.
 
 ---
 
-## 🎓 Training & Testing
-
-The CLI handles the complex state management required for optimization:
-
-### `gocrew train`
-Runs a training session for your crew.
-- **`--n 5`**: Run 5 iterations.
-- Automatically pauses for human feedback and saves the "Advice Layer."
-
-### `gocrew test`
-Benchmarks your crew's performance.
-- **`--model <model>`**: Specify the model to use as the "Grader."
-- Outputs a comprehensive performance report with scores and consistency metrics.
+> [!IMPORTANT]
+> **Status: v1.0.0 (Stable).** The `gocrew` CLI supports **Rapid Scaffolding**, **Replay Logic**, and **Headless Dashboard** deployment.
 
 ---
 
-## 🔄 Debugging & Replay
+## 🏗️ Installation
 
-### `gocrew replay`
-Replays a previous execution from a `StateFile`. Perfect for debugging specific tool failures or edge cases without re-running the entire crew.
-
-### `gocrew reset-memories`
-Wipes the persistent memory stores (SQL/Vector) for your agents, allowing you to start with a "clean slate."
-
----
-
-## 🛠️ Global Installation
-
-Install the CLI globally on your system:
+Install the global Gocrewwai binary directly from the GitHub repository:
 
 ```bash
 go install github.com/Ecook14/gocrewwai/cmd/gocrew@latest
 ```
 
+## 🚀 Key Commands
+
+### 1. Project Scaffolding (`create`)
+Scaffold a complete, production-ready Gocrewwai project in seconds. This creates a standard folder structure with `agents/`, `tasks/`, and a `main.go` using the **Elite Style** configuration.
+
+```bash
+gocrew create my-awesome-project
+```
+
+### 2. Live Dashboard (`--ui`)
+Launch the real-time **Glassmorphic Dashboard** to watch your agents thought process and handle **Human-in-the-Loop** approvals. This command is typically used when running a crew mission from the CLI.
+
+```bash
+gocrew run mission.go --ui
+```
+
+### 3. Crew Replay (`replay`)
+If a crew execution fails or you need to reproduce a specific behavior, use the `replay` command. It uses the persistence layer to "rewind" the execution to a specific **ThreadID** or **TaskID**.
+
+```bash
+gocrew replay thread_abc123
+```
+
 ---
-**Gocrew CLI** - Commanding excellence in agentic orchestration.
+
+## 🛡️ Production Deployment (Headless Mode)
+
+For servers and CI/CD environments, Gocrewwai supports a **Headless Mode**. This allows you to run crews without the interactive TUI, while still providing full **OpenTelemetry** tracing and logging to your remote O11y collector.
+
+```bash
+gocrew run mission.go --headless
+```
+
+## 📊 CLI Observability
+
+All CLI commands in Gocrewwai are automatically instrumented. You can monitor the performance of your `create`, `run`, and `replay` commands using the same **OTEL** standards used in the core engine.
+
+---
+
+[Back to Production Guide](./production.md) | [Next: Testing](./testing.md)

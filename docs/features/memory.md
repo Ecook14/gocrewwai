@@ -1,54 +1,62 @@
-# Feature Deep Dive: Unified Memory 🧠
+# Feature Deep Dive: Memory ⚓🧠
 
-Memory allows Gocrew agents to learn over time, recall past interactions, and maintain context across complex, multi-stage workflows.
-
----
-
-## 🏗️ The Multi-Tiered Architecture
-
-Gocrew uses a three-tier memory system inspired by human cognition:
-
-1. **Short-Term Memory**: The agent's current "Thought Stream" and recent task history.
-2. **Long-Term Memory**: Persistent storage (Vector DB) for recalling facts across different sessions and crews.
-3. **Entity Memory**: A specialized store for remembering specific details about objects, people, or concepts (e.g., "User prefers Python over Go").
+Memory is the persistent state of your agents and crews. Gocrewwai includes an advanced memory system that allows agents to learn from past experiences, store user preferences, and recall relevant facts across different tasks.
 
 ---
 
-## 🛠️ Composite Scoring Logic
-
-Unlike simple vector search, Gocrew uses a **Composite Scoring** algorithm to decide *which* memory to recall:
-
-| Metric | Description |
-| :--- | :--- |
-| **Recency** | How recently the memory was recorded. |
-| **Relevance** | Semantic similarity to the current task. |
-| **Importance** | How "critical" the agent flagged the memory during storage. |
-
-**Final Score = (w1 * Recency) + (w2 * Relevance) + (w3 * Importance)**
+> [!IMPORTANT]
+> **Status: v1.0.0 (Stable).** Gocrewwai memory systems support **Recency + Relevance** scoring and persistent vector storage via SQLite, Redis, and Chroma.
 
 ---
 
-## 💾 Supported Backends
+## 🏗️ Memory Types
 
-Gocrew is database-agnostic. You can configure your memory store during crew setup:
-- **Local**: SQLite (default), In-Memory.
-- **Cloud**: Pinecone, Qdrant, Weaviate, Redis.
+Gocrewwai implements three distinct memory systems, each optimized for a specific role:
+
+### 1. Short-Term Memory (Contextual)
+Powered by the LLM's own context window, this memory allows agents to remember details during the execution of a single task or within a crew's current run.
+
+### 2. Long-Term Memory (Persistent)
+This system stores processed insights and general knowledge in a persistent database (SQLite, Redis, etc.), allowing agents to recall information from previous crew executions.
+
+### 3. Entity Memory
+A specialized system for tracking and recalling specific details about actors (users, agents, companies) across long periods.
+
+---
+
+## 🚀 Persistent Memory Stores (Elite Style)
+
+Using the `gocrew` SDK, you can initialize and assign vector stores to your agents with simple declarative configuration.
 
 ```go
-agent := gocrew.NewAgentBuilder().
-    Memory(true).
-    MemoryStore(gocrew.NewSQLiteStore("memory.db")).
-    Build()
+package main
+
+import "github.com/Ecook14/gocrewwai/gocrew"
+
+func main() {
+    // 1. Initialize Persistent Memory
+    sqlite, _ := gocrew.NewSQLiteStore("agent_memory.db")
+    defer sqlite.Close()
+
+    // 2. Assign Memory to Agent
+    researcher := gocrew.NewAgent(gocrew.AgentConfig{
+        Role:      "Memory-Enabled Researcher",
+        Memory:    sqlite, // That's it! 
+    })
+}
 ```
 
+## 🧠 Memory Orchestration
+
+When an agent executes a task, it automatically:
+1.  **Searches**: Performs a vector search in its memory for relevant past context.
+2.  **Appends**: Injects findings into its prompt.
+3.  **Learns**: After the task is complete, it summarizes the experience and stores it as a new memory item for future recall.
+
+## 🛡️ Recency & Relevance Scoring
+
+Gocrewwai uses a sophisticated scoring engine to ensure that only the most relevant memories are injected into the agent's prompt. This prevents context clutter and ensures the agent always reflects on its most pertinent past experiences.
+
 ---
 
-## 🔄 Memory Lifecycle
-
-1. **Observe**: The agent performs a task.
-2. **Flag**: The agent (or engine) identifies "memorable" facts.
-3. **Store**: Facts are vectorized and assigned an importance score.
-4. **Recall**: During the next task, relevant memories are retrieved and injected into the "Context" window.
-
----
-**Gocrew** - Building agents that truly learn.
+[Back to LLMs Guide](./llms.md) | [Next: Knowledge](./knowledge.md)

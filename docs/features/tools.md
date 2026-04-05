@@ -1,64 +1,57 @@
-# Feature Deep Dive: Tools 🧰
+# Feature Deep Dive: Tools ⚓🧰🛠️
 
-Tools are the "hands" of your agents. They allow agents to interact with the real world—searching the web, running code, reading files, or calling APIs.
+Tools are the interface between your agents and the outside world. Gocrewwai agents can use tools to search the web, execute code, browse websites, and interact with external APIs.
 
 ---
 
-## 🏗️ The Tool Interface
+> [!IMPORTANT]
+> **Status: v1.0.0 (Stable).** Gocrewwai includes 24+ high-performance, built-in tools with native support for **Sandboxed Code Execution** and **Browser Automation**.
 
-In Gocrew, a tool is any Go struct that implements the `tools.Tool` interface:
+---
+
+## 🏗️ Built-in Tools (Elite Style)
+
+Gocrewwai includes a rich set of production-ready tools available directly via the `gocrew` SDK.
+
+| Tool | SDK Constructor | Description |
+| :--- | :--- | :--- |
+| **SearchWeb** | `gocrew.NewSearchWebTool` | Generic web search (Serper, Google, etc.). |
+| **Exa Search** | `gocrew.NewExaTool` | Vector-indexed neural search for high-quality results. |
+| **Browser** | `gocrew.NewBrowserTool` | Automated web navigation and scraping (multi-modal). |
+| **Calculator** | `gocrew.NewCalculatorTool` | Precise mathematical operations. |
+| **Code Interpreter** | `gocrew.NewCodeInterpreter` | Safe, sandboxed Python and Shell execution. |
+| **File Systems** | `gocrew.NewFileReadTool` | Chrooted file reading, writing, and editing. |
+
+## 🚀 Using a Tool
+
+Simply pass the tool instances to your agent's configuration:
 
 ```go
-type Tool interface {
-    Name() string
-    Description() string
-    ArgsSchema() []ArgSchema
-    Run(ctx context.Context, input string) (string, error)
-    CacheFunction() func(input string) string // Optional
+package main
+
+import "github.com/Ecook14/gocrewwai/gocrew"
+
+func main() {
+    searchTool := gocrew.NewSearchWebTool()
+    browserTool := gocrew.NewBrowserTool()
+
+    researcher := gocrew.NewAgent(gocrew.AgentConfig{
+        Tools: []gocrew.Tool{searchTool, browserTool},
+    })
 }
 ```
 
-### High-Precision Arguments
+## 🛡️ Tool Guardrails & Security
 
-We use `ArgsSchema` to tell the LLM exactly what JSON structure to provide. This ensures that tool calls are valid and easy to parse.
+### 1. Manual Approval (HITL)
+Configure specific tools (e.g., `github.delete_issue`) to require manual approval before execution. The engine will pause and wait for a signal from the **Dashboard**.
 
----
+### 2. Execution Sandboxing
+All code-execution tools (Python, Shell) are isolated from the host system. Gocrewwai supports **Docker**, **WASM**, and **E2B** sandboxing out-of-the-box.
 
-## 🔌 Native Tool Arsenal
-
-Gocrew ships with 24+ native tools, including:
-- **SearchWeb**: Powered by Chromedp for full browser automation (SPA support).
-- **CodeInterpreter**: Securely execute Python/Go/Shell scripts in Docker or E2B.
-- **FileTools**: Read, write, and list files securely.
-- **GitHub/Slack/Notion**: First-class SaaS integrations.
-- **MCP Bridge**: Connect to any Model Context Protocol (MCP) server.
+### 3. Tool Error Feedback
+If a tool fails, the error message is automatically fed back to the agent's reasoning loop. The agent can then analyze the error, adjust its parameters, and attempt a retry.
 
 ---
 
-## 🛡️ Secure Execution (Sandboxing)
-
-For code-based tools, Gocrew provides several isolation layers:
-- **Docker**: Run execution in ephemeral containers.
-- **E2B**: Offload execution to remote, secure cloud sandboxes.
-- **WASM**: Use WebAssembly for zero-dependency local isolation.
-
----
-
-## 🧠 Smart Caching
-
-Tools can optionally provide a `CacheFunction`. If enabled, the results of tool calls are indexed by the agent's `Cache` (e.g., Redis or SQLite), saving costs and reducing latency for repetitive tasks.
-
----
-
-## 🛠️ Creating Custom Tools
-
-Creating a custom tool is as easy as implementing the interface. You can then pass it to any agent:
-
-```go
-agent := gocrew.NewAgentBuilder().
-    Tools(myCustomTool).
-    Build()
-```
-
----
-**Gocrew** - Empowering agents with real-world capabilities.
+[Back to Telemetry Guide](./telemetry.md) | [Next: Files](./files.md)

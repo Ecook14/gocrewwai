@@ -1,51 +1,53 @@
-# Feature Deep Dive: Agent Training 🎓
+# Feature Deep Dive: Training ⚓🎓🛡️
 
-Gocrew includes a specialized **Training System** (`pkg/training`) that allows you to improve agent performance through iterative, human-in-the-loop feedback.
-
----
-
-## 🏗️ How Training Works
-
-Training isn't about fine-tuning the base LLM weights. Instead, it's about building a **Persistent Advice Layer** that guides the agent's behavior based on past corrections.
-
-1. **Training Run**: You run a crew in "Training Mode" using the CLI: `gocrew train --n 5`.
-2. **Execution**: The agent performs the tasks.
-3. **Human Feedback**: After each task, the agent presents its result. You can then provide "Advice" or "Corrections."
-4. **Advice Persistence**: This feedback is saved to a local JSON/SQLite store, indexed by the agent's role and the specific task type.
-5. **Guided Reasoning**: In future production runs, the agent automatically retrieves relevant "Advice" from the training store and injects it into its reasoning loop.
+Training in Gocrewwai goes beyond simple prompt engineering. It is the process of improving agent performance over time by capturing human feedback and "injecting" it into the agent's long-term memory as persistent knowledge.
 
 ---
 
-## 🛠️ The Training Loop
+> [!IMPORTANT]
+> **Status: v1.0.0 (Stable).** Gocrewwai training mode supports **Feedback Capture**, **Advice Injection**, and **Long-term Reasoning Refinement**.
+
+---
+
+## 🏗️ The Training Workflow
+
+Gocrewwai training is integrated directly into the **Human-in-the-Loop** (HITL) cycle of the crew mission.
+
+1. **Pause**: The crew execution reaches a task that requires human approval.
+2. **Interact**: Through the **Dashboard**, you review the agent's draft and provide corrective feedback (e.g., "The tone is too formal, make it more conversational").
+3. **Learn**: Gocrewwai's engine captures this feedback and stores it in the agent's **Entity Memory**.
+4. **Persist**: In future runs, the agent will recall this advice when faced with a similar task, autonomously applying the learned preference.
+
+---
+
+## 🚀 Implementing Training Mode (Elite Style)
+
+Using the `gocrew` SDK, you can enable training mode with a single boolean flag:
 
 ```go
-// Training logic is built directly into the Crew engine
-crew := gocrew.NewCrewBuilder().
-    TrainingDir("./training_data").
-    Build()
-
-// Advice is injected during Agent.Execute
-if a.TrainingMode {
-    advice := a.TrainingStore.GetAdvice(a.Role, task.Description)
-    prompt = fmt.Sprintf("%s\n\nPast Human Advice: %s", prompt, advice)
-}
+myCrew := gocrew.NewCrew(gocrew.CrewConfig{
+    Agents:   []gocrew.CoreAgent{researcher, writer},
+    Tasks:    []*gocrew.Task{articleTask},
+    Training: true, // Enable feedback capture and memory injection
+})
 ```
 
----
+## 🧠 Memory-Based Refinement
 
-## 📊 Why Train Your Agents?
+### 1. Advice Recall
+During the planning phase of the mission, agents perform a vector search in their memory for any training feedback related to the current task. This advice is then injected directly into the agent's reasoning prompt.
 
-- **Edge Case Correction**: Fix persistent logic errors without changing the code.
-- **Style Alignment**: Teach the agent to match your specific tone or formatting preferences.
-- **Tool Mastery**: Guide the agent on *when* and *how* to use specific complex tools more effectively.
-
----
-
-## 🔄 Managing Training Data
-
-Use the `gocrew` CLI to manage your training data:
-- `gocrew reset-training`: Wipes all stored advice.
-- `gocrew export-training`: Dumps advice to a shareable JSON file for other developers.
+### 2. Multi-Agent Training
+If you train a "Lead Researcher," any knowledge or advice captured during the training session can be shared with other researcher agents in the same crew, creating a "Collective Intelligence" effect.
 
 ---
-**Gocrew** - Continuous improvement through human expertise.
+
+## 🛡️ Training Safety & Reset
+
+- **Feedback Auditing**: Review and edit captured training data through the Gocrewwai CLI or Dashboard.
+- **Memory Reset**: If an agent's reasoning develops a negative bias, you can clear its training memory without affecting its core backstory or tools.
+- **Human-only Training**: Only designated "Humans" can provide training feedback, ensuring that the agent's knowledge base remains trustworthy and verified.
+
+---
+
+[Back to Testing Guide](./testing.md) | [Back to index](../index.md)

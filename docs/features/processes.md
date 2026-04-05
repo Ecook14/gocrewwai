@@ -1,56 +1,57 @@
-# Feature Deep Dive: Processes 🚦
+# Feature Deep Dive: Processes ⚓⚖️
 
-Processes define the "orchestration logic" of your crew. They determine how tasks are distributed among agents and how the execution flow is managed.
-
----
-
-## 🏗️ Supported Process Types
-
-Gocrew supports several orchestration strategies to handle everything from simple linear pipelines to complex, autonomous debacles.
-
-### 1. Sequential (`gocrew.Sequential`)
-The simplest and most common process. Tasks are executed in the exact order they are defined in the `Tasks` slice.
-- **Context Flow**: Output from Task N is automatically injected as context for Task N+1.
-- **Best For**: Data processing pipelines, research-then-write workflows.
-
-### 2. Hierarchical (`gocrew.Hierarchical`)
-A manager-led approach where tasks can be executed in parallel.
-- **The Manager**: You can provide a `ManagerAgent` or let Gocrew spin up an automated one.
-- **Delegation**: The manager analyzes the tasks and delegates them to the workers best suited for the role.
-- **Systematic Merging**: The manager merges parallel results into a final cohesive output.
-- **Best For**: Large-scale research sweeps, complex project planning.
-
-### 3. Consensual (`gocrew.Consensual`)
-A democratic approach to problem-solving.
-- **Voting**: Every agent in the crew works on the *same* task.
-- **Debate**: The manager gathers all responses and facilitates a debate between the agents until a consensus is reached.
-- **Best For**: High-stakes decision making, creative brainstorming.
-
-### 4. StateMachine (`gocrew.StateMachine`) / Graph
-The most advanced orchestration mode, allowing for non-linear flows and cycles.
-- **Conditional Routing**: Tasks can route to different "Next" tasks based on their output.
-- **Cycles**: Agents can loop back to previous tasks if criteria aren't met (e.g., "Code failed tests, try again").
-- **Best For**: Software development (Write-Test-Fix loop), iterative design.
+Processes in Gocrewwai define the "Rules of Engagement" for your crew. They determine how tasks are distributed and how agents collaborate to achieve their goals.
 
 ---
 
-## 🛠️ Configuring the Process
+> [!IMPORTANT]
+> **Status: v1.0.0 (Stable).** Gocrewwai supports **Sequential**, **Hierarchical**, and **Consensus-based** processes with native **Human-in-the-Loop** interrupts.
 
-You set the process type during crew construction.
+---
+
+## 🏗️ Sequential (Default)
+
+The simplest and most common orchestration strategy.
+
+1. **Order matters**: Tasks are executed in the exact order they appear in the `TaskConfig` slice.
+2. **Result Piping**: The output of Task 1 is automatically provided as context to Task 2.
+3. **Efficiency**: Best for linear workflows where each step depends on the previous one.
 
 ```go
-myCrew := gocrew.NewCrewBuilder().
-    Agents(a, b).
-    Tasks(t1, t2).
-    Process(gocrew.Hierarchical). // Set the strategy here
-    Build()
+process := gocrew.Sequential
 ```
 
 ---
 
-## 🔄 Custom Orchestration
+## 👑 Hierarchical
 
-Because Gocrew is built in Go, you can also build custom orchestration logic by using **Flows** (`pkg/flow`). Flows allow you to treat entire Crews as nodes in a larger state machine, enabling multi-crew coordination.
+Emulates a real-world organizational structure. In this mode, Gocrewwai automatically creates a **Manager Agent** to orchestrate the team.
+
+1. **Delegation**: The manager analyzes the `Tasks` and `Agents` and decides who is best suited for each assignment.
+2. **Review**: Once an agent completes a task, the manager reviews the result. If unsatisfactory, the manager asks the agent to refine it.
+3. **Final Synthesis**: After all tasks are complete, the manager synthesizes the final result.
+
+```go
+process := gocrew.Hierarchical
+managerLLM := gocrew.NewOpenAI(apiKey, "gpt-4o")
+```
 
 ---
-**Gocrew** - Intelligent orchestration for any workflow.
+
+## 📈 Graph (State Machine)
+
+The most advanced orchestration strategy, inspired by LangGraph. It allows for non-linear, dynamic workflows.
+
+1.  **Nodes & Edges**: Define your workflow as a directed graph where each node is an agent/task and edges are the logic for determining the "Next" step.
+2.  **Conditional Branching**: Move through the graph based on real-time task results (e.g., if "Validation" fails, go back to "Researcher").
+3.  **Cyclic Loops**: Perfect for iterative refinement and recursive problem-solving.
+
+---
+
+## 📊 Process Observability
+
+All orchestration processes in Gocrewwai are fully instrumented with **OpenTelemetry**. Every "Handoff" and "Review" is captured as a distinct span in your trace, allowing you to see exactly how your crew collaborated.
+
+---
+
+[Back to Crews Guide](./crews.md) | [Next: Flows](./flows.md)
