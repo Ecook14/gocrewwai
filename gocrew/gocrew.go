@@ -232,7 +232,11 @@ func DefaultKnowledgeConfig() KnowledgeConfig {
 
 // NewOpenAI creates an OpenAI LLM client.
 func NewOpenAI(apiKey, model string) *llm.OpenAIClient {
-	return llm.NewOpenAIClient(apiKey)
+	client := llm.NewOpenAIClient(apiKey)
+	if model != "" {
+		client.Model = model
+	}
+	return client
 }
 
 // NewOpenRouter creates an OpenRouter LLM client.
@@ -275,13 +279,40 @@ func NewCodeInterpreter(safe bool) *tools.CodeInterpreterTool {
 }
 
 // NewFileReadTool creates a file reading tool.
-func NewFileReadTool() tools.Tool {
-	return tools.NewFileReadTool()
+func NewFileReadTool(chroot ...string) tools.Tool {
+	path := ""
+	if len(chroot) > 0 {
+		path = chroot[0]
+	}
+	return tools.NewFileReadTool(path)
 }
 
 // NewFileWriteTool creates a file writing tool.
-func NewFileWriteTool() tools.Tool {
-	return tools.NewFileWriteTool()
+func NewFileWriteTool(chroot ...string) tools.Tool {
+	path := ""
+	if len(chroot) > 0 {
+		path = chroot[0]
+	}
+	return tools.NewFileWriteTool(path)
+}
+
+// NewFileEditTool creates a file editing tool.
+func NewFileEditTool(chroot ...string) tools.Tool {
+	path := ""
+	if len(chroot) > 0 {
+		path = chroot[0]
+	}
+	return tools.NewFileEditTool(path)
+}
+
+// NewDirectoryTool creates a directory traversal tool.
+func NewDirectoryTool(root string, depth int, allowAbs bool) tools.Tool {
+	return tools.NewDirectoryTool(root, depth, allowAbs)
+}
+
+// NewAskHumanTool creates a tool for requesting human approval.
+func NewAskHumanTool(enabled bool) tools.Tool {
+	return tools.NewAskHumanTool(enabled)
 }
 
 // ============================================================

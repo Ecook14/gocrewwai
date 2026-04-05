@@ -100,7 +100,49 @@ func NewCrew(agents []core.Agent, tasks []*tasks.Task, opts ...CrewOption) *Crew
 	return c
 }
 
-// New creates a new Crew using a declarative configuration struct.
+// NewCrew is a legacy-compatible constructor for creating a new Crew.
+func NewCrew(agents []core.Agent, tasks []*tasks.Task, options ...CrewOption) *Crew {
+	c := &Crew{
+		Agents:       agents,
+		Tasks:        tasks,
+		Process:      Sequential,
+		UsageMetrics: make(map[string]int),
+	}
+	for _, opt := range options {
+		opt(c)
+	}
+	return c
+}
+
+// WithVerbose is a legacy-compatible option for enabling verbose logging.
+func WithVerbose(v bool) CrewOption {
+	return func(c *Crew) {
+		c.Verbose = v
+	}
+}
+
+// WithProcess is a legacy-compatible option for setting the process type.
+func WithProcess(p ProcessType) CrewOption {
+	return func(c *Crew) {
+		c.Process = p
+	}
+}
+
+// WithPlanning is a legacy-compatible option for enabling the planning phase.
+func WithPlanning(p bool) CrewOption {
+	return func(c *Crew) {
+		c.Planning = p
+	}
+}
+
+// WithManager is a legacy-compatible option for setting a custom manager agent.
+func WithManager(m core.Agent) CrewOption {
+	return func(c *Crew) {
+		c.ManagerAgent = m
+	}
+}
+
+// New creates a new Crew using a declarative configuration struct (Elite Style).
 func New(cfg CrewConfig) *Crew {
 	return &Crew{
 		Agents:         cfg.Agents,
@@ -151,7 +193,8 @@ type Crew struct {
 	StepCallback   func(step map[string]interface{})       `json:"-"` // Called per agent step for collaboration tracking
 	TaskCallback   func(taskIndex int, output interface{})  `json:"-"` // Called when any task produces output
 
-	// Persistence & Logging
+	// Persistence & Logging (Elite)
+	SessionID     string
 	StateFile     string
 	OutputLogFile string
 
@@ -225,6 +268,9 @@ func (c *Crew) Train(ctx context.Context, iterations int, inputs map[string]inte
 
 // Kickoff starts the execution process based on the process type.
 func (c *Crew) Kickoff(ctx context.Context) (interface{}, error) { 
+	// 🛠️ Phase 15: Automatic MCP Injection from Config
+	c.injectMCPFromConfig(ctx)
+
 	ctx, span := telemetry.Tracer.Start(ctx, "Crew.Kickoff")
 	defer span.End()
 
@@ -274,11 +320,24 @@ func (c *Crew) Kickoff(ctx context.Context) (interface{}, error) {
 		return "", crewErrors.ErrNoAgents
 	}
 
-	// Load state if a StateFile is provided and exists
+	// Elite Persistence: Load from SQL if SessionID is provided
+	if c.SessionID != "" {
+		m, err := core.GetSessionManager()
+		if err == nil {
+			if c.Verbose {
+				defaultLogger.Info("🏛️ Resuming Crew from SQL Session", slog.String("session_id", c.SessionID))
+			}
+			if err := m.LoadLatestCheckpoint(c.SessionID, c); err != nil {
+				defaultLogger.Warn("⚠️ Failed to load SQL checkpoint", slog.String("error", err.Error()))
+			}
+		}
+	}
+
+	// Legacy: Load state if a StateFile is provided and exists
 	if c.StateFile != "" {
 		if _, err := os.Stat(c.StateFile); err == nil {
 			if c.Verbose {
-				defaultLogger.Info("📍 Resuming Crew from Checkpoint", slog.String("file", c.StateFile))
+				defaultLogger.Info("📍 Resuming Crew from Checkpoint File", slog.String("file", c.StateFile))
 			}
 			if err := c.LoadState(c.StateFile); err != nil {
 				defaultLogger.Warn("⚠️ Failed to load state file", slog.String("error", err.Error()))
@@ -447,7 +506,12 @@ func (c *Crew) executeSequential(ctx context.Context) (interface{}, error) {
 				future: future,
 			})
 		} else {
+			// Instrument Task Execution
+			ctx, taskSpan := telemetry.StartSpan(ctx, "Task.Execute: "+task.Description)
 			result, err := task.Execute(ctx)
+			taskSpan.Attribute(semconv.MessageIDKey.String(fmt.Sprintf("%d", i+1)))
+			taskSpan.End()
+			
 			if err != nil {
 				task.Failed = true
 				task.Error = err
@@ -464,6 +528,13 @@ func (c *Crew) executeSequential(ctx context.Context) (interface{}, error) {
 			finalResult = result
 			if c.OnTaskComplete != nil {
 				c.OnTaskComplete(i+1, result)
+			}
+
+			// Elite: Save Checkpoint after each task
+			if c.SessionID != "" {
+				if m, err := core.GetSessionManager(); err == nil {
+					_ = m.SaveCheckpoint(c.SessionID, c)
+				}
 			}
 		}
 	}
@@ -1337,6 +1408,27 @@ func (c *Crew) InjectDelegationTools() {
 						slog.Int("coworkers", len(coworkers)))
 				}
 			}
+	}
+}
+
+func (c *Crew) injectMCPFromConfig(ctx context.Context) {
+	cfg := config.Get()
+	if len(cfg.MCPServers) == 0 {
+		return
+	}
+
+	for name, serverCfg := range cfg.MCPServers {
+		source := fmt.Sprintf("stdio:%s %s", serverCfg.Command, strings.Join(serverCfg.Args, " "))
+		
+		for _, agent := range c.Agents {
+			if agentPtr, ok := agent.(*agents.Agent); ok {
+				agentPtr.EquipMCP(ctx, source)
+			}
+		}
+		
+		if c.Verbose {
+			fmt.Printf("📦 Crew: Automatically injected MCP server '%s' into all agents\n", name)
+		}
 	}
 }
 

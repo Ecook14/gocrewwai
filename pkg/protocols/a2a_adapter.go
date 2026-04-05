@@ -34,6 +34,10 @@ func (a *RemoteAgentAdapter) GetGoal() string {
 	return a.Card.Description
 }
 
+func (a *RemoteAgentAdapter) GetBackstory() string {
+	return "" // Remote agents keep their full backstory private or share via card if extended
+}
+
 func (a *RemoteAgentAdapter) GetMaxRPM() int {
 	return 0 // TODO: Fetch from remote capability card if needed
 }

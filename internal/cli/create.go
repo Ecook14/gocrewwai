@@ -67,18 +67,14 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/Ecook14/gocrewwai/pkg/agents"
+	"github.com/Ecook14/gocrewwai/gocrew"
 	"github.com/Ecook14/gocrewwai/pkg/config"
-	"github.com/Ecook14/gocrewwai/pkg/crew"
-	"github.com/Ecook14/gocrewwai/pkg/llm"
-	"github.com/Ecook14/gocrewwai/pkg/tasks"
-	"github.com/Ecook14/gocrewwai/pkg/dashboard"
 )
 
 func main() {
 	apiKey := os.Getenv("OPENAI_API_KEY")
 
-	// 1. Load Configurations
+	// 1. Load Configurations (using the specialized loaders)
 	agentsMap, err := config.LoadAgents("config/agents.yaml")
 	if err != nil {
 		panic(err)
@@ -89,39 +85,37 @@ func main() {
 		panic(err)
 	}
 
-	// 2. Bind LLM
+	// 2. Bind LLM to Agents
+	model := gocrew.NewOpenAI(apiKey, "gpt-4o")
 	for _, a := range agentsMap {
-		a.LLM = llm.NewOpenAIClient(apiKey)
+		a.LLM = model
 	}
 
-	// 3. Assemble tasks and agents
-	var taskList []*tasks.Task
-	for _, t := range tasksMap {
-		taskList = append(taskList, t)
-	}
-
-	var agentList []*agents.Agent
+	// 3. Assemble and Kickoff
+	var agentList []gocrew.Agent
 	for _, a := range agentsMap {
 		agentList = append(agentList, a)
 	}
 
-	myCrew := crew.Crew{
-		Agents:  agentList,
-		Tasks:   taskList,
-		Process: crew.Sequential,
-		Verbose: true,
+	var taskList []*gocrew.Task
+	for _, t := range tasksMap {
+		taskList = append(taskList, t)
 	}
 
-	// 4. Start the Dashboard (Background)
-	dashboard.Start("8080")
+	myCrew := gocrew.NewCrew(gocrew.CrewConfig{
+		Agents:  agentList,
+		Tasks:   taskList,
+		Process: gocrew.Sequential,
+		Verbose: true,
+	})
 
-	slog.Info("Starting Boilerplate Crew-GO...")
+	slog.Info("🚀 Starting Crew-GO Scaffolded Project...")
 	res, err := myCrew.Kickoff(context.Background())
 	if err != nil {
 		slog.Error("Crew execution failed", slog.Any("error", err))
 		os.Exit(1)
 	}
-	slog.Info("Finished!", slog.Any("result", res))
+	slog.Info("🏁 Finished!", slog.Any("result", res))
 }
 `
 	if err := os.WriteFile(filepath.Join(baseDir, "main.go"), []byte(mainGo), 0644); err != nil {

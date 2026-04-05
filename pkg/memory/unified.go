@@ -329,7 +329,7 @@ func (um *UnifiedMemory) deepRecall(ctx context.Context, query string, candidate
 	sb.WriteString("\nReturn the candidate numbers in order of relevance, most relevant first. Just the numbers, comma-separated.")
 
 	messages := []llm.Message{{Role: "user", Content: sb.String()}}
-	_, err := um.llm.Generate(ctx, messages, nil)
+	_, err := um.llm.Generate(ctx, messages, llm.GenerateOptions{})
 	if err != nil {
 		// Fallback: return original ranking
 		return candidates
@@ -392,7 +392,7 @@ func (um *UnifiedMemory) ExtractMemories(ctx context.Context, content string) ([
 		Content: "Break the following text into discrete, atomic facts. Return each fact on a separate line.\n\nText:\n" + content,
 	}}
 
-	response, err := um.llm.Generate(ctx, messages, nil)
+	response, err := um.llm.Generate(ctx, messages, llm.GenerateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("extract memories failed: %w", err)
 	}
@@ -435,7 +435,7 @@ func (um *UnifiedMemory) inferImportance(ctx context.Context, content string) fl
 		Content: "Rate the importance of this information on a scale of 0.0 to 1.0 (where 1.0 is critical). Return ONLY the number.\n\n" + content,
 	}}
 
-	response, err := um.llm.Generate(ctx, messages, nil)
+	response, err := um.llm.Generate(ctx, messages, llm.GenerateOptions{})
 	if err != nil {
 		return 0.5
 	}

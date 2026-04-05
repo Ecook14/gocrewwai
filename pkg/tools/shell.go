@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strings"
 	"time"
+	//"github.com/Ecook14/gocrewwai/pkg/utils"
 )
 
 // ShellTool allows agents to execute shell commands on the host system.
@@ -31,14 +32,16 @@ func NewShellTool(opts ...func(*ShellTool)) *ShellTool {
 	t := &ShellTool{
 		BaseTool: BaseTool{
 			NameValue:        "ShellTool",
-			DescriptionValue: "Execute shell commands on the host system. Input: {'command': 'shell command string', 'timeout': seconds}. Returns stdout and stderr. DANGEROUS: always requires approval.",
+			DescriptionValue: "Execute shell commands. Input: {'command': 'string', 'timeout': seconds}.",
 		},
 		DefaultTimeout: 30 * time.Second,
-		BlockedCommands: []string{
-			"rm -rf /", "mkfs", "dd if=/dev/zero", ":(){ :|:& };:",
-			"shutdown", "reboot", "halt", "poweroff",
-		},
 	}
+
+	t.BlockedCommands = []string{
+		"rm -rf /", "mkfs", "dd if=/dev/zero", ":(){ :|:& };:",
+		"shutdown", "reboot", "halt", "poweroff",
+	}
+
 	for _, opt := range opts {
 		opt(t)
 	}
@@ -148,4 +151,6 @@ func (t *ShellTool) Execute(ctx context.Context, input map[string]interface{}) (
 	return output, nil
 }
 
-func (t *ShellTool) RequiresReview() bool { return true } // Always requires review
+func (t *ShellTool) RequiresReview() bool {
+	return true // Default for decoupled shell tool
+}

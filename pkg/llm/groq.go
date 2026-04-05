@@ -51,34 +51,25 @@ func NewGroqClient(apiKey, model string) *GroqClient {
 }
 
 // Generate overrides the base OpenAI Generate to inject the default model if not provided.
-func (c *GroqClient) Generate(ctx context.Context, messages []Message, options map[string]interface{}) (string, error) {
-	if options == nil {
-		options = make(map[string]interface{})
-	}
-	if options["model"] == nil {
-		options["model"] = c.DefaultModel
+func (c *GroqClient) Generate(ctx context.Context, messages []Message, options GenerateOptions) (string, error) {
+	if options.Model == "" {
+		options.Model = c.DefaultModel
 	}
 	return c.OpenAIClient.Generate(ctx, messages, options)
 }
 
 // GenerateStructured overrides the base OpenAI GenerateStructured to inject the default model if not provided.
-func (c *GroqClient) GenerateStructured(ctx context.Context, messages []Message, schema interface{}, options map[string]interface{}) (interface{}, error) {
-	if options == nil {
-		options = make(map[string]interface{})
-	}
-	if options["model"] == nil {
-		options["model"] = c.DefaultModel
+func (c *GroqClient) GenerateStructured(ctx context.Context, messages []Message, schema interface{}, options GenerateOptions) (interface{}, error) {
+	if options.Model == "" {
+		options.Model = c.DefaultModel
 	}
 	return c.OpenAIClient.GenerateStructured(ctx, messages, schema, options)
 }
 
 // GenerateWithUsage overrides the base to inject the default model and provider.
-func (c *GroqClient) GenerateWithUsage(ctx context.Context, messages []Message, options map[string]interface{}) (string, *Usage, error) {
-	if options == nil {
-		options = make(map[string]interface{})
-	}
-	if options["model"] == nil {
-		options["model"] = c.DefaultModel
+func (c *GroqClient) GenerateWithUsage(ctx context.Context, messages []Message, options GenerateOptions) (string, *Usage, error) {
+	if options.Model == "" {
+		options.Model = c.DefaultModel
 	}
 	text, usage, err := c.OpenAIClient.GenerateWithUsage(ctx, messages, options)
 	if usage != nil {
@@ -88,12 +79,9 @@ func (c *GroqClient) GenerateWithUsage(ctx context.Context, messages []Message, 
 }
 
 // StreamGenerate overrides the base OpenAI StreamGenerate to inject the default model if not provided.
-func (c *GroqClient) StreamGenerate(ctx context.Context, messages []Message, options map[string]interface{}) (<-chan string, error) {
-	if options == nil {
-		options = make(map[string]interface{})
-	}
-	if options["model"] == nil {
-		options["model"] = c.DefaultModel
+func (c *GroqClient) StreamGenerate(ctx context.Context, messages []Message, options GenerateOptions) (<-chan string, error) {
+	if options.Model == "" {
+		options.Model = c.DefaultModel
 	}
 	return c.OpenAIClient.StreamGenerate(ctx, messages, options)
 }

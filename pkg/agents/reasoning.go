@@ -36,13 +36,14 @@ func (a *Agent) runReasoningLoop(ctx context.Context, messages []llm.Message, op
 
 	for i := 0; i < maxAttempts; i++ {
 		// 1. Reflect & Plan
-		prompt := `Analyze the task and tools provided. Create a detailed reasoning plan in the following structure:
-- Understanding of the task: [Your interpretation]
-- Key steps: [Numbered list of actions]
-- Approach to challenges: [How you will handle edge cases]
-- Use of available tools: [Which tools and why]
-- Expected outcome: [What success looks like]
-- READY status: [YES/NO]`
+		prompt := a.I18N.Process(a.I18N.Retrieve("reasoning", "create_plan_prompt"), map[string]string{
+			"role":            a.Role,
+			"backstory":       a.Backstory,
+			"goal":            a.Goal,
+			"description":     messages[len(messages)-1].Content, // Last user message is the task description
+			"expected_output": "",                                // Handled via task-level prompts usually
+			"tools":           "",                                // Handled via system prompt usually
+		})
 
 		currentMessages = append(currentMessages, llm.Message{Role: "user", Content: prompt})
 		
@@ -52,9 +53,9 @@ func (a *Agent) runReasoningLoop(ctx context.Context, messages []llm.Message, op
 		}
 
 		// 2. Evaluate
-		isReady := strings.Contains(strings.ToUpper(response), "READY: YES") || 
-		           strings.Contains(strings.ToUpper(response), "STATUS: YES") ||
-				   strings.Contains(strings.ToUpper(response), "READY status: YES")
+		isReady := strings.Contains(strings.ToUpper(response), "READY: I AM READY") || 
+		           strings.Contains(strings.ToUpper(response), "READY: YES") ||
+		           strings.Contains(strings.ToUpper(response), "STATUS: YES")
 
 		if isReady {
 			finalPlan = response
@@ -69,7 +70,12 @@ func (a *Agent) runReasoningLoop(ctx context.Context, messages []llm.Message, op
 			defaultLogger.Info("🧠 Agent reasoning loop: REFINING", slog.String("role", a.Role), slog.Int("attempt", i+1))
 		}
 		
-		refineMsg := "Your plan is not yet marked as READY: YES. Please refine the plan, address potential shortcomings, and Ensure you end with 'READY status: YES' when fully prepared."
+		refineMsg := a.I18N.Process(a.I18N.Retrieve("reasoning", "refine_plan_prompt"), map[string]string{
+			"role":         a.Role,
+			"backstory":    a.Backstory,
+			"goal":         a.Goal,
+			"current_plan": response,
+		})
 		currentMessages = append(currentMessages, llm.Message{Role: "assistant", Content: response})
 		currentMessages = append(currentMessages, llm.Message{Role: "user", Content: refineMsg})
 		

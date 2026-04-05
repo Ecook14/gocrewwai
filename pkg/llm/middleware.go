@@ -94,7 +94,7 @@ func (mc *MiddlewareClient) Inner() Client {
 // Client Interface Implementation
 // ---------------------------------------------------------------------------
 
-func (mc *MiddlewareClient) Generate(ctx context.Context, messages []Message, options map[string]interface{}) (string, error) {
+func (mc *MiddlewareClient) Generate(ctx context.Context, messages []Message, options GenerateOptions) (string, error) {
 	ctx = mc.applyTimeout(ctx)
 	if err := mc.waitRateLimit(ctx); err != nil {
 		return "", err
@@ -106,7 +106,7 @@ func (mc *MiddlewareClient) Generate(ctx context.Context, messages []Message, op
 	return result, err
 }
 
-func (mc *MiddlewareClient) GenerateWithUsage(ctx context.Context, messages []Message, options map[string]interface{}) (string, *Usage, error) {
+func (mc *MiddlewareClient) GenerateWithUsage(ctx context.Context, messages []Message, options GenerateOptions) (string, *Usage, error) {
 	ctx = mc.applyTimeout(ctx)
 	if err := mc.waitRateLimit(ctx); err != nil {
 		return "", nil, err
@@ -118,7 +118,7 @@ func (mc *MiddlewareClient) GenerateWithUsage(ctx context.Context, messages []Me
 	return result, usage, err
 }
 
-func (mc *MiddlewareClient) GenerateStructured(ctx context.Context, messages []Message, schema interface{}, options map[string]interface{}) (interface{}, error) {
+func (mc *MiddlewareClient) GenerateStructured(ctx context.Context, messages []Message, schema interface{}, options GenerateOptions) (interface{}, error) {
 	ctx = mc.applyTimeout(ctx)
 	if err := mc.waitRateLimit(ctx); err != nil {
 		return nil, err
@@ -130,7 +130,7 @@ func (mc *MiddlewareClient) GenerateStructured(ctx context.Context, messages []M
 	return result, err
 }
 
-func (mc *MiddlewareClient) StreamGenerate(ctx context.Context, messages []Message, options map[string]interface{}) (<-chan string, error) {
+func (mc *MiddlewareClient) StreamGenerate(ctx context.Context, messages []Message, options GenerateOptions) (<-chan string, error) {
 	ctx = mc.applyTimeout(ctx)
 	if err := mc.waitRateLimit(ctx); err != nil {
 		return nil, err
@@ -167,18 +167,12 @@ func (mc *MiddlewareClient) waitRateLimit(ctx context.Context) error {
 	return nil
 }
 
-func (mc *MiddlewareClient) logCall(method string, messages []Message, options map[string]interface{}, result string, err error, latency time.Duration) {
+func (mc *MiddlewareClient) logCall(method string, messages []Message, options GenerateOptions, result string, err error, latency time.Duration) {
 	if mc.logger == nil {
 		return
 	}
 
-	model := ""
-	if options != nil {
-		if m, ok := options["model"].(string); ok {
-			model = m
-		}
-	}
-
+	model := options.Model
 	promptLen := 0
 	for _, m := range messages {
 		promptLen += len(m.Content)
@@ -199,18 +193,12 @@ func (mc *MiddlewareClient) logCall(method string, messages []Message, options m
 	}
 }
 
-func (mc *MiddlewareClient) logCallWithUsage(method string, messages []Message, options map[string]interface{}, result string, usage *Usage, err error, latency time.Duration) {
+func (mc *MiddlewareClient) logCallWithUsage(method string, messages []Message, options GenerateOptions, result string, usage *Usage, err error, latency time.Duration) {
 	if mc.logger == nil {
 		return
 	}
 
-	model := ""
-	if options != nil {
-		if m, ok := options["model"].(string); ok {
-			model = m
-		}
-	}
-
+	model := options.Model
 	promptLen := 0
 	for _, m := range messages {
 		promptLen += len(m.Content)

@@ -99,54 +99,8 @@ type ModelPricing struct {
 	CompletionPricePerToken float64 `json:"completion_price_per_token"`
 }
 
-// builtinPricing is an OFFLINE FALLBACK ONLY. The PriceCache automatically
-// fetches live pricing from OpenRouter on first use — these values are only
-// used when the API is unreachable (no internet, firewall, etc.).
-// Prices: USD per token. Last manually updated: March 2026.
-var builtinPricing = map[string]ModelPricing{
-	// --- OpenAI (as of early 2026) ---
-	"gpt-5.2":        {PromptPricePerToken: 0.00000175, CompletionPricePerToken: 0.000014},
-	"gpt-4.1":        {PromptPricePerToken: 0.000002, CompletionPricePerToken: 0.000008},
-	"gpt-4o":         {PromptPricePerToken: 0.0000025, CompletionPricePerToken: 0.00001},
-	"gpt-4o-mini":    {PromptPricePerToken: 0.00000015, CompletionPricePerToken: 0.0000006},
-	"gpt-4-turbo":    {PromptPricePerToken: 0.00001, CompletionPricePerToken: 0.00003},
-	"gpt-4":          {PromptPricePerToken: 0.00003, CompletionPricePerToken: 0.00006},
-	"gpt-3.5-turbo":  {PromptPricePerToken: 0.0000005, CompletionPricePerToken: 0.0000015},
-
-	// --- Anthropic (as of early 2026) ---
-	"claude-sonnet-4.5":           {PromptPricePerToken: 0.000003, CompletionPricePerToken: 0.000015},
-	"claude-opus-4.5":             {PromptPricePerToken: 0.000005, CompletionPricePerToken: 0.000025},
-	"claude-haiku-4.5":            {PromptPricePerToken: 0.000001, CompletionPricePerToken: 0.000005},
-	"claude-3-5-sonnet":           {PromptPricePerToken: 0.000003, CompletionPricePerToken: 0.000015},
-	"claude-3-5-sonnet-20240620":  {PromptPricePerToken: 0.000003, CompletionPricePerToken: 0.000015},
-	"claude-3-opus":               {PromptPricePerToken: 0.000015, CompletionPricePerToken: 0.000075},
-	"claude-3-haiku":              {PromptPricePerToken: 0.00000025, CompletionPricePerToken: 0.00000125},
-
-	// --- Google Gemini (as of early 2026) ---
-	"gemini-3.1-pro":   {PromptPricePerToken: 0.000002, CompletionPricePerToken: 0.000012},
-	"gemini-3.1-flash": {PromptPricePerToken: 0.0000005, CompletionPricePerToken: 0.000003},
-	"gemini-2.5-pro":   {PromptPricePerToken: 0.00000125, CompletionPricePerToken: 0.00001},
-	"gemini-2.0-flash":  {PromptPricePerToken: 0.0000001, CompletionPricePerToken: 0.0000004},
-	"gemini-1.5-pro":    {PromptPricePerToken: 0.00000125, CompletionPricePerToken: 0.000005},
-
-	// --- Groq / Open Source (as of early 2026) ---
-	"llama-3.3-70b":      {PromptPricePerToken: 0.0000001, CompletionPricePerToken: 0.00000032},
-	"llama-3.1-70b":      {PromptPricePerToken: 0.00000059, CompletionPricePerToken: 0.00000079},
-	"mixtral-8x7b-32768": {PromptPricePerToken: 0.00000024, CompletionPricePerToken: 0.00000024},
-	"mixtral-8x7b":       {PromptPricePerToken: 0.00000024, CompletionPricePerToken: 0.00000024},
-
-	// --- DeepSeek (as of early 2026) ---
-	"deepseek-chat":     {PromptPricePerToken: 0.00000028, CompletionPricePerToken: 0.00000042},
-	"deepseek-reasoner": {PromptPricePerToken: 0.00000056, CompletionPricePerToken: 0.00000168},
-
-	// --- Mistral (as of early 2026) ---
-	"mistral-large":  {PromptPricePerToken: 0.000002, CompletionPricePerToken: 0.000006},
-	"mistral-medium": {PromptPricePerToken: 0.00000275, CompletionPricePerToken: 0.0000081},
-	"mistral-small":  {PromptPricePerToken: 0.000001, CompletionPricePerToken: 0.000003},
-
-	// --- Qwen (as of early 2026) ---
-	"qwen-2.5-72b": {PromptPricePerToken: 0.0000009, CompletionPricePerToken: 0.0000009},
-}
+// Prices: USD per token. Initialized from config.json.
+var builtinPricing = make(map[string]ModelPricing)
 
 // ---------------------------------------------------------------------------
 // PriceCache — Simple Lazy-Loading Price Cache (No Background Goroutines)
@@ -186,8 +140,8 @@ type PriceCacheConfig struct {
 	CustomPricing map[string]ModelPricing
 }
 
-// NewPriceCache creates a new cache pre-loaded with builtin pricing.
-// Live prices are fetched lazily on first CalculateCost/GetPricing call.
+// NewPriceCache creates a new cache.
+// Live prices are fetched lazily on first use.
 func NewPriceCache(cfg PriceCacheConfig) *PriceCache {
 	if cfg.CacheTTL == 0 {
 		cfg.CacheTTL = 6 * time.Hour
@@ -199,7 +153,7 @@ func NewPriceCache(cfg PriceCacheConfig) *PriceCache {
 		cfg.APIEndpoint = "https://openrouter.ai/api/v1/models"
 	}
 
-	// Start with builtin + custom
+	// Initial set includes builtins + custom overrides
 	prices := make(map[string]ModelPricing, len(builtinPricing)+len(cfg.CustomPricing))
 	for k, v := range builtinPricing {
 		prices[k] = v
@@ -376,17 +330,55 @@ func parsePrice(s string) float64 {
 // ---------------------------------------------------------------------------
 
 var (
-	globalCache     *PriceCache
-	globalCacheOnce sync.Once
+	globalCache      *PriceCache
+	globalCacheOnce  sync.Once
+	GlobalUsage      *UsageTracker
+	GlobalUsageOnce  sync.Once
+	globalMaxBudget  float64
 )
 
+// SetGlobalBudget sets the maximum USD budget allowed for the engine.
+func SetGlobalBudget(budget float64) {
+	globalMaxBudget = budget
+}
+
+// SetModelPricing allows external configuration (like pkg/config) to inject pricing.
+func SetModelPricing(model string, pricing ModelPricing) {
+	builtinPricing[model] = pricing
+	if globalCache != nil {
+		globalCache.SetPricing(model, pricing)
+	}
+}
+
 // GlobalPriceCache returns the default singleton PriceCache.
-// Created lazily on first call with default config.
 func GlobalPriceCache() *PriceCache {
 	globalCacheOnce.Do(func() {
 		globalCache = NewPriceCache(PriceCacheConfig{})
 	})
 	return globalCache
+}
+
+// GlobalTracker returns the singleton global usage tracker.
+func GlobalTracker() *UsageTracker {
+	GlobalUsageOnce.Do(func() {
+		GlobalUsage = NewUsageTracker()
+	})
+	return GlobalUsage
+}
+
+var ErrBudgetExceeded = fmt.Errorf("LLM budget exceeded")
+
+// CheckBudget verifies if the current session has exceeded the max_budget_usd limit.
+func CheckBudget() error {
+	if globalMaxBudget <= 0 {
+		return nil // No limit
+	}
+
+	totals := GlobalTracker().Totals()
+	if totals.CostUSD >= globalMaxBudget {
+		return fmt.Errorf("%w: current spend $%.4f exceeds limit of $%.4f", ErrBudgetExceeded, totals.CostUSD, globalMaxBudget)
+	}
+	return nil
 }
 
 // CalculateCost computes the USD cost for a Usage entry using live pricing

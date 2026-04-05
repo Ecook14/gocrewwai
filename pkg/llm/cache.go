@@ -6,8 +6,22 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
+	"time"
 )
+
+// CacheConfig represents the settings for the LLM cache.
+type CacheConfig struct {
+	Type  string
+	Dir   string
+	Redis struct {
+		Addr     string
+		Password string
+		DB       int
+		TTL      time.Duration
+	}
+}
 
 // Cache interface for persisting LLM responses and tool results.
 type Cache interface {
@@ -54,8 +68,24 @@ func (c *FileCache) Set(key, value string) error {
 	return os.WriteFile(path, []byte(value), 0644)
 }
 
+// NewCache returns the configured cache implementation.
+func NewCache(cfg CacheConfig) Cache {
+	switch strings.ToLower(cfg.Type) {
+	case "redis":
+		if c, err := NewRedisCache(cfg.Redis.Addr, cfg.Redis.Password, cfg.Redis.DB, cfg.Redis.TTL); err == nil {
+			return c
+		}
+		fmt.Printf("Warning: Failed to init Redis cache, falling back to FileCache\n")
+		return NewFileCache(cfg.Dir)
+	default:
+		return NewFileCache(cfg.Dir)
+	}
+}
+
 // GenerateCacheKey creates a stable key from the prompt and options.
-func GenerateCacheKey(model, prompt string, options map[string]interface{}) string {
+func GenerateCacheKey(model, prompt string, options interface{}) string {
 	optsJson, _ := json.Marshal(options)
-	return fmt.Sprintf("model:%s|prompt:%s|opts:%s", model, prompt, string(optsJson))
+	hasher := sha256.New()
+	hasher.Write([]byte(fmt.Sprintf("%s|%s|%s", model, prompt, string(optsJson))))
+	return fmt.Sprintf("llm:cache:%x", hasher.Sum(nil))
 }
