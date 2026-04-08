@@ -96,4 +96,4 @@ go run main.go
 
 ---
 
-[Explore Core Concepts](./CORE_CONCEPTS.md) | [Agents Guide](./AGENTS.md) | [Tasks Guide](./TASKS.md)
+[Explore Core Concepts](./CORE_CONCEPTS.md) | [Agents Guide](./features/agents.md) | [Tasks Guide](./features/tasks.md)

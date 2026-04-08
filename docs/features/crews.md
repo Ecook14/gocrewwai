@@ -32,11 +32,25 @@ result, err := myCrew.Kickoff(ctx)
 | :--- | :--- | :--- |
 | **Agents** | `[]CoreAgent` | The slice of agents participating in the crew. |
 | **Tasks** | `[]*Task` | The sequence of tasks to be performed. |
-| **Process** | `ProcessType` | The orchestration strategy (Sequential, Hierarchical, Graph). |
-| **ManagerLLM** | `LLMClient` | The LLM used for hierarchical delegation and synthesis. |
-| **Verbose** | `bool` | Enables detailed logging of the crew's orchestration steps. |
-| **MaxRPM** | `int` | Global rate limit to prevent API throttling during execution. |
-| **Planning** | `bool` | Enables a pre-execution planning phase to optimize task division. |
+| **Process** | `ProcessType` | Orchestration strategy (Sequential, Hierarchical, etc.). |
+| **ManagerLLM** | `LLMClient` | LLM used for hierarchical delegation. |
+| **ManagerAgent** | `CoreAgent` | Optional: Provide a custom agent to act as the manager. |
+| **Verbose** | `bool` | Detailed logging of orchestration steps. |
+| **MaxRPM** | `int` | Global rate limit across all agents. |
+| **Planning** | `bool` | pre-execution task planning phase. |
+| **PlanningLLM** | `LLMClient` | LLM specifically for the planning phase. |
+| **StateFile** | `string` | Path for auto-checkpointing (Persistence). |
+| **TrainingDir** | `string` | Directory for training iteration feedback. |
+| **TestLLM** | `LLMClient` | Internal evaluation LLM for elite tier verification. |
+| **TaskCooldown** | `Duration` | Delay between tasks to prevent bursty rate limits. |
+
+### 🧠 The Planning Phase (`Planning: true`)
+
+When `Planning` is enabled, Gocrewwai injects a preliminary stage before any tasks are executed. The `PlanningLLM` (or `ManagerLLM`) receives the entire `CrewConfig` and dynamically constructs an execution **Directed Acyclic Graph (DAG)**.
+
+1. **Analysis**: The LLM evaluates the tasks and agent capabilities.
+2. **Strategy**: It determines the optimal order of execution (potentially overriding your sequential array) to maximize parallelization if tasks aren't dependent.
+3. **Execution**: The crew then executes according to this newly minted plan.
 
 ---
 
@@ -48,10 +62,35 @@ Agents work in a pre-defined order, passing their results to the next task's ass
 ### 👑 Hierarchical
 A **Manager Agent** is automatically created to orchestrate the team. The manager delegates tasks dynamically based on agent goals and reviews the output of each agent before moving on.
 
-### 📈 Graph
+### 🤖 State Machine (Graph)
 Utilizes a dynamic state machine to determine the next step based on real-time task results. This enables non-linear workflows and cyclic loops.
 
----
+**Example Implementation:**
+```go
+// 1. Define nodes (Tasks)
+generator := gocrew.NewTask(...)
+reviewer := gocrew.NewTask(...)
+
+// 2. Define the Router logic on the reviewer task
+reviewer.OutputCondition = func(result interface{}) string {
+    r := result.(*ReviewResult)
+    if r.Passed {
+        return "end"
+    }
+    return "retry"
+}
+
+// 3. Map the conditions to paths
+reviewer.NextPaths = map[string]*gocrew.Task{
+    "retry": generator, // Cycle back!
+}
+
+// 4. Run as Graph Process
+myCrew := gocrew.NewCrew(gocrew.CrewConfig{
+    Process: gocrew.Graph,
+    Tasks:   []*gocrew.Task{generator, reviewer},
+})
+```
 
 ## 📊 Crew Observability
 

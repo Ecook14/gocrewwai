@@ -30,21 +30,29 @@ Using the `gocrew` SDK, you can define and run evaluations with ease:
 package main
 
 import (
+    "testing"
     "github.com/Ecook14/gocrewwai/gocrew"
-    "github.com/Ecook14/gocrewwai/pkg/testing"
+    "github.com/Ecook14/gocrewwai/pkg/eval"
 )
 
-func main() {
+func TestCrewReliability(t *testing.T) {
     // 1. Define the Evaluation Criteria
-    eval := testing.NewEvaluator(testing.EvaluatorConfig{
-        Agents:    []gocrew.CoreAgent{tester},
-        Criteria:  "The summary must be exactly 3 bullet points long.",
-        NumRuns:   10, // Run the crew 10 times
+    evaluator := eval.NewEvaluator(eval.EvaluatorConfig{
+        ExpectedSchema:  "SummaryOutput",
+        Rubric:          "The summary must be exactly 3 bullet points long.",
+        JudgeLLM:        gocrew.NewOpenAI("api-key", "gpt-4o"),
+        Runs:            10, // Run the crew 10 times to measure determinism
     })
 
     // 2. Run the Test
-    results := eval.Run(myCrew)
-    fmt.Printf("Average Score: %.2f%%\n", results.AverageScore)
+    results, err := evaluator.EvaluateCrew(context.Background(), myCrew)
+    if err != nil {
+        t.Fatalf("Evaluation failed to run: %v", err)
+    }
+
+    if results.PassRate < 0.95 {
+        t.Errorf("Crew failed reliability threshold. Only %.2f%% runs passed.", results.PassRate*100)
+    }
 }
 ```
 

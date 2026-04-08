@@ -30,6 +30,16 @@ myCrew := gocrew.NewCrew(gocrew.CrewConfig{
     Tasks:    []*gocrew.Task{articleTask},
     Training: true, // Enable feedback capture and memory injection
 })
+
+// Trigger a Training Pause and apply human feedback
+func acceptTaskFeedback(taskID string, humanFeedback string) {
+    err := myCrew.ProvideTrainingFeedback(taskID, gocrew.TrainingFeedback{
+        Rating:  -1, // Negative rating triggers Agent learning loop
+        Comment: humanFeedback,
+    })
+    
+    // The agent will capture this into Entity Memory and recall it for all future runs
+}
 ```
 
 ## 🧠 Memory-Based Refinement

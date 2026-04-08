@@ -44,16 +44,44 @@ func main() {
 ## 🧠 Flow 2.0 Feature Highlights
 
 ### 💾 1. Durable Persistence (Checkpoints)
-Flows automatically save their state after every node execution. If a process crashes or is interrupted, you can resume precisely from the last successful node using a `ThreadID`.
+Flows automatically save their state after every node execution using LangGraph-style checkpointing. If a process crashes or is interrupted, you can resume precisely from the last successful node using a `ThreadID`.
+
+```go
+// Intialize a Checkpointer backed by PostgreSQL or SQLite
+ckpt := gocrew.NewSQLiteCheckpointer("./db/checkpoints.db")
+flow.SetCheckpointer(ckpt)
+
+// Run the flow specifying a ThreadID
+flow.Start(ctx, gocrew.FlowConfig{ThreadID: "pr-review-1042"})
+```
 
 ### 👤 2. Human-in-the-Loop (HITL)
-Add `HumanInterrupt` nodes to your flow to pause execution for manual review. This is essential for workflows that require expert sign-off on AI-generated content.
+Add `Interrupt` nodes to your flow to pause execution for manual review. The engine will halt until a payload is submitted via the REST API or Dashboard.
 
-### 📈 3. Graph-Based Routing
-Use router nodes to determine the "Next" execution step based on real-time state. This enables complex, non-linear workflows and cyclic reasoning loops.
+```go
+flow.AddInterrupt("human_review", func(ctx context.Context, s *MyState, input interface{}) error {
+    // Process input sent by the human
+    userInput := input.(string)
+    s.Result += "\nHuman Feedback: " + userInput
+    return nil
+})
+```
 
-### 📊 4. Real-Time Dashboard Integration
-Every flow execution is visually tracked on the Glassmorphic Dashboard, allowing you to watch the state move through the nodes and inspect data at every step.
+### 📈 3. Graph-Based Routing (Multi-Crew)
+Flows transcend the standard linear sequence. Use router nodes to determine the "Next" execution step based on real-time state, effectively wiring multiple independent Crews together.
+
+```go
+flow.AddRouter("quality_gate", func(ctx context.Context, s *MyState) (string, error) {
+    if !s.IsDraft {
+        return "publish_crew", nil // Route to the publisher crew
+    }
+    return "research_crew", nil    // Route back to research
+})
+
+// Wire the workflow edges
+flow.AddEdge("research", "quality_gate")
+flow.AddEdge("quality_gate", "publish_crew")
+```
 
 ---
 

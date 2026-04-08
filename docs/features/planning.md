@@ -11,13 +11,31 @@ Planning is the pre-execution phase of a Gocrewwai crew where the engine intelli
 
 ## 🏗️ Enabling Planning (Elite Style)
 
-In Gocrewwai v1.0, planning is enabled with a single boolean flag in your `CrewConfig`. When enabled, the framework will:
+In Gocrewwai v1.0, planning transforms linear arrays of tasks into an optimized internal Directed Acyclic Graph (DAG). 
 
 ```go
 myCrew := gocrew.NewCrew(gocrew.CrewConfig{
     Agents:   []gocrew.CoreAgent{researcher, writer},
+    // The engine automatically decomposes this broad task:
     Tasks:    []*gocrew.Task{highLevelMission},
     Planning: true, // Enable pre-execution planning
+})
+```
+
+### Advanced DAG Configuration
+You can also manually map dependency trees bypassing the implicit planner if you know exactly how the nodes should wait on each other:
+
+```go
+taskA := gocrew.NewTask("Fetch Data")
+taskB := gocrew.NewTask("Fetch Context")
+taskC := gocrew.NewTask("Synthesize")
+
+// taskC will block until A and B explicitly complete
+taskC.WaitFor(taskA, taskB)
+
+myCrew := gocrew.NewCrew(gocrew.CrewConfig{
+    Tasks:    []*gocrew.Task{taskA, taskB, taskC},
+    Planning: true, // Optimizes the explicitly provided graph
 })
 ```
 

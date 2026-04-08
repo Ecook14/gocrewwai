@@ -30,6 +30,7 @@ const (
 	AgentThinking           EventType = "agent.thinking"
 	AgentReasoningStarted   EventType = "agent.reasoning.started"
 	AgentReasoningCompleted EventType = "agent.reasoning.completed"
+	AgentFeedbackReceived   EventType = "agent.feedback.received"
 
 	// Task Events
 	TaskStarted    EventType = "task.started"

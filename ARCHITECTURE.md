@@ -2,60 +2,114 @@
 
 ```
 Crew-GO/
-├── cmd/gocrew/           # CLI entrypoint
-│   └── main.go
-├── internal/cli/         # CLI implementation (not importable by external packages)
-│   ├── cli.go
-│   └── create.go
-├── pkg/                  # Public packages (the framework API)
-│   ├── agents/           # Agent definition, ReAct loop, memory/guardrails integration
-│   ├── config/           # YAML loaders for agents.yaml and tasks.yaml
-│   ├── crew/             # Crew orchestration (Sequential, Hierarchical + Manager Agent)
-│   ├── delegation/       # Inter-agent delegation (DelegateWork, AskQuestion)
-│   ├── errors/           # Sentinel errors and typed error wrappers
-│   ├── flow/             # State-machine flows (conditional, router, parallel, listener)
-│   ├── guardrails/       # Output validation middleware (MaxToken, ContentFilter, Schema)
-│   ├── knowledge/        # Document ingestion and chunking for RAG
-│   ├── llm/              # LLM client interface + OpenAI/Anthropic implementations
-│   ├── memory/           # Memory store interface + InMemCosine/SQLite implementations
-│   ├── tasks/            # Task definition, context piping, HITL, guardrails
-│   └── tools/            # Tool interface + built-in tools (file, web, code, search)
-├── examples/
-│   ├── researcher_app/   # Simple sequential crew demo
-│   └── advanced_app/     # Multi-tool pipeline with structured JSON output
-└── docs/
-    ├── quickstart.md
-    └── advanced_usage.md
+├── api/proto/            # Protocol buffers for gRPC/REST APIs
+├── cmd/
+│   ├── gocrew/           # CLI entrypoint
+│   └── server/           # HTTP API & Dashboard Server entrypoint
+├── gocrew/               # Unified SDK Facade (Recommended for users)
+├── pkg/                  # Core Modular Packages
+│   ├── agents/           # Agent implementation & reasoning loops
+│   ├── core/             # Base interfaces (breaks circular dependencies)
+│   ├── crew/             # Orchestration engines (Sequential, Graph, etc.)
+│   ├── delegation/       # Agent-to-Agent internal delegation logic
+│   ├── events/           # System-wide event structures for WebSockets
+│   ├── flows/            # LangGraph-style workflow persistence
+│   ├── guardrails/       # Pre/post validation hooks & HITL interrupts
+│   ├── knowledge/        # RAG document parsing, chunking & sourcing
+│   ├── llm/              # Provider clients (OpenAI, Anthropic, Gemini)
+│   ├── memory/           # Vector & entity memory systems
+│   ├── protocols/        # MCP and A2A communication layers
+│   ├── sandbox/          # Wasm/Docker code execution environments
+│   ├── server/           # HTTP Server and Dashboard APIs
+│   ├── tasks/            # Task lifecycle & structured output
+│   ├── telemetry/        # OpenTelemetry tracing & GlobalBus events
+│   ├── tools/            # Tool ecosystem & custom tool patterns
+│   └── training/         # Synthetic data pipelines & evaluation
+├── internal/             # Private implementation details
+├── web/                  # Modern React/Vite Glassmorphic Dashboard
+└── web-ui/               # Static/Vanilla UI embeds
 ```
 
 ## Dependency Flow
 
 ```mermaid
 graph TD
-    A[cmd/gocrew] --> B[internal/cli]
-    B --> C[pkg/crew]
-    C --> D[pkg/agents]
-    C --> E[pkg/tasks]
-    D --> F[pkg/llm]
-    D --> G[pkg/tools]
-    D --> H[pkg/memory]
-    D --> I[pkg/guardrails]
-    D --> J[pkg/errors]
-    E --> D
-    E --> I
-    E --> J
-    K[pkg/delegation] --> G
-    L[pkg/flow] -.-> C
-    M[pkg/knowledge] --> H
-    M --> F
-    N[pkg/config] --> D
-    N --> E
+    SDK[gocrew] --> pkg/crew
+    SDK --> pkg/agents
+    SDK --> pkg/tasks
+
+    pkg/crew --> pkg/core
+    pkg/agents --> pkg/core
+    pkg/tasks --> pkg/core
+
+    pkg/agents --> pkg/llm
+    pkg/agents --> pkg/memory
+    pkg/agents --> pkg/knowledge
+    pkg/agents --> pkg/tools
+    pkg/agents --> pkg/sandbox
+    pkg/agents --> pkg/protocols
+
+    pkg/tasks --> pkg/guardrails
+
+    pkg/crew --> pkg/telemetry
+    pkg/agents --> pkg/telemetry
+    pkg/tasks --> pkg/telemetry
+
+    pkg/telemetry --> pkg/events
+    pkg/events --> pkg/server
+    pkg/server --> WebUI[web / web-ui]
 ```
 
 ## Design Principles
 
-1. **Interface-first**: Core abstractions (`llm.Client`, `tools.Tool`, `memory.Store`, `guardrails.Guardrail`) are Go interfaces, making every component swappable.
-2. **Context propagation**: Every function takes `context.Context` for timeout, cancellation, and deadline handling.
-3. **Concurrency-native**: Hierarchical mode uses `sync.WaitGroup` for parallel task execution. Flows support parallel fan-out nodes.
-4. **Error hierarchy**: Custom error types wrap sentinels via `errors.Is`/`errors.As` for precise error handling.
-5. **Zero external dependencies for core**: The core (`agents`, `tasks`, `crew`, `flow`, `guardrails`, `errors`, `delegation`) has no external dependencies beyond the Go standard library. Only `llm` (OpenAI SDK), `memory` (SQLite driver), and `config` (YAML parser) import third-party packages.
+1. **Interface-first & Decoupled**: The `pkg/core` package defines the `Agent` interface, allowing `pkg/crew` and `pkg/tasks` to interact with agents without depending on the heavy `pkg/agents` implementation.
+2. **Deterministic Orchestration**: Every LLM interaction is parsed into strictly-typed Go structs. 
+3. **Reactive Telemetry**: The `GlobalBus` provides a high-fidelity event stream for real-time observability.
+4. **Durable Persistence**: LangGraph-style checkpoints allow for "time-travel" debugging and long-running flow resilience.
+5. **Polyglot Safety**: Code execution is isolated via Wasm or Docker sandboxes by default.
+
+---
+
+## 🧠 Subsystem Deep Dive: Memory
+
+Gocrewwai's memory model is designed to operate concurrently and deterministically.
+
+```mermaid
+graph LR
+    A[Agent Thought] -->|Context Query| B(UnifiedMemory Interface)
+    B -->|Search| C[(SQLite/Redis)]
+    C -->|Vector Hits| D[Relevance Scorer]
+    D -->|Top K Entities| E[Prompt Injection]
+    A -->|Observation| F(Memory Appender)
+    F -->|Background Save| C
+```
+
+The memory subsystem is entirely decoupled from the LLM provider, meaning a model using OpenAI for reasoning can seamlessly query a Redis vector store populated by an open-source Ollama embedding model.
+
+---
+
+## 🛡️ Subsystem Deep Dive: Polyglot Sandboxing
+
+Allowing LLMs to write and execute code is dangerous. The `pkg/sandbox` module acts as a strict execution boundary.
+
+When a `CodeInterpreter` tool is invoked, the request is intercepted by the Sandbox Manager:
+
+1. **WASM (Recommended)**: For lightweight Python/JS execution, Gocrewwai uses a embedded WebAssembly runtime (`wazero`). This provides microsecond startup times with zero filesystem access.
+2. **E2B (Cloud)**: For complex environments needing PIP installations, the SDK connects to remote, ephemeral Firecracker microVMs via the E2B SDK.
+3. **Docker (Local Enterprise)**: Spins up short-lived containers, binds specific `/tmp` directories, and enforces hard limits (e.g., `--cpus="0.5" --memory="512m"`).
+
+---
+
+## 📚 Subsystem Deep Dive: Knowledge (RAG)
+
+Connecting agents to local or remote documents is handled securely by the `pkg/knowledge` subsystem, avoiding direct memory manipulation by the LLM.
+
+```mermaid
+graph LR
+    A[PDF/TXT Files] -->|Ingestion| B(Document Parser)
+    B -->|Chunking| C[Semantic Splitter]
+    C -->|Embedding Model| D[Vector Store]
+    E[Agent Config] -->|Attach Source| D
+```
+
+When a Knowledge source is bound to an Agent, the engine automatically intercepts the agent's tasks, queries the Vector Store for relevant chunks, and prepends the findings to the prompt as strict `<context>` blocks. This ensures the agent is grounded in facts *before* generation begins.

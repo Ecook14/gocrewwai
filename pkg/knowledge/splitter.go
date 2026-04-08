@@ -4,6 +4,54 @@ import (
 	"strings"
 )
 
+type SplitterConfig struct {
+	ChunkSize    int
+	ChunkOverlap int
+	Model        string // embedding model
+}
+
+type SemanticSplitter struct {
+	Config SplitterConfig
+}
+
+func NewSemanticSplitter(cfg SplitterConfig) *SemanticSplitter {
+	if cfg.ChunkSize <= 0 {
+		cfg.ChunkSize = 1024
+	}
+	if cfg.ChunkOverlap < 0 {
+		cfg.ChunkOverlap = 256
+	}
+	if cfg.Model == "" {
+		cfg.Model = "text-embedding-3-small"
+	}
+	return &SemanticSplitter{Config: cfg}
+}
+
+// SplitText mimics a semantic chunker.
+func (ss *SemanticSplitter) SplitText(text string) []string {
+	// For simulation, we fall back to a basic token split
+	words := strings.Fields(text)
+	if len(words) == 0 {
+		return nil
+	}
+	var chunks []string
+	if len(words) <= ss.Config.ChunkSize {
+		return []string{strings.Join(words, " ")}
+	}
+	for i := 0; i < len(words); i += (ss.Config.ChunkSize - ss.Config.ChunkOverlap) {
+		end := i + ss.Config.ChunkSize
+		if end > len(words) {
+			end = len(words)
+		}
+		chunk := strings.Join(words[i:end], " ")
+		chunks = append(chunks, chunk)
+		if end == len(words) {
+			break
+		}
+	}
+	return chunks
+}
+
 // TokenSplitter breaks massive document strings into manageable chunks
 // so they can be securely embedded and loaded into Vector context windows.
 type TokenSplitter struct {

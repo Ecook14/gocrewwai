@@ -1,4 +1,58 @@
-# Crew-GO Backend API Reference
+# Crew-GO API Reference
+
+Gocrewwai provides two primary ways to interact with the engine: a strictly-typed **Go SDK** for library-first development, and a **Remote API** for HTTP/WebSocket-based orchestration.
+
+---
+
+## 🏗️ Go SDK (`gocrew` Facade)
+
+The `gocrew` package provides a unified, ergonomic entry point for the entire framework. It uses type aliases and convenient constructors to minimize imports.
+
+### Core Handlers
+
+#### `NewAgent(cfg AgentConfig) *Agent`
+Creates a new autonomous agent.
+- **AgentConfig**: See [Agents Feature Guide](./docs/features/agents.md) for full field reference.
+
+#### `NewTask(cfg TaskConfig) *Task`
+Defines a specific unit of work.
+- **TaskConfig**: See [Tasks Feature Guide](./docs/features/tasks.md).
+
+#### `NewCrew(cfg CrewConfig) *Crew`
+Assembles agents and tasks into an orchestrated team.
+- **CrewConfig**: See [Crews Feature Guide](./docs/features/crews.md).
+
+#### `Kickoff(ctx context.Context, cfg CrewConfig) (interface{}, error)`
+Convenience function to create and execute a crew in one call. If the final task specifies an `OutputJSON` struct, the returned `interface{}` contains that populated struct.
+
+To extract the struct safely, use the generic `GetOutput[T]` helper:
+```go
+result, _ := myCrew.Kickoff(ctx)
+parsedStruct := gocrew.GetOutput[MyCustomStruct](result)
+fmt.Println(parsedStruct.Field)
+```
+
+### Memory & Persistence
+
+#### `NewMemory(store MemoryStore, llm LLMClient, cfg *UnifiedMemoryConfig) *UnifiedMemory`
+Initializes the reactive memory system.
+
+#### `NewSQLiteStore(path string) (*SQLiteStore, error)`
+Creates a persistent local memory store.
+
+### LLM Providers
+
+| Constructor | Description |
+| :--- | :--- |
+| `NewOpenAI(key, model)` | OpenAI / GPT service. |
+| `NewAnthropic(key, model)` | Anthropic / Claude service. |
+| `NewGemini(key, model)` | Google Gemini service. |
+| `NewGroq(key, model)` | Groq high-speed inference. |
+| `NewOpenRouter(key, model)` | Multi-model routing via OpenRouter. |
+
+---
+
+## 🔌 Remote API (HTTP/WebSocket)
 
 The `Crew-GO` engine exposes a lightweight HTTP and WebSocket server (typically running on `localhost:8080`) when the `--ui` flag is provided or when `server.StartDashboardServer()` is invoked manually.
 

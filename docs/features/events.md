@@ -40,6 +40,29 @@ agent := gocrew.NewAgent(gocrew.AgentConfig{
 })
 ```
 
+### The `GlobalBus` and WebSockets
+For backend services, Gocrewwai broadcasts all engine activity over `telemetry.GlobalBus`. This allows you to easily pipe the internal engine state directly to a React frontend or WebSocket server without coupling UI logic to the Crew orchestrator:
+
+```go
+// 1. Listen for specific event spaces
+telemetry.GlobalBus.Subscribe("agent:action", func(e telemetry.Event) {
+    /* 
+    Event Payload Structure:
+    {
+       "trace_id": "5b8c9d...",
+       "timestamp": "2024-03-20T...",
+       "agent_id": "researcher_1",
+       "event_type": "agent:action",
+       "payload": {
+           "tool": "SearchWeb",
+           "input": "Quantum computing news"
+       }
+    }
+    */
+    broadcastToWebsockets(e)
+})
+```
+
 ## 📊 Event Persistence & Auditing
 
 All events generated during a crew execution are automatically:

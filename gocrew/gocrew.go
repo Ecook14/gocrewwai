@@ -15,13 +15,14 @@ package gocrew
 
 import (
 	"context"
-
+	"time"
 	"github.com/Ecook14/gocrewwai/pkg/agents"
 	"github.com/Ecook14/gocrewwai/pkg/crew"
 	"github.com/Ecook14/gocrewwai/pkg/core"
 	"github.com/Ecook14/gocrewwai/pkg/events"
 	"github.com/Ecook14/gocrewwai/pkg/files"
 	"github.com/Ecook14/gocrewwai/pkg/flow"
+	"github.com/Ecook14/gocrewwai/pkg/flows"
 	"github.com/Ecook14/gocrewwai/pkg/knowledge"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/memory"
@@ -357,6 +358,24 @@ func NewCalculatorTool() *tools.CalculatorTool {
 // NewBrowserTool creates an automated browser navigation tool.
 func NewBrowserTool() tools.Tool {
 	return tools.NewBrowserTool()
+}
+
+// NewPineconeStore securely wraps a Pinecone Vector DB initialization.
+func NewPineconeStore(host, apiKey, namespace string) (*memory.PineconeStore, error) {
+	return memory.NewPineconeStore(host, apiKey, namespace)
+}
+
+// SplitterConfig alias for knowledge module configuration.
+type SplitterConfig = knowledge.SplitterConfig
+
+// NewSemanticSplitter safely instantiates an advanced token/semantic text splitter.
+func NewSemanticSplitter(cfg SplitterConfig) *knowledge.SemanticSplitter {
+	return knowledge.NewSemanticSplitter(cfg)
+}
+
+// NewSQLiteCheckpointer configures a local filesystem persist store for Flow checkpoints.
+func NewSQLiteCheckpointer(dir string) (*flows.CheckpointManager, error) {
+	return flows.NewCheckpointManager(dir)
 }
 
 // ============================================================

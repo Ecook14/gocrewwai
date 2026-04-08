@@ -56,4 +56,4 @@ reflectiveCrew := gocrew.NewCrew(gocrew.CrewConfig{
 
 ---
 
-[Back to HITL Guide](./HUMAN_IN_THE_LOOP.md) | [Next: Observability Guide](./OBSERVABILITY.md)
+[Back to HITL Guide](./HUMAN_IN_THE_LOOP.md) | [Next: Observability Guide](./features/telemetry.md)

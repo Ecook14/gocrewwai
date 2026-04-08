@@ -26,11 +26,20 @@ Scaffold a complete, production-ready Gocrewwai project in seconds. This creates
 gocrew create my-awesome-project
 ```
 
-### 2. Live Dashboard (`--ui`)
-Launch the real-time **Glassmorphic Dashboard** to watch your agents thought process and handle **Human-in-the-Loop** approvals. This command is typically used when running a crew mission from the CLI.
+### 2. Live Dashboard & Server (`server`)
+Launch the backend REST API and the real-time **Glassmorphic Dashboard** to watch your agents' thought processes and handle **Human-in-the-Loop** approvals. 
 
 ```bash
-gocrew run mission.go --ui
+# Start the backend server alongside the React UI
+go run cmd/server/main.go --port 8080 --ui-dir ./web/dist
+```
+
+### 3. Single-Binary Distribution
+Because Crew-GO is idiomatic Go, you can embed the entire React `web/dist` dashboard directly into the CLI runner using `go:embed`. This yields a highly portable, single ~20MB static binary deployable anywhere:
+
+```bash
+CGO_ENABLED=0 go build -ldflags="-w -s" -o gocrew-agent cmd/gocrew/main.go
+./gocrew-agent run
 ```
 
 ### 3. Crew Replay (`replay`)

@@ -28,15 +28,104 @@ type PerformanceSuite struct {
 	AverageScore float64      `json:"average_score"`
 	AverageTime  time.Duration `json:"average_time"`
 	TotalTokens  int          `json:"total_tokens"`
+	PassRate     float64      `json:"pass_rate"`
 }
 
 // ============================================================
 // Evaluator
 // ============================================================
 
+type EvaluatorConfig struct {
+	ExpectedSchema string
+	Rubric         string
+	JudgeLLM       llm.Client
+	Runs           int
+}
+
 // Evaluator uses an LLM to score agent outputs against expected criteria.
 type Evaluator struct {
-	LLM llm.Client
+	LLM    llm.Client
+	Config EvaluatorConfig
+}
+
+// NewEvaluator creates a new multi-run test evaluator.
+func NewEvaluator(cfg EvaluatorConfig) *Evaluator {
+	if cfg.Runs <= 0 {
+		cfg.Runs = 1
+	}
+	return &Evaluator{
+		LLM:    cfg.JudgeLLM,
+		Config: cfg,
+	}
+}
+
+// Orchestrator represents any crew or flow workflow that can be kicked off.
+type Orchestrator interface {
+	Kickoff(ctx context.Context) (interface{}, error)
+}
+
+// EvaluateCrew runs an orchestrator multiple times and returns aggregated metrics.
+func (e *Evaluator) EvaluateCrew(ctx context.Context, app Orchestrator) (*PerformanceSuite, error) {
+	if e.LLM == nil {
+		return nil, fmt.Errorf("evaluation LLM not configured")
+	}
+
+	suite := &PerformanceSuite{
+		Results: make([]TestResult, 0, e.Config.Runs),
+	}
+
+	var totalScore int
+	var totalDuration time.Duration
+
+	for i := 0; i < e.Config.Runs; i++ {
+		start := time.Now()
+		
+		// Run the crew
+		output, err := app.Kickoff(ctx)
+		duration := time.Since(start)
+
+		if err != nil {
+			return nil, fmt.Errorf("evaluation run %d failed: %w", i+1, err)
+		}
+
+		outStr := fmt.Sprintf("%v", output)
+		
+		// Score the run
+		score, feedback, err := e.ScoreResult(ctx, e.Config.Rubric, e.Config.ExpectedSchema, outStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to score run %d: %w", i+1, err)
+		}
+
+		res := TestResult{
+			Iteration:    i + 1,
+			Duration:     duration,
+			Score:        score,
+			Feedback:     feedback,
+			OutputSample: outStr,
+		}
+
+		suite.Results = append(suite.Results, res)
+		totalScore += score
+		totalDuration += duration
+	}
+
+	if e.Config.Runs > 0 {
+		suite.AverageScore = float64(totalScore) / float64(e.Config.Runs)
+		suite.AverageTime = time.Duration(int64(totalDuration) / int64(e.Config.Runs))
+	}
+
+	// Calculate custom pass rate metric easily extrapolated
+	var passes int
+	for _, res := range suite.Results {
+		if res.Score >= 8 { // Typical benchmark for "Pass"
+			passes++
+		}
+	}
+	
+	// Dynamically attach pass rate to the suite
+	suite.PassRate = float64(passes) / float64(e.Config.Runs)
+
+	return suite, nil
 }
 
 // ScoreResult evaluates a single task output.

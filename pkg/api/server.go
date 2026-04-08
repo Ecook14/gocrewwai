@@ -53,7 +53,7 @@ func (s *Server) setupRoutes() {
 func (s *Server) handleHealth(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "ok",
-		"version": "1.0.0-elite",
+		"version": "1.0.0-Stable",
 		"time":    time.Now().Format(time.RFC3339),
 	})
 }
@@ -61,4 +61,9 @@ func (s *Server) handleHealth(c *gin.Context) {
 // Run starts the server on the given address.
 func (s *Server) Run(addr string) error {
 	return s.router.Run(addr)
+}
+
+// ServeStatic enables the delivery of static files from an embedded filesystem.
+func (s *Server) ServeStatic(fs http.FileSystem) {
+	s.router.NoRoute(gin.WrapH(http.StripPrefix("", http.FileServer(fs))))
 }

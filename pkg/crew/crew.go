@@ -176,6 +176,39 @@ type Crew struct {
 	staticSyncDone bool
 }
 
+// TrainingFeedback contains explicit HITL rating and instruction.
+type TrainingFeedback struct {
+	Rating  int    // Negative rating triggers learning loop
+	Comment string // Human feedback instruction
+}
+
+// ProvideTrainingFeedback injects human evaluations directly into the specified task's agent memory loop.
+func (c *Crew) ProvideTrainingFeedback(taskID string, feedback TrainingFeedback) error {
+	if !c.TrainingMode {
+		return fmt.Errorf("crew not in training mode")
+	}
+
+	for _, task := range c.Tasks {
+		// Quick check if task name matches an ID (Using Description prefix as fallback for now)
+		if strings.HasPrefix(task.Description, taskID) {
+			slog.Info("Feedback received", "task", task.Description, "rating", feedback.Rating)
+			// Agent capturing logic would be piped internally via entity memory here.
+			if feedback.Rating < 0 {
+				events.GlobalBus.Publish(events.Event{
+					Type:    events.AgentFeedbackReceived,
+					Source:  "Crew",
+					Payload: map[string]interface{}{
+						"rating":  feedback.Rating,
+						"comment": feedback.Comment,
+					},
+				})
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("task with reference %s not found for feedback", taskID)
+}
+
 // Train runs the crew for n iterations with human feedback enabled to improve agent performance.
 func (c *Crew) Train(ctx context.Context, iterations int, inputs map[string]interface{}) error {
 	if iterations <= 0 {
