@@ -25,14 +25,23 @@ Gocrewwai provides specialized tools for common file operations, ensuring that a
 Pass the file-related tools to your agent and define a task that requires file interaction:
 
 ```go
+// 1. Establish a Security Chroot
+sandbox := gocrew.NewChroot("/var/data/gocrew/workspace")
+
+// 2. Wrap file tools in the Chroot
+fileTool := gocrew.NewFileReadTool(gocrew.FileConfig{
+    Chroot: sandbox,
+    AllowWrite: true,
+})
+
 agent := gocrew.NewAgent(gocrew.AgentConfig{
-    Tools: []gocrew.Tool{gocrew.NewFileReadTool(), gocrew.NewPDFTool()},
+    Tools: []gocrew.Tool{fileTool, gocrew.NewPDFTool()},
 })
 
 task := gocrew.NewTask(gocrew.TaskConfig{
-    Description: "Read the 'report.pdf' and extract all table data into a CSV file.",
+    Description: "Read 'report.pdf' and extract all table data into a CSV file.",
     Agent:       agent,
-    OutputFile:  "output/results.csv", // Automatic file writing!
+    OutputFile:  "results.csv", // Automatically written to /var/data/gocrew/workspace/results.csv
 })
 ```
 

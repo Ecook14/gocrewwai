@@ -26,10 +26,17 @@ In **Hierarchical** mode, collaboration is managed by an automated "Manager Agen
 ### 3. Shared Memory & Knowledge
 All agents in a crew share a common **Knowledge Base** (RAG) and can access the crew's **Shared Memory**. This ensures that even if two agents work on different tasks, they have a consistent understanding of the project's state.
 
+### 4. Agent-to-Agent (A2A) Networking
+In Gocrewwai v1.0, agents can collaborate across the network using the A2A protocol.
+- **Discovery**: Agents can advertise their capabilities and find coworkers on the local network.
+- **Dynamic Tasking**: An agent can "reach out" to a remote agent to delegate a task, even if that agent is part of a different crew or running on a different server.
+- **Strict Auth**: All inter-agent communication is secured via Bearer tokens and mutual TLS option.
+
 ---
 
 ## 🚀 Implementing Collaborative Crews (Elite Style)
 
+### Standard Hierarchical Coordination
 ```go
 myCrew := gocrew.NewCrew(gocrew.CrewConfig{
     Agents:      []gocrew.CoreAgent{researcher, analyst, writer},
@@ -37,6 +44,28 @@ myCrew := gocrew.NewCrew(gocrew.CrewConfig{
     ManagerLLM:  gpt4o,
 })
 ```
+
+### Advanced A2A Networking (Decentralized Swarms)
+
+To spin up a remote agent that can receive tasks over the network:
+
+```go
+// 1. Configure the Remote Agent Node
+specialist := gocrew.NewAgent(gocrew.AgentConfig{
+    Role:    "Remote CyberSec Analyst",
+    A2APort: 9090, // Bind to port 9090
+    A2AAuth: gocrew.A2AAuthConfig{
+        RequireMTLS: true,
+        CertDir:     "/etc/gocrew/certs",
+        Token:       os.Getenv("A2A_BEARER_TOKEN"),
+    },
+})
+
+// 2. Start the listener (Blocks)
+go specialist.StartA2AListener()
+```
+
+Once running, another agent on a completely different server can connect to it using the Remote API via the `POST /api/create/a2a` bridge.
 
 ## 🛡️ Collaboration Guardrails
 

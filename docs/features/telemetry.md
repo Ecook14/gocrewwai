@@ -30,16 +30,28 @@ Using the `gocrew` SDK, you can enable global tracing with a single line of code
 package main
 
 import (
+    "context"
     "github.com/Ecook14/gocrewwai/gocrew"
     "github.com/Ecook14/gocrewwai/pkg/telemetry"
 )
 
 func main() {
-    // 1. Initialize OpenTelemetry Exporter (e.g., Honeycomb or Jaeger)
-    telemetry.InitTracer("gocrew-app", "http://localhost:4318")
+    // 1. Initialize OpenTelemetry Exporter for Jaeger (OTLP/gRPC)
+    cleanup := telemetry.InitTracer(telemetry.TracerConfig{
+        ServiceName: "gocrew-app",
+        Endpoint:    "localhost:4317",
+        Insecure:    true, // For local dev
+    })
+    defer cleanup()
 
-    // 2. Run your Crew (Spans are automatically generated!)
-    myCrew.Kickoff(ctx)
+    // 2. (Optional) Hook into the GlobalBus to capture events in memory
+    telemetry.GlobalBus.Subscribe("agent:thought", func(event telemetry.Event) {
+        fmt.Printf("[Trace %s] Agent %s thought: %v\n", 
+            event.TraceID, event.AgentID, event.Payload)
+    })
+
+    // 3. Run your Crew (Spans are automatically generated and exported!)
+    myCrew.Kickoff(context.Background())
 }
 ```
 

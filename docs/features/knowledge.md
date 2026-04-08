@@ -45,14 +45,36 @@ func main() {
 
 ## 🧠 Advanced Knowledge Retrieval
 
-### 1. Vector Embeddings
-Gocrewwai will automatically chunk, embed, and store your knowledge sources using your configured LLM's embedding model.
+### 1. Vector Embeddings with Semantic Splitter
+Gocrewwai will automatically chunk and embed your sources. For advanced control over chunk sizes and overlap, configure a `SemanticSplitter` alongside a designated Vector DB:
+
+```go
+// Initialize Pinecone Vector Store
+vectorDB := gocrew.NewPineconeStore("api-key", "index-name")
+
+// Configure custom Semantic Splitter
+splitter := gocrew.NewSemanticSplitter(gocrew.SplitterConfig{
+    ChunkSize:    1024,
+    ChunkOverlap: 256,
+    Model:        "text-embedding-3-small", 
+})
+
+// Attach to Knowledge Source
+pdfSource := gocrew.NewPDFSource("./docs/annual_report.pdf")
+pdfSource.SetStore(vectorDB)
+pdfSource.SetSplitter(splitter)
+```
 
 ### 2. Multi-Modal Knowledge
-If using a vision-capable model (like `gpt-4o`), Gocrewwai supports extracting information from images and charts within PDF files for the retrieval phase.
+If using a vision-capable model (like `gpt-4o`), Gocrewwai supports extracting information from images and charts within PDF files for the retrieval phase. Enable this by passing `Multimodal: true` to the Agent config, which signals the RAG pipeline to embed image references.
 
 ### 3. Knowledge Refreshing
 You can configure knowledge sources to periodically refresh their data from their original source, ensuring your agents always have access to the latest information.
+
+```go
+webSource := gocrew.NewURLSource("https://pricing.api.com")
+webSource.EnableAutoRefresh(time.Hour * 24) // Re-embeds every 24 hours
+```
 
 ---
 

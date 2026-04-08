@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/Ecook14/gocrewwai/web"
 	"github.com/Ecook14/gocrewwai/pkg/api"
 	"github.com/Ecook14/gocrewwai/pkg/config"
 	"github.com/Ecook14/gocrewwai/pkg/core"
@@ -16,6 +17,7 @@ func main() {
 	// 0. Parse Command Line Flags
 	apiPortFlag := flag.String("api-port", "", "Port for the Gin REST API (default: 8080 or API_PORT env)")
 	meshPortFlag := flag.String("mesh-port", "", "Port for the gRPC Agent Mesh (default: 50051 or MESH_PORT env)")
+	webFlag := flag.Bool("web", false, "Launch the Visual Builder (default: false)")
 	helpFlag := flag.Bool("help", false, "Show this help message")
 
 	flag.Usage = func() {
@@ -49,7 +51,7 @@ func main() {
   / ____/________ _      __   | |     / / /   |
  / /   / ___/ _ \ | /| / /   | | /| / / / /| |
 / /___/ /  /  __/ |/ |/ /    | |/ |/ / / ___ |
-\____/_/   \___/|__/|__/     |__/|__/ /_/  |_| v0.9 (Elite)
+\____/_/   \___/|__/|__/     |__/|__/ /_/  |_| v1.0.0 (Stable)
                                                `)
 	log.Printf("🛠️  Engine: Gocrewwai | Mode: Multi-Service Orchestrator")
 	log.Printf("📂 Config: %s", os.Getenv("CREW_CONFIG_PATH"))
@@ -114,6 +116,12 @@ func main() {
 			fmt.Printf("❌ Mesh Server failed: %v\n", err)
 		}
 	}()
+
+	// 5.1 Optionally Launch Visual Builder (Frontend)
+	if *webFlag {
+		fmt.Printf("🎨 Visual Builder enabled (Serving from embedded files)\n")
+		server.ServeStatic(web.GetFS())
+	}
 
 	// 6. Launch Gin API Server (Blocking)
 	fmt.Printf("🚀 Crew-GO API Engine starting on port %s...\n", apiPort)

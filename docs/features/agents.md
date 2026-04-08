@@ -28,12 +28,23 @@ agent := gocrew.NewAgent(gocrew.AgentConfig{
 
 | Parameter | Type | Description |
 | :--- | :--- | :--- |
-| **SelfCritique** | `bool` | Enables the **Reflect -> Evaluate -> Refine** loop. The agent will internally critique its own thoughts before taking action. |
-| **SelfHealing** | `bool` | Allows the agent to autonomously fix tool errors (e.g., if a Python script crashes, the agent reads the traceback and tries to fix the code). |
-| **Sandbox** | `string` | Defines the execution environment for code tools. Options: `"local"`, `"docker"`, `"e2b"`, `"wasm"`. |
-| **InjectDate** | `bool` | Automatically injects the current system date into the prompt to prevent "knowledge cutoff" hallucinations. |
-| **MaxRPM** | `int` | Enforces rate limiting at the individual agent level to prevent API token exhaustion. |
-| **AllowDelegation** | `bool` | Determines if this agent can ask coworkers for help or delegate sub-tasks. |
+| **Role** | `string` | The functional persona of the agent. |
+| **Goal** | `string` | The objective the agent is trying to achieve. |
+| **Backstory** | `string` | Provides context and personality to the agent. |
+| **LLM** | `LLMClient` | The model that powers the agent (e.g., OpenAI, Claude). |
+| **Tools** | `[]Tool` | A slice of tools available to the agent. |
+| **Memory** | `MemoryStore` | Enables the agent to store and recall past context. |
+| **SelfCritique** | `bool` | Enables the **Reflect -> Evaluate -> Refine** loop. |
+| **Reasoning** | `bool` | Activates deep reasoning mode for complex problem solving. |
+| **SelfHealing** | `bool` | Allows the agent to autonomously fix tool & code errors. |
+| **Sandbox** | `string` | Isolation environment for code tools (`"local"`, `"docker"`, `"e2b"`, `"wasm"`). |
+| **InjectDate** | `bool` | Injects current system date into prompts. |
+| **MaxRPM** | `int` | Agent-level rate limiting for API safety. |
+| **MaxIterations** | `int` | Global cap on the number of steps an agent can take (Default: 15). |
+| **StepReview** | `func` | Human-in-the-loop hook for tool approval. |
+| **MCPS** | `[]string` | URLs or stdio commands for MCP server connection. |
+| **A2APort** | `int` | Port for inter-agent communication (if > 0). |
+| **Language** | `string` | Preferred language for prompts/formatting (e.g., `"es"`, `"fr"`). |
 
 ---
 

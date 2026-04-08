@@ -18,6 +18,7 @@ Gocrewwai is model-agnostic, supporting a wide range of LLM providers through a 
 | **Google** | `gocrew.NewGemini` | Access Gemini 1.5 Pro (2M Context) and Flash. |
 | **Groq** | `gocrew.NewGroq` | Blazing-fast inference for Llama 3 and Mixtral. |
 | **OpenRouter** | `gocrew.NewOpenRouter` | Unified gateway to 100+ open-source models. |
+| **Local / Custom** | `llm.NewCustomClient` | Connect to Ollama, vLLM, or any OpenAI-compatible API. |
 
 ## 🚀 Basic Configuration
 
@@ -49,8 +50,38 @@ options := gocrew.LLMOptions{
 
 ## 🛡️ Resilience & Reliability
 
-### 🔄 Recursive Retries
-The engine includes a native retry handler with exponential backoff. If an LLM is overloaded or hits a rate limit, Gocrewwai will automatically pause and retry the request until successful or the max retry limit is hit.
+### 🚦 Granular Model Routing
+A sophisticated crew uses specific models for distinct tasks to balance capability and budget. Gocrewwai supports **Purpose-Driven Routing** maps. By supplying a `Routing` map to the `QueryEngine`, the system dynamically resolves the optimal model based on the active task's required capability.
+
+```go
+engine := gocrew.NewQueryEngine(gocrew.EngineConfig{
+    DefaultModel: gocrew.NewAnthropic("api-key", "claude-3-haiku"),
+    Routing: map[string]gocrew.LLMClient{
+        "vision": gocrew.NewOpenAI("api-key", "gpt-4o"),
+        "rag":    gocrew.NewPineconeStore("api-key", "index").GetEmbeddingModel(),
+        "math":   gocrew.NewOpenAI("api-key", "o1-preview"),
+    },
+})
+```
+If a specific route isn't defined for a task requirement, the engine seamlessly fails over to the `DefaultModel`.
+
+### 🔄 Recursive Retries & Fallbacks
+The engine includes a native retry handler with exponential backoff. If an LLM is overloaded, Gocrewwai will automatically pause and retry.
+
+For extreme reliability, you can define **Cross-Provider Fallbacks**. If Anthropic goes down completely, your agent can instantly switch to OpenAI without skipping a beat:
+
+```go
+claude := gocrew.NewAnthropic(os.Getenv("ANTHROPIC_KEY"), "claude-3.5-sonnet")
+gpt4 := gocrew.NewOpenAI(os.Getenv("OPENAI_KEY"), "gpt-4o")
+
+// If Claude returns 503 Service Unavailable, switch to GPT-4o
+claude.SetFallback(gpt4)
+
+expert := gocrew.NewAgent(gocrew.AgentConfig{
+    Role: "Architect",
+    LLM:  claude,
+})
+```
 
 ### 💾 Async Caching
 To reduce costs and latency, enable **LLM Caching**. Every request/response pair is hashed and stored in your preferred backend (File, Redis, SQLite).

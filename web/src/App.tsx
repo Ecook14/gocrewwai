@@ -10,6 +10,7 @@ import {
   Connection,
   Edge,
   ReactFlowProvider,
+  Node,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -56,7 +57,7 @@ function Flow() {
     if (!lastEvent) return;
 
     setNodes((nds: Node[]) => nds.map((node: Node) => {
-      if (node.type === 'agentNode' && node.data.role === lastEvent.agent_role) {
+      if (node.type === 'agentNode' && node.data && typeof node.data === 'object' && 'role' in node.data && node.data.role === lastEvent.agent_role) {
         return {
           ...node,
           data: { ...node.data, status: lastEvent.type.includes('thinking') ? 'thinking' : 'idle' }

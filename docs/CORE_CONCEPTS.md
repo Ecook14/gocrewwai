@@ -34,4 +34,4 @@ Flows are the highest level of orchestration, allowing you to build complex stat
 
 ---
 
-[Next: Getting Started](./GETTING_STARTED.md) | [Agents Guide](./AGENTS.md) | [Crews Guide](./CREWS.md)
+[Next: Getting Started](./GETTING_STARTED.md) | [Agents Guide](./features/agents.md) | [Crews Guide](./features/crews.md)

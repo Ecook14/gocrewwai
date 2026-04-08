@@ -34,6 +34,12 @@ Agents can reflect on their own work using internal reflection loops or peer-rev
 ### 📊 4. Native Observability (OpenTelemetry)
 Standardized, vendor-neutral tracing with built-in OTEL integration. Track every agent thought, tool execution, and token cost with high fidelity.
 
+### 🌐 5. Model Context Protocol (MCP) & Discovery
+Seamlessly connect your agents to external tools and knowledge sources via the standardized MCP protocol. Native support for local and remote MCP servers with auto-discovery.
+
+### 🤖 6. Agent-to-Agent (A2A) Protocols
+Enable true decentralized swarm intelligence. Agents can discover each other on the network, negotiate tasks, and collaborate autonomously using standardized communication protocols.
+
 ---
 
 ## 🚀 Quickstart (Elite Style)
@@ -67,10 +73,16 @@ func main() {
 		LLM:       llm,
 	})
 
-	// 3. Define a Task
+	// 3. Define a Task with Strict JSON Output
+	type SummaryResult struct {
+		Trends []string `json:"trends"`
+		Impact string   `json:"impact"`
+	}
+
 	task := gocrew.NewTask(gocrew.TaskConfig{
 		Description: "Analyze Go 1.25 Type Aliases and return a summary.",
 		Agent:       researcher,
+		OutputJSON:  &SummaryResult{},
 	})
 
 	// 4. Assemble and Kickoff!
@@ -80,8 +92,18 @@ func main() {
 		Verbose: true,
 	})
 
-	myCrew.Kickoff(context.Background())
+	// 5. Execute and extract the strongly-typed result natively
+	result, _ := myCrew.Kickoff(context.Background())
+	summary := gocrew.GetOutput[SummaryResult](result)
+	
+	fmt.Printf("Parsed Impact: %s\n", summary.Impact)
 }
+```
+
+### 🖥️ Start the Dashboard Server
+To monitor your agents in real-time, launch the Web UI:
+```bash
+gocrew start --ui --port=8080
 ```
 
 ---
@@ -96,7 +118,7 @@ Dive deep into the Gocrewwai ecosystem with our world-class documentation guides
 - **[🧩 Agents, Tasks & Crews](docs/index.md#core-components)**: Detailed orchestration guides.
 - **[💾 Persistence & HITL](docs/PERSISTENCE.md)**: Durable execution and human oversight.
 - **[🛡️ Self-Correction](docs/SELF_CORRECTION.md)**: Reflective reasoning and reliability.
-- **[📊 Observability](docs/OBSERVABILITY.md)**: Native OTEL tracing and performance metrics.
+- **[📊 Observability](docs/features/telemetry.md)**: Native OTEL tracing and performance metrics.
 
 ---
 

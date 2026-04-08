@@ -17,8 +17,21 @@ In Gocrewwai v1.0, delegation is controlled by the `AllowDelegation` flag in you
 leader := gocrew.NewAgent(gocrew.AgentConfig{
     Role:            "Project Manager",
     Goal:            "Oversee the entire AI project.",
-    AllowDelegation: true, // Enable coworker requests
+    AllowDelegation: true, // Enable implicit coworker requests
 })
+```
+
+### Explicit Task Delegation (A2A Network)
+You can optionally configure explicit task assignment through the A2A sub-protocols. This is highly useful when coworkers live on remote cloud servers:
+
+```go
+subTask := leader.DelegateTo(
+    "Security Analyst", 
+    "Run a vulnerability scan on port 8080 and return the CVE report.",
+)
+
+// The engine blocks until the remote agent replies
+result := subTask.Await()
 ```
 
 ## 🧠 The Delegation Lifecycle

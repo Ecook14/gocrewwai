@@ -57,4 +57,4 @@ If an agent passes invalid arguments to a tool, Gocrewwai will return the exact 
 
 ---
 
-[Back to Observability Guide](./OBSERVABILITY.md) | [Next: Migration Guide](./MIGRATION.md)
+[Back to Observability Guide](./features/telemetry.md) | [Next: Migration Guide](./MIGRATION.md)

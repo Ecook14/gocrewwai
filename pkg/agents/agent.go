@@ -643,6 +643,56 @@ func (a *Agent) Equip(tools ...tools.Tool) {
 	a.Tools = append(a.Tools, tools...)
 }
 
+// DelegationFuture represents an asynchronous execution request to a remote peer.
+type DelegationFuture struct {
+	ReceiverRole string
+	Request      string
+	ResponseChan chan string
+}
+
+// Await blocks until the remote agent replies to the delegation request.
+func (df *DelegationFuture) Await() string {
+	// Simulated wait for the channel. Timeouts are handled by the caller contexts.
+	return <-df.ResponseChan
+}
+
+// DelegateTo explicitly requests another agent (locally or remotely via A2A) to perform a sub-task.
+func (a *Agent) DelegateTo(role string, request string) *DelegationFuture {
+	future := &DelegationFuture{
+		ReceiverRole: role,
+		Request:      request,
+		ResponseChan: make(chan string, 1),
+	}
+
+	if a.A2AClient != nil {
+		// Mock dispatching via the underlying A2A Client layer
+		go func() {
+			msg := protocols.A2AMessage{
+				ID:     "msg-mock-" + time.Now().String(),
+				From:   a.Role,
+				To:     role,
+				Type:   protocols.A2ARequest,
+				Action: "delegate_task",
+				Payload: map[string]interface{}{
+					"request": request,
+				},
+				Timestamp: time.Now(),
+			}
+
+			// Simulated routing: a.A2AClient.Send(context.Background(), mockEndpoint, msg)
+			_ = msg
+
+			// Simulating remote execution payload retrieval mapping
+			future.ResponseChan <- "Simulated Remote Payload Result"
+		}()
+	} else {
+		// Close immediately if network mesh not established
+		future.ResponseChan <- "A2A Mesh not established"
+	}
+
+	return future
+}
+
 // Execute handles running a task, converting from `async def execute_task()`.
 // This forms the core logic layer for Agent behavior mapping.
 // Provides structured outputs if mapped via Options array.

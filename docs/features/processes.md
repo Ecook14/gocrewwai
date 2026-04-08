@@ -38,6 +38,25 @@ managerLLM := gocrew.NewOpenAI(apiKey, "gpt-4o")
 
 ---
 
+## 🤝 Consensual
+
+Parallel execution for high-accuracy agreement. In this mode, multiple agents execute the same task simultaneously.
+
+**Example Setup:**
+```go
+myCrew := gocrew.NewCrew(gocrew.CrewConfig{
+    Agents:     []gocrew.CoreAgent{analystA, analystB, analystC},
+    Process:    gocrew.Consensual,
+    ManagerLLM: gpt4o, // Acts as the voting judge
+})
+```
+
+1. **Simultaneous Play**: Every agent in the crew receives the same task natively in parallel via Goroutines.
+2. **Weighted Voting**: The `ManagerLLM` acts as a judge, analyzing each agent's output.
+3. **Consensus**: The manager synthesizes a singular "best" result from all outputs.
+
+---
+
 ## 📈 Graph (State Machine)
 
 The most advanced orchestration strategy, inspired by LangGraph. It allows for non-linear, dynamic workflows.
@@ -45,6 +64,36 @@ The most advanced orchestration strategy, inspired by LangGraph. It allows for n
 1.  **Nodes & Edges**: Define your workflow as a directed graph where each node is an agent/task and edges are the logic for determining the "Next" step.
 2.  **Conditional Branching**: Move through the graph based on real-time task results (e.g., if "Validation" fails, go back to "Researcher").
 3.  **Cyclic Loops**: Perfect for iterative refinement and recursive problem-solving.
+
+---
+
+## 🪞 Reflective
+
+Self-improving loops for high-fidelity tasks. Given a primary agent and a critic, the engine will automatically loop until the critic is satisfied.
+
+**Example Setup:**
+```go
+myCrew := gocrew.NewCrew(gocrew.CrewConfig{
+    Agents: []gocrew.CoreAgent{developer, codeReviewer},
+    Tasks:  []*gocrew.Task{codingTask},
+    Process: gocrew.Reflective,
+    // The engine automatically uses the 2nd agent as the critic
+})
+```
+
+1. **Thought & Action**: The primary agent executes the task.
+2. **Internal Critique**: A second "Critic" agent (with a different persona) reviews the result.
+3. **Recursive Refinement**: The primary agent receives the critique and regenerates a better answer. This continues until the Critic approves or `MaxIterations` is reached.
+
+---
+
+## 🤖 State Machine
+
+Structured, deterministic flow control via the `NextPaths` API.
+
+1. **Conditional Transitions**: Tasks define an `OutputCondition` function that returns a key.
+2. **Path Mapping**: Use `NextPaths` to map these keys to the next successor task.
+3. **Deterministic Swarms**: Great for building complex agents that need to switch states based on specific data triggers.
 
 ---
 

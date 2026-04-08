@@ -13,9 +13,18 @@ Gocrewwai is designed for mission-critical production environments. Unlike other
 
 ### 1. Execution Sandboxing
 Never run agentic code directly on your host machine. Gocrewwai provides native support for:
-- **Docker**: Run Python and Shell tools in ephemeral, resource-capped containers.
-- **WASM (wazero)**: Lightning-fast, zero-dependency sandboxing for Go-based tools.
-- **E2B**: Offload execution to remote, secure cloud sandboxes.
+- **Docker**: Run Python and Shell tools in ephemeral containers. You MUST configure hard resource limits in your Agent config to prevent memory leaks or crypto-mining attacks:
+  ```go
+  sandbox := gocrew.NewDockerSandbox(gocrew.DockerConfig{
+      Image:   "python:3.11-slim",
+      Timeout: 30 * time.Second,
+      Memory:  "512m", 
+      CPUs:    "0.5",
+      Network: "none", // Prevent external exfiltration
+  })
+  ```
+- **WASM (wazero)**: Lightning-fast, zero-dependency sandboxing for Go-based tools natively inside the host process.
+- **E2B**: Offload execution to remote, secure cloud sandboxes via Firecracker microVMs.
 
 ### 2. Durable Persistence (Checkpoints)
 Production workflows often span hours or days. Gocrewwai's **Flow 2.0** engine automatically checkpoints state to SQLite, Redis, or Postgres, allowing you to resume execution after system restarts or human interrupts.

@@ -23,38 +23,63 @@ Gocrewwai allows agents to consume tools from any remote MCP server with zero co
 
 ## 🚀 Connecting to an MCP Server (Elite Style)
 
-Using the `gocrew` SDK, you can connect an agent to a remote MCP server in seconds:
+In Gocrewwai v1.0, MCP servers can be connected directly via the `AgentConfig` using a DSL-like string array:
 
 ```go
-package main
-
-import "github.com/Ecook14/gocrewwai/gocrew"
-
-func main() {
-    // 1. Initialize MCP Client (Stdio transport)
-    mcpClient, _ := gocrew.NewMCPClient("python", "path/to/server.py")
-    defer mcpClient.Close()
-
-    // 2. Discover and Add Remote Tools to Agent
-    agent := gocrew.NewAgent(gocrew.AgentConfig{
-        Role:  "MCP-Enabled Researcher",
-        Tools: mcpClient.GetTools(), // Fetch all remote tools!
-    })
-}
+agent := gocrew.NewAgent(gocrew.AgentConfig{
+    Role: "Universal Librarian",
+    // 1. Declare MCP Servers
+    MCPS: []string{
+        "http://localhost:8080/mcp",                      // Remote HTTP/SSE
+        "stdio:npx -y @modelcontextprotocol/server-everything", // Local Stdio
+    },
+    // 2. Optional: Filter precisely which tools this agent can use
+    MCPAllowList: []string{"echo", "calculate"},
+    MCPBlockList: []string{"danger_tool"},
+})
 ```
+
+The engine automatically handles:
+1. **Initialization**: Connecting to each server and performing the handshake.
+2. **Discovery**: Mapping remote tools, resources, and prompts into the agent's toolbelt.
+3. **Sampling**: If a remote MCP server requests an LLM completion (Sampling), the agent's own LLM is used to provide the response, governed by the `MCPSamplingPolicy`.
 
 ## 🛡️ MCP Tool Filtering & Security
 
-Gocrewwai gives you granular control over which remote tools an agent is allowed to execute.
+Gocrewwai gives you granular control over which remote tools an agent is allowed to execute. This is critical when connecting to powerful servers like the `docker` or `filesystem` MCPs.
 
 ### 1. Allow/Block Lists
-Explicitly define the specific MCP tools that an agent can see and use. This prevents "Tool Overload" and ensures that sensitive tools are only available to authorized agents.
+
+You can use the declarative `AgentConfig` to explicitly define routing.
+
+```go
+agent := gocrew.NewAgent(gocrew.AgentConfig{
+    Role: "Read-Only Analyst",
+    MCPS: []string{"stdio:npx -y @modelcontextprotocol/server-filesystem /app/data"},
+    // Only allow safe reading tools:
+    MCPAllowList: []string{"read_file", "list_directory", "search_files"},
+    // Explicitly block mutating tools:
+    MCPBlockList: []string{"write_file", "delete_file", "execute_command"},
+})
+```
+
+If the agent's LLM attempts to call `write_file`, the engine will immediately reject the JSON RPC call without communicating with the remote server, triggering the agent's self-healing loop.
 
 ### 2. Native Validation
-All MCP tool results are automatically validated against the agent's internal reasoning loop. This prevents "Tool Hallucination" and ensures that the agent correctly understands the remote output.
 
-### 3. Human-in-the-Loop
-Configure specific MCP tools (e.g., `git.delete_branch`) to require manual approval before execution via the **Dashboard**.
+All MCP tool results are automatically validated against the agent's internal reasoning loop. This prevents "Tool Hallucination" and ensures that the agent correctly understands the remote output before proceeding.
+
+### 3. Human-in-the-Loop Hooks
+
+For hyper-sensitive tools that you still want the agent to use, you can attach an interceptor:
+
+```go
+agent.Guardrails = append(agent.Guardrails, guardrails.NewHumanReviewGuardrail(
+    "execute_query", // The MCP Tool Name
+    "SQL execution requires manual review.",
+))
+```
+When triggered, this pauses the orchestration thread and pushes an alert to the Dashboard.
 
 ---
 

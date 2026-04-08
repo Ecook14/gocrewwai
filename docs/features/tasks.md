@@ -28,12 +28,18 @@ summaryTask := gocrew.NewTask(gocrew.TaskConfig{
 | Parameter | Type | Description |
 | :--- | :--- | :--- |
 | **Description** | `string` | The detailed prompt/instructions for the task. |
+| **ExpectedOutput** | `string` | Clear definition of what the final result should be. |
 | **Agent** | `CoreAgent` | The agent assigned to perform this task. |
-| **Context** | `[]*Task` | A slice of prior tasks whose results provide required context for this task. |
-| **OutputJSON** | `interface{}` | An optional Go pointer (e.g., `&MyStruct{}`) that the agent will populate as structured JSON. |
-| **OutputFile** | `string` | Path where the result will be saved (supports automatic directory creation). |
-| **Markdown** | `bool` | If true, ensures the output is formatted as valid Markdown. |
-| **MaxRetryLimit** | `int` | Number of autonomous retries if the task fails or validation fails. |
+| **Context** | `[]*Task` | Prior tasks whose results provide required context. |
+| **OutputJSON** | `interface{}` | Struct pointer for structured JSON extraction. |
+| **OutputSchema** | `string` | Raw JSON schema for validation (Alternative to OutputJSON). |
+| **OutputFile** | `string` | Path where the result will be auto-saved. |
+| **CreateDirectory** | `bool` | Auto-create parent directories for the output file. |
+| **HumanInput** | `bool` | Enables **HITL** (Human-in-the-Loop) approval/feedback loops. |
+| **Guardrails** | `[]Guardrail` | Custom validation logic for task outputs. |
+| **MaxRetries** | `int` | Retries for schema validation failures. |
+| **Timeout** | `Duration` | Max execution time for the single task. |
+| **NextPaths** | `map[string]*Task` | State machine transitions for cyclic/graph logic. |
 
 ---
 
@@ -41,18 +47,51 @@ summaryTask := gocrew.NewTask(gocrew.TaskConfig{
 
 Gocrew tasks excel at building complex, multi-stage "Logic Chains." By providing a slice of tasks to the `Context` field, the framework will:
 
-1. **Inject History**: Append the results of the context tasks into the current task's prompt.
-2. **Handle Dependencies**: Ensure that dependencies are resolved before the current task begins (handled by the Crew/Flow engine).
+1. **Wait for Dependencies**: Ensure that dependencies are resolved before the current task begins.
+2. **Inject History**: Append the results of the context tasks into the current task's prompt.
+
+**Visualizing the Chain:**
+```text
+Task A (Research) ──┐
+                    ▼
+Task B (Scrape) ────┼──► Task D (Write Final Report)
+                    ▲
+Task C (Analyze) ───┘
+```
+In Gocrewwai, you simply set `Context: []*Task{TaskA, TaskB, TaskC}` inside `TaskD`.
 
 ---
 
-## 🛡️ Strict JSON Outputs
+## 🛡️ Strict JSON Outputs (`GetOutput[T]`)
 
-Gocrewwai solves the "Unreliable LLM" problem by enforcing strictly-typed JSON outputs. If you provide a struct pointer to `OutputJSON`:
+Gocrewwai solves the "Unreliable LLM" problem by enforcing strictly-typed JSON outputs. If you provide a struct pointer to `OutputJSON`, the engine will inject the required JSON schema, validate the LLM's response, and autonomously retry if the schema is malformed.
 
-1. **Schema Injection**: Gocrew informs the LLM of the exact JSON schema required.
-2. **Validation**: The engine attempts to unmarshal the response into your Go struct.
-3. **Self-Correction**: If unmarshalling fails, the engine automatically triggers a retry, providing the LLM with the specific error and asking for a fix.
+**Extracting the Data:**
+Once the crew has finished, you can extract the populated data using the generic `GetOutput[T]()` helper.
+
+```go
+// 1. Define your struct
+type Employee struct {
+    Name     string `json:"name"`
+    Age      int    `json:"age"`
+    IsRemote bool   `json:"is_remote"`
+}
+
+// 2. Configure the task
+profileTask := gocrew.NewTask(gocrew.TaskConfig{
+    Description: "Extract the employee's details from the provided bio.",
+    Agent:       analyst,
+    OutputJSON:  &Employee{},
+})
+
+// ... run the crew ...
+
+// 3. Extract Safely (Type Assertion handled internally)
+result, _ := myCrew.Kickoff(ctx)
+emp := gocrew.GetOutput[Employee](result)
+
+fmt.Printf("Parsed Name: %s\n", emp.Name)
+```
 
 ---
 
