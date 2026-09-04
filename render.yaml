@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: gocrew-engine
+    runtime: go
+    plan: starter
+    region: oregon
+    branch: deploy/render
+    rootDir: /
+    buildCommand: "go build -o /tmp/gocrew-server ./cmd/server"
+    startCommand: "/tmp/gocrew-server"
+    healthCheckPath: /api/v1/health
+    autoDeploy: false
+    envVars:
+      - key: API_PORT
+        value: "8080"
+      - key: PORT
+        value: "8080"
+      - key: CREW_GO_LOG_FORMAT
+        value: "json"
+      - key: CREW_GO_LOG_LEVEL
+        value: "info"
