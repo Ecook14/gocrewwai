@@ -1,11 +1,11 @@
-# Gocrewwai ⚓🏆🚀 (v1.0.0 Stable)
+# Gocrewwai ⚓🏆🚀
 
 High-performance, strictly-typed agentic orchestration for the Go ecosystem. Inspired by **CrewAI, LangChain, and LangGraph**, Gocrewwai is built for developers who demand speed, reliability, and production-ready precision.
 
 ---
 
 > [!IMPORTANT]
-> **Status: v1.0.0 (Production Hardened).** Gocrewwai has evolved into a stable, high-fidelity framework for heterogeneous agent orchestration. With native A2A protocols, durable flow persistence, and recursive self-correction, it is ready for critical digital missions.
+> **Status: v0.9.0 (Alpha → Beta).** The framework is feature-complete against the public roadmap; v1.0.0 will ship once the next CHANGELOG entry is published. Native A2A protocols, durable flow persistence, and recursive self-correction are in production use today.
 
 ---
 
