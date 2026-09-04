@@ -1,0 +1,15 @@
+.git
+.gitignore
+node_modules
+.DS_Store
+.env
+.env.local
+my-crew
+crewai
+*.log
+out
+dist
+web-ui
+web/.git
+.idea
+.vscode
