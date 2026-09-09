@@ -13,7 +13,7 @@ type mockAgent struct {
 	executeFunc func(taskInput string) (interface{}, error)
 }
 
-func (m *mockAgent) Execute(ctx context.Context, taskInput string, options map[string]interface{}) (interface{}, error) {
+func (m *mockAgent) Execute(ctx context.Context, taskInput string, options llm.GenerateOptions) (interface{}, error) {
 	return m.executeFunc(taskInput)
 }
 
@@ -72,6 +72,6 @@ type mockLLMClient struct {
 	generateFunc func(messages []llm.Message) (string, error)
 }
 
-func (m *mockLLMClient) Generate(ctx context.Context, messages []llm.Message, options map[string]interface{}) (string, error) {
+func (m *mockLLMClient) Generate(ctx context.Context, messages []llm.Message, options llm.GenerateOptions) (string, error) {
 	return m.generateFunc(messages)
 }
