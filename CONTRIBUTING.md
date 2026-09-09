@@ -1,63 +1,54 @@
-# Contributing to Crew-GO
+# Contributing to Gocrewwai
 
-Thank you for your interest in contributing! This guide will help you get started.
+## Getting Started
+
+1. Fork the repository
+2. Clone your fork: `git clone https://github.com/Ecook14/gocrewwai.git`
+3. Create a feature branch: `git checkout -b feature/amazing-feature`
+4. Make your changes
+5. Run tests: `go test ./pkg/...`
+6. Build: `go build ./pkg/... ./cmd/...`
+7. Commit: `git commit -m 'Add amazing feature'`
+8. Push to your fork
+9. Open a Pull Request
 
 ## Development Setup
 
-1. **Prerequisites**: Go 1.22+ installed
-2. **Clone and build**:
-   ```bash
-   git clone https://github.com/Ecook14/gocrew.git
-   cd Crew-GO
-   go build ./...
-   ```
-3. **Run tests**:
-   ```bash
-   go test ./... -v
-   ```
+```bash
+# Clone the repo
+git clone https://github.com/Ecook14/gocrewwai.git
+cd gocrewwai
 
-## Project Structure
+# Install dependencies
+go mod download
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full layout and dependency graph.
+# Build everything
+go build ./pkg/... ./cmd/...
 
-## Coding Style
+# Run all tests
+go test ./pkg/...
 
-- Follow standard Go conventions (`gofmt`, `go vet`)
-- All exported types and functions must have doc comments
-- Use `context.Context` as the first parameter for any function involving I/O or concurrency
-- Return errors using types from `pkg/errors` (wrap with sentinels, use typed errors)
-- Interfaces belong in the package that *uses* them, not the package that implements them
+# Run the CLI
+go run ./cmd/gocrew --help
+```
 
-## Adding a New Tool
+## Code Standards
 
-1. Create a new file in `pkg/tools/` (e.g., `my_tool.go`)
-2. Implement the `Tool` interface:
-   ```go
-   type MyTool struct{}
-   func (t *MyTool) Name() string { return "MyTool" }
-   func (t *MyTool) Description() string { return "Does something useful." }
-   func (t *MyTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) { ... }
-   ```
-3. Add tests in `pkg/tools/tools_test.go`
+- Follow Go conventions and `gofmt`
+- Write tests for all new code
+- Use descriptive variable names
+- Keep functions small and focused
+- Document all public interfaces
 
-## Adding a New Guardrail
+## Submitting Changes
 
-1. Create a struct implementing `guardrails.Guardrail` in `pkg/guardrails/`
-2. Implement `Name() string` and `Validate(output string) error`
-3. Add tests in `pkg/guardrails/guardrails_test.go`
+- Keep PRs focused on a single feature or fix
+- Write clear commit messages
+- Include tests and documentation
+- Ensure all CI checks pass
 
-## Pull Request Process
+## Community Guidelines
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/my-feature`)
-3. Write tests for new functionality
-4. Ensure `go test ./...` passes
-5. Ensure `go vet ./...` reports no issues
-6. Submit a pull request with a clear description
-
-## Testing
-
-- Unit tests live alongside the code (`*_test.go`)
-- Tests should not require API keys or network access (use mocks)
-- Use `t.TempDir()` for file-based tests
-- Aim for table-driven tests where applicable
+- Be respectful and inclusive
+- Help others in the community
+- Follow the code of conduct
