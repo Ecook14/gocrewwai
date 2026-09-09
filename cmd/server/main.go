@@ -6,11 +6,11 @@ import (
 	"log"
 	"os"
 
-	"github.com/Ecook14/gocrewwai/web"
 	"github.com/Ecook14/gocrewwai/pkg/api"
 	"github.com/Ecook14/gocrewwai/pkg/config"
 	"github.com/Ecook14/gocrewwai/pkg/core"
 	"github.com/Ecook14/gocrewwai/pkg/telemetry"
+	"github.com/Ecook14/gocrewwai/web"
 )
 
 func main() {
@@ -49,8 +49,8 @@ func main() {
 	fmt.Println(`
    ______                      _       __  ___ 
   / ____/________ _      __   | |     / / /   |
- / /   / ___/ _ \ | /| / /   | | /| / / / /| |
-/ /___/ /  /  __/ |/ |/ /    | |/ |/ / / ___ |
+ / /   / ___/ _ \ | /| / /   | | /| / / /| |
+/ /___/ /  / __/ |/ |/ /    | |/ |/ / / ___ |
 \____/_/   \___/|__/|__/     |__/|__/ /_/  |_| v1.0.0 (Stable)
                                                `)
 	log.Printf("🛠️  Engine: Gocrewwai | Mode: Multi-Service Orchestrator")
