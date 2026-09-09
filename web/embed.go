@@ -3,10 +3,10 @@
 // (Cloud UI), so the in-binary dashboard is intentionally a no-op FS.
 package web
 
-import "io/fs"
+import "net/http"
 
 // GetFS returns an empty in-memory filesystem. The Visual Builder lives
 // at gocrewwai-ui.vercel.app and is the canonical UI for the Cloud.
-func GetFS() fs.FS {
+func GetFS() http.FileSystem {
 	return nil
 }
