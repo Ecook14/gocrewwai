@@ -41,7 +41,7 @@ type CodeInterpreterTool struct {
 func NewCodeInterpreterTool(opts ...CodeInterpreterOption) *CodeInterpreterTool {
 	t := &CodeInterpreterTool{
 		BaseTool: BaseTool{
-			NameValue:        "CodeInterpreter",
+			NameValue:        "CodeInterpreterTool",
 			DescriptionValue: "Execute snippets in Python, Go, or Shell (bash/sh). Input: {'language': 'python'|'go'|'bash'|'sh', 'code': '...'}. Runs via Docker if configured.",
 		},
 	}

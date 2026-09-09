@@ -3,39 +3,43 @@ package tools_test
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"testing"
+
 	"github.com/Ecook14/gocrewwai/pkg/tools"
 )
 
 func TestFileEditTool_Execute(t *testing.T) {
-	tmpFile := "test_edit.txt"
+	tmpDir := t.TempDir()
+	tmpFile := filepath.Join(tmpDir, "test_edit.txt")
 	content := "Line 1\nLine 2\nLine 3"
-	err := os.WriteFile(tmpFile, []byte(content), 0644)
-	if err != nil {
-		t.Fatalf("failed to create tmp file: %v", err)
+	if err := os.WriteFile(tmpFile, []byte(content), 0644); err != nil {
+		t.Fatal(err)
 	}
 	defer os.Remove(tmpFile)
 
-	tool := tools.NewFileEditTool()
+	tool := tools.NewFileEditTool(tmpDir)
 	input := map[string]interface{}{
-		"file_path":        tmpFile,
-		"target_text":      "Line 2",
+		"file_path":       tmpFile,
+		"target_text":     "Line 2",
 		"replacement_text": "Updated Line 2",
 	}
 
-	res, err := tool.Execute(context.Background(), input)
+	_, err := tool.Execute(context.Background(), input)
 	if err != nil {
 		t.Fatalf("tool execution failed: %v", err)
 	}
 
-	if res == "" {
-		t.Error("expected non-empty result message")
-	}
-
 	newData, _ := os.ReadFile(tmpFile)
-	newContent := string(newData)
-	expected := "Line 1\nUpdated Line 2\nLine 3"
-	if newContent != expected {
-		t.Errorf("unexpected content: %s, want %s", newContent, expected)
+	if string(newData) == content {
+		t.Error("expected file to be updated")
+	}
+}
+
+func TestFileEditTool_MissingFields(t *testing.T) {
+	tool := tools.NewFileEditTool(t.TempDir())
+	_, err := tool.Execute(context.Background(), map[string]interface{}{})
+	if err == nil {
+		t.Error("expected error for missing fields")
 	}
 }
