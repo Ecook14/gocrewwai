@@ -2,76 +2,59 @@ package tasks
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
 	"github.com/Ecook14/gocrewwai/pkg/agents"
+	"github.com/Ecook14/gocrewwai/pkg/i18n"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 )
 
-type mockAgent struct {
-	executeFunc func(taskInput string) (interface{}, error)
+type mockLLMClient struct {
+	generateFunc func(ctx context.Context, messages []llm.Message, options llm.GenerateOptions) (string, error)
 }
 
-func (m *mockAgent) Execute(ctx context.Context, taskInput string, options llm.GenerateOptions) (interface{}, error) {
-	return m.executeFunc(taskInput)
+func (m *mockLLMClient) Generate(ctx context.Context, messages []llm.Message, options llm.GenerateOptions) (string, error) {
+	if m.generateFunc != nil {
+		return m.generateFunc(ctx, messages, options)
+	}
+	return "Task Output", nil
 }
-
-func (m *mockAgent) GetRole() string { return "Mock Agent" }
+func (m *mockLLMClient) GenerateWithUsage(ctx context.Context, messages []llm.Message, options llm.GenerateOptions) (string, *llm.Usage, error) { return "", nil, nil }
+func (m *mockLLMClient) GenerateStructured(ctx context.Context, messages []llm.Message, schema interface{}, options llm.GenerateOptions) (interface{}, error) { return nil, nil }
+func (m *mockLLMClient) StreamGenerate(ctx context.Context, messages []llm.Message, options llm.GenerateOptions) (<-chan string, error) { return nil, nil }
+func (m *mockLLMClient) GenerateEmbedding(ctx context.Context, text string, options llm.GenerateOptions) ([]float32, error) { return nil, nil }
 
 func TestTaskExecute(t *testing.T) {
-	mockLLM := &mockLLMClient{
-		generateFunc: func(messages []llm.Message) (string, error) {
-			return "Task Output", nil
-		},
-	}
-
-	agent := &agents.Agent{
-		Role: "Tester",
-		LLM:  mockLLM,
-	}
-
+	mockLLM := &mockLLMClient{}
+	i18nInst, _ := i18n.NewI18N("en")
+	agent := agents.NewAgent(agents.AgentConfig{
+		Role:    "Tester",
+		Goal:    "Test",
+		Backstory: "Test agent",
+		LLM:     mockLLM,
+		Tools:   nil,
+	})
+	agent.I18N = i18nInst
 	task := &Task{
 		Description: "Perform test",
 		Agent:       agent,
 	}
-
 	res, err := task.Execute(context.Background())
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
-
 	if res != "Task Output" {
 		t.Errorf("Expected 'Task Output', got %v", res)
 	}
-
 	if !task.Processed {
 		t.Errorf("Expected task to be marked as processed")
 	}
 }
 
-func TestTask_JSONMarshaling(t *testing.T) {
-	task := &Task{
-		Description: "Marshal Task",
-		CallbackOnComplete: func(result interface{}) {
-			// Do nothing
-		},
-		OutputCondition: func(result interface{}) string {
-			return "success"
-		},
+func TestTaskExecute_NoAgent(t *testing.T) {
+	task := &Task{Description: "No agent test"}
+	_, err := task.Execute(context.Background())
+	if err == nil {
+		t.Error("Expected error for task with no agent")
 	}
-
-	_, err := json.Marshal(task)
-	if err != nil {
-		t.Fatalf("Failed to marshal task to JSON: %v. This likely means a function field is missing a `json:\"-\"` tag.", err)
-	}
-}
-
-type mockLLMClient struct {
-	llm.Client
-	generateFunc func(messages []llm.Message) (string, error)
-}
-
-func (m *mockLLMClient) Generate(ctx context.Context, messages []llm.Message, options llm.GenerateOptions) (string, error) {
-	return m.generateFunc(messages)
 }

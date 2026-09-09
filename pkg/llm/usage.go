@@ -391,6 +391,9 @@ func CalculateCost(u Usage) float64 {
 // CalculateCostStatic computes cost using only the hardcoded builtin table.
 // Use this when you explicitly don't want any HTTP calls (e.g., in tests).
 func CalculateCostStatic(u Usage) float64 {
+	if len(builtinPricing) == 0 {
+		return 0
+	}
 	pricing, ok := builtinPricing[u.Model]
 	if !ok {
 		return 0

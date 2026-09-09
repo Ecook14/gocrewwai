@@ -234,3 +234,10 @@ func (c *Config) GetToolParam(tool, key string) string {
 	}
 	return ""
 }
+
+// resetGetForTest resets the singleton for testing purposes.
+// This is only used in tests to avoid singleton caching issues.
+func resetGetForTest() {
+	instance = nil
+	once = sync.Once{}
+}

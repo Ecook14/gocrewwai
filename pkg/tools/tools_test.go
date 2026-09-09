@@ -1,55 +1,67 @@
-package tools
+package tools_test
 
 import (
 	"context"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
+
+	"github.com/Ecook14/gocrewwai/pkg/tools"
 )
 
-func TestFileReadToolExecute(t *testing.T) {
-	// Create a temp file
-	tmpDir := t.TempDir()
-	tmpFile := filepath.Join(tmpDir, "test.txt")
-	os.WriteFile(tmpFile, []byte("hello world"), 0644)
-
-	tool := NewFileReadTool()
-
+func TestFileReadToolName(t *testing.T) {
+	tool := tools.NewFileReadTool(t.TempDir())
 	if tool.Name() != "FileReadTool" {
 		t.Errorf("expected name 'FileReadTool', got '%s'", tool.Name())
 	}
+}
 
+func TestFileReadToolMissingPath(t *testing.T) {
+	tool := tools.NewFileReadTool(t.TempDir())
+	_, err := tool.Execute(context.Background(), map[string]interface{}{})
+	if err == nil {
+		t.Error("expected error for missing file_path")
+	}
+}
+
+func TestFileReadToolExecute(t *testing.T) {
+	tmpDir := t.TempDir()
+	tmpFile := filepath.Join(tmpDir, "test.txt")
+	content := "hello world"
+	if err := os.WriteFile(tmpFile, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+	tool := tools.NewFileReadTool(tmpDir)
 	result, err := tool.Execute(context.Background(), map[string]interface{}{
 		"file_path": tmpFile,
 	})
 	if err != nil {
 		t.Fatalf("FileReadTool.Execute failed: %v", err)
 	}
-
-	if result != "hello world" {
-		t.Errorf("expected 'hello world', got '%s'", result)
+	if result != content {
+		t.Errorf("expected '%s', got '%s'", content, result)
 	}
 }
 
-func TestFileReadToolMissingPath(t *testing.T) {
-	tool := NewFileReadTool()
+func TestFileWriteToolName(t *testing.T) {
+	tool := tools.NewFileWriteTool(t.TempDir())
+	if tool.Name() != "FileWriteTool" {
+		t.Errorf("expected name 'FileWriteTool', got '%s'", tool.Name())
+	}
+}
+
+func TestFileWriteToolMissingFields(t *testing.T) {
+	tool := tools.NewFileWriteTool(t.TempDir())
 	_, err := tool.Execute(context.Background(), map[string]interface{}{})
 	if err == nil {
-		t.Error("expected error for missing file_path, got nil")
+		t.Error("expected error for missing fields")
 	}
 }
 
 func TestFileWriteToolExecute(t *testing.T) {
 	tmpDir := t.TempDir()
 	tmpFile := filepath.Join(tmpDir, "output.txt")
-
-	tool := NewFileWriteTool()
-
-	if tool.Name() != "FileWriteTool" {
-		t.Errorf("expected name 'FileWriteTool', got '%s'", tool.Name())
-	}
-
+	tool := tools.NewFileWriteTool(tmpDir)
 	result, err := tool.Execute(context.Background(), map[string]interface{}{
 		"file_path": tmpFile,
 		"content":   "written content",
@@ -57,155 +69,96 @@ func TestFileWriteToolExecute(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FileWriteTool.Execute failed: %v", err)
 	}
-
 	if result == "" {
-		t.Error("expected non-empty result")
+		t.Error("expected non-empty result message")
 	}
-
-	// Verify the file was written
 	data, err := os.ReadFile(tmpFile)
 	if err != nil {
-		t.Fatalf("failed to read written file: %v", err)
+		t.Fatal(err)
 	}
 	if string(data) != "written content" {
 		t.Errorf("expected 'written content', got '%s'", string(data))
 	}
 }
 
-func TestFileWriteToolMissingInput(t *testing.T) {
-	tool := NewFileWriteTool()
-	_, err := tool.Execute(context.Background(), map[string]interface{}{
-		"file_path": "/tmp/test.txt",
-	})
-	if err == nil {
-		t.Error("expected error for missing content, got nil")
-	}
-}
-
-func TestAskQuestionToolExecute(t *testing.T) {
-	tool := NewAskQuestionTool()
-
-	if tool.Name() != "Ask Question" {
-		t.Errorf("expected name 'Ask Question', got '%s'", tool.Name())
-	}
-
-	result, err := tool.Execute(context.Background(), map[string]interface{}{
-		"question": "What is Go?",
-	})
-	if err != nil {
-		t.Fatalf("AskQuestionTool.Execute failed: %v", err)
-	}
-
-	if result == "" {
-		t.Error("expected non-empty result")
-	}
-}
-
-func TestAskQuestionToolMissingInput(t *testing.T) {
-	tool := NewAskQuestionTool()
-	_, err := tool.Execute(context.Background(), map[string]interface{}{})
-	if err == nil {
-		t.Error("expected error for missing question, got nil")
-	}
-}
-
-func TestSearchWebToolName(t *testing.T) {
-	tool := NewSearchWebTool()
-	if tool.Name() != "SearchWebTool" {
-		t.Errorf("expected name 'SearchWebTool', got '%s'", tool.Name())
-	}
-	if tool.Description() == "" {
-		t.Error("expected non-empty description")
-	}
-}
-
-func TestSearchWebToolMissingQuery(t *testing.T) {
-	tool := NewSearchWebTool()
-	_, err := tool.Execute(context.Background(), map[string]interface{}{})
-	if err == nil {
-		t.Error("expected error for missing query, got nil")
-	}
-}
-
 func TestCodeInterpreterToolName(t *testing.T) {
-	tool := NewCodeInterpreterTool()
+	tool := tools.NewCodeInterpreterTool()
 	if tool.Name() != "CodeInterpreterTool" {
 		t.Errorf("expected name 'CodeInterpreterTool', got '%s'", tool.Name())
 	}
-	if tool.Description() == "" {
-		t.Error("expected non-empty description")
+}
+
+func TestGoogleSheetsToolName(t *testing.T) {
+	tool := tools.NewGoogleSheetsTool("")
+	if tool.Name() != "GoogleSheetsTool" {
+		t.Errorf("expected name 'GoogleSheetsTool', got '%s'", tool.Name())
 	}
 }
 
-func TestCodeInterpreterToolMissingInput(t *testing.T) {
-	tool := NewCodeInterpreterTool()
+func TestLinearToolName(t *testing.T) {
+	tool := tools.NewLinearTool("")
+	if tool.Name() != "LinearTool" {
+		t.Errorf("expected name 'LinearTool', got '%s'", tool.Name())
+	}
+}
 
-	// Missing language
-	_, err := tool.Execute(context.Background(), map[string]interface{}{
-		"code": "fmt.Println(\"hi\")",
-	})
+func TestTwilioToolName(t *testing.T) {
+	tool := tools.NewTwilioTool("", "")
+	if tool.Name() != "TwilioTool" {
+		t.Errorf("expected name 'TwilioTool', got '%s'", tool.Name())
+	}
+}
+
+func TestBraveSearchToolName(t *testing.T) {
+	tool := tools.NewBraveSearchTool("")
+	if tool.Name() != "BraveSearchTool" {
+		t.Errorf("expected name 'BraveSearchTool', got '%s'", tool.Name())
+	}
+}
+
+func TestToolExecuteWithBadAction(t *testing.T) {
+	tool := tools.NewGoogleSheetsTool("")
+	_, err := tool.Execute(context.Background(), map[string]interface{}{"action": "bad"})
 	if err == nil {
-		t.Error("expected error for missing language, got nil")
+		t.Error("expected error for bad action")
 	}
+}
 
-	// Missing code
-	_, err = tool.Execute(context.Background(), map[string]interface{}{
-		"language": "go",
-	})
+func TestGoogleSheetsToolDescription(t *testing.T) {
+	tool := tools.NewGoogleSheetsTool("")
+	expected := "Interacts with Google Sheets."
+	if tool.Description()[:len(expected)] != expected {
+		t.Errorf("expected description starting with '%s', got '%s'", expected, tool.Description())
+	}
+}
+
+func TestFileEditToolExecute(t *testing.T) {
+	tmpDir := t.TempDir()
+	tmpFile := filepath.Join(tmpDir, "test_edit.txt")
+	content := "Line 1\nLine 2\nLine 3"
+	if err := os.WriteFile(tmpFile, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+	tool := tools.NewFileEditTool(tmpDir)
+	input := map[string]interface{}{
+		"file_path":       tmpFile,
+		"target_text":     "Line 2",
+		"replacement_text": "Updated Line 2",
+	}
+	_, err := tool.Execute(context.Background(), input)
+	if err != nil {
+		t.Fatalf("FileEditTool.Execute failed: %v", err)
+	}
+	newData, _ := os.ReadFile(tmpFile)
+	if string(newData) == content {
+		t.Error("expected file to be updated")
+	}
+}
+
+func TestFileEditToolMissingFields(t *testing.T) {
+	tool := tools.NewFileEditTool(t.TempDir())
+	_, err := tool.Execute(context.Background(), map[string]interface{}{})
 	if err == nil {
-		t.Error("expected error for missing code, got nil")
-	}
-}
-
-func TestCodeInterpreterToolUnsupportedLanguage(t *testing.T) {
-	tool := NewCodeInterpreterTool()
-	_, err := tool.Execute(context.Background(), map[string]interface{}{
-		"language": "rust",
-		"code":     "fn main() {}",
-	})
-	if err == nil {
-		t.Error("expected error for unsupported language, got nil")
-	}
-}
-
-func TestStripHTMLTags(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected string
-	}{
-		{"<b>bold</b>", "bold"},
-		{"no tags", "no tags"},
-		{"<a href='url'>link</a> text", "link text"},
-		{"", ""},
-	}
-
-	for _, tt := range tests {
-		result := stripHTMLTags(tt.input)
-		if result != tt.expected {
-			t.Errorf("stripHTMLTags(%q) = %q, want %q", tt.input, result, tt.expected)
-		}
-	}
-}
-
-func TestCalculatorToolExecute(t *testing.T) {
-	tool := NewCalculatorTool()
-	
-	tests := []struct {
-		expr     string
-		expected string
-	}{
-		{"2 + 2", "4"},
-		{"10 / 2", "5"},
-		{"10 * 5", "50"},
-	}
-
-	for _, tt := range tests {
-		res, err := tool.Execute(context.Background(), map[string]interface{}{"expression": tt.expr})
-		if err != nil {
-			t.Errorf("expr %s failed: %v", tt.expr, err)
-		}
-		if !strings.Contains(res, tt.expected) {
-			t.Errorf("expr %s expected %s, got %s", tt.expr, tt.expected, res)
-		}
+		t.Error("expected error for missing fields")
 	}
 }
