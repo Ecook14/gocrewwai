@@ -50,7 +50,7 @@ func main() {
 		Role("Technical Blogger").
 		Goal("Synthesize research into viral content.").
 		LLM(model).
-		Tools(tools.NewFileWriteTool()).
+		Tools(tools.NewFileWriteTool("")).
 		Verbose(true).
 		Build()
 

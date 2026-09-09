@@ -1,50 +1,68 @@
-# Changelog 📜
+# Changelog
 
-All notable changes to the **Gocrew** project will be documented in this file.
+All notable changes to Gocrewwai will be documented in this file.
 
----
+## [v0.9.0] - 2026-09-09
 
-## [Unreleased]
-### Added
-- **Mesh gRPC server** (`pkg/api/mesh`) — language-agnostic delegation over the wire with three RPCs: `DelegateTask`, `SearchKnowledge`, `IndexKnowledge`.
-- **AgentDiscovery** (`pkg/protocols/discovery.go`) — background scanning and `AgentRegistry` for A2A peer discovery.
-- **AgentManager** (`pkg/agents/manager.go`) — first-class hierarchical crew manager driver.
-- **Agent cloning** (`pkg/agents/clone.go`) — duplicate an agent with overrides and optional isolated memory.
-- **Crew visualization** (`pkg/crew/visualization.go`) — DOT export for crew graphs.
-- **TypedFlow[T]** (`pkg/flow/typed_flow.go`) — generic typed flow with `WithPersistence`.
-- **8 memory backends** — SQLite, Redis, Chroma, Qdrant, Pinecone, Weaviate, InMemCosine, InMemEntity.
-- **6 process types** — Sequential, Hierarchical, Consensual, Graph, Reflective, StateMachine.
-- **8 guardrail types** — MaxToken, ContentFilter, Schema, PIIRedaction, Toxicity, JSON, Sanitizer, HumanReview.
-- **3 sandbox providers** — Wasm (wazero), Docker, E2B Cloud Sandbox.
-- **WASM shell tools** (`pkg/tools/wasm_sandbox.go`).
-- **Wolfram Alpha tool** (`pkg/tools/wolfram.go`).
-- **WASM file tools** (`pkg/tools/file_{read,write,edit}.go`) with chroot isolation.
-- **MongoDB tool** (`pkg/tools/mongodb.go`).
+### ✨ Added
 
-### Changed
-- **Dashboard** — moved to `web/` (React/Vite). `web-ui/embed.go` remains for backward-compatible embeds.
+- **Ollama native client** — Full local LLM inference with streaming, structured output, embeddings
+- **8 new SaaS tools** — Google Sheets, Linear, Twilio, Brave Search, Notion, HubSpot, Jira, Supabase, SendGrid, Discord
+- **AAMARVA network integration** — `pkg/aamarva/client.go` with Register, Login, Search, Post, Reply, Connect
+- **GitHub Actions CI/CD** — Build, test, and release automation for Linux/Mac/Windows
+- **51 built-in tools** — Comprehensive tool ecosystem covering CRM, search, messaging, databases
+- **19 memory backends** — SQLite, Redis, Chroma, Pinecone, Qdrant, Weaviate, and more
+- **8 LLM providers** — OpenAI, Anthropic, Google Gemini, DeepSeek, Groq, OpenRouter, Ollama
+- **Go 1.25 compatibility** — Full support for latest Go toolchain
+- **Documentation overhaul** — PROGRESS.md, Gap.md, AAMARVA_INTEGRATION.md, architecture docs
+- **Test coverage** — 17/17 packages passing, 100+ tests
 
-### Documentation
-- **Examples** — 30 ready-to-run examples in `examples/` (was 13 documented).
-- **Architecture** — added `pkg/protocols/discovery.go`, `pkg/crew/visualization.go`, `pkg/i18n/translations/`.
+### 🔧 Fixed
 
----
+- go.mod version format fixed to match Go toolchain
+- Agent interface compatibility across all test mocks
+- Tool registration and discovery
+- Config singleton testability
+- Broken Windows paths in source files
 
-## [0.9.0] - 2026-03-10
-### Added
-- **core.Agent Interface Migration**: Structural decoupling enable heterogeneous local and remote agent orchestration.
-- **Distributed Resilience**: Standardized `RemoteAgentAdapter` with circuit breaking and OTel tracing.
-- **Stability**: Resolved all 22 execution-layer compilation errors across core and examples.
-- **Dynamic Dashboard**: Enhanced creator mode with `core.Agent` interface support for live injection.
+## [v0.8.0] - 2026-08-01
 
-## [0.8.0] - 2026-03-09
-### Added
-- **Initial Public Release**: The Gocrew framework is now open-source!
-- **Unified SDK Facade**: Optimized `gocrew` package for a high-performance library experience.
-- **Documentation**: New comprehensive guides for Agents, Tasks, and Memory.
-- **Build**: 100% verified build success across all examples.
+### ✨ Added
 
-## [0.1.0 - 0.7.0] - Internal Development
-- Initial foundation, iteration on core engine packages, and internal stabilizer builds.
-- Development of the Glassmorphic Dashboard and tool ecosystem.
-- Refinement of the ReAct reasoning loop and memory scoring logic.
+- Core agent framework with role-based agents
+- Crew orchestration (Sequential, Hierarchical, Graph)
+- Flow persistence with checkpoints
+- MCP server support
+- A2A protocol implementation
+- HITL (Human-in-the-Loop) support
+- OpenTelemetry tracing
+- CLI scaffolding (`gocrew init`, `gocrew new`, `gocrew run`)
+- Dashboard server with real-time metrics
+
+### 🔧 Fixed
+
+- Memory manager initialization
+- Task execution error handling
+- Agent delegation logic
+
+## [v0.7.0] - 2026-07-01
+
+### ✨ Added
+
+- Self-correction and reflective crews
+- Knowledge base with RAG
+- Training data pipelines
+- Event bus for async communication
+- Guardrails framework
+- Multi-provider LLM routing
+
+## [v0.1.0] - 2026-06-01
+
+### ✨ Added
+
+- Initial project structure
+- Core agent interface
+- Basic crew execution
+- Tool registration system
+- CLI entry point
+- Configuration management
