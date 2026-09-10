@@ -35,7 +35,7 @@ func main() {
 
 	// 2. Initialize built-in tools
 	scraperTool := tools.NewScrapeWebsiteTool()
-	writerTool := tools.NewFileWriteTool()
+	writerTool := tools.NewFileWriteTool("")
 
 	// 3. Define the Agents
 	researcher := &agents.Agent{
