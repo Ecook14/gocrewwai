@@ -5,31 +5,30 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Ecook14/gocrewwai/pkg/agents"
-	"github.com/Ecook14/gocrewwai/pkg/crew"
-	"github.com/Ecook14/gocrewwai/pkg/core"
-	"github.com/Ecook14/gocrewwai/pkg/llm"
-	"github.com/Ecook14/gocrewwai/pkg/tasks"
+	"github.com/Ecook14/gocrewwai/gocrew"
 )
 
 func main() {
 	apiKey := os.Getenv("OPENAI_API_KEY")
-	model := llm.NewOpenAIClient(apiKey)
+	model := gocrew.NewOpenAI(apiKey, "gpt-4o")
 
-	researcher := agents.NewAgent("Researcher", "Research the current weather in SF.", "Weather expert", model)
-	
-	task := &tasks.Task{
+	researcher := gocrew.NewAgent(gocrew.AgentConfig{
+		Role:      "Researcher",
+		Goal:      "Research the current weather in SF.",
+		Backstory: "Weather expert",
+		LLM:       model,
+	})
+
+	task := &gocrew.Task{
 		Description: "Find the current weather in San Francisco.",
 		Agent:       researcher,
 	}
 
-	// Use hierarchical mode so the manager can re-plan
-	myCrew := crew.NewCrew(
-		[]core.Agent{researcher},
-		[]*tasks.Task{task},
-		crew.WithProcess(crew.Hierarchical),
-		crew.WithVerbose(true),
-	)
+	myCrew := gocrew.NewCrew(gocrew.CrewConfig{
+		Agents:  []gocrew.CoreAgent{researcher},
+		Tasks:   []*gocrew.Task{task},
+		Verbose: true,
+	})
 
 	fmt.Println("🚀 Starting Dynamic Re-planning Demo...")
 	fmt.Println("(The manager might decide to add a 'Packing Suggestion' task after seeing the weather)")

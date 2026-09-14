@@ -6,38 +6,34 @@ import (
 	"os"
 	"time"
 
+	"github.com/Ecook14/gocrewwai/gocrew"
 	"github.com/Ecook14/gocrewwai/pkg/dashboard"
-	"github.com/Ecook14/gocrewwai/pkg/agents"
-	"github.com/Ecook14/gocrewwai/pkg/crew"
-	"github.com/Ecook14/gocrewwai/pkg/core"
-	"github.com/Ecook14/gocrewwai/pkg/llm"
-	"github.com/Ecook14/gocrewwai/pkg/tasks"
 )
 
 func main() {
 	apiKey := os.Getenv("OPENAI_API_KEY")
-	model := llm.NewOpenAIClient(apiKey)
+	model := gocrew.NewOpenAI(apiKey, "gpt-4o")
 
-	thinker := agents.NewAgent(
-		"Thinker",
-		"Solve a complex math riddle slowly.",
-		"Deep thinker",
-		model,
-		agents.WithVerbose(true),
-	)
+	thinker := gocrew.NewAgent(gocrew.AgentConfig{
+		Role:      "Thinker",
+		Goal:      "Solve a complex math riddle slowly.",
+		Backstory: "Deep thinker",
+		LLM:       model,
+		Verbose:   true,
+	})
 
 	// Initialize interrupt channel
 	thinker.InterruptCh = make(chan string, 1)
 
-	task := &tasks.Task{
+	task := &gocrew.Task{
 		Description: "Solve the riddle: What is 1234 * 5678 but explain it like I'm five with many steps.",
 		Agent:       thinker,
 	}
 
-	myCrew := crew.NewCrew(
-		[]core.Agent{thinker},
-		[]*tasks.Task{task},
-	)
+	myCrew := gocrew.NewCrew(gocrew.CrewConfig{
+		Agents:  []gocrew.CoreAgent{thinker},
+		Tasks:   []*gocrew.Task{task},
+	})
 
 	fmt.Println("🚀 Starting Interrupt Demo...")
 	

@@ -5,25 +5,29 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Ecook14/gocrewwai/pkg/agents"
-	"github.com/Ecook14/gocrewwai/pkg/crew"
-	"github.com/Ecook14/gocrewwai/pkg/core"
-	"github.com/Ecook14/gocrewwai/pkg/llm"
-	"github.com/Ecook14/gocrewwai/pkg/tasks"
+	"github.com/Ecook14/gocrewwai/gocrew"
 )
 
 func main() {
 	apiKey := os.Getenv("OPENAI_API_KEY")
-	model := llm.NewOpenAIClient(apiKey)
+	model := gocrew.NewOpenAI(apiKey, "gpt-4o")
 
-	agent := agents.NewAgent("Voice Agent", "Say something inspiring.", "Inspirational speaker", model)
+	agent := gocrew.NewAgent(gocrew.AgentConfig{
+		Role:      "Voice Agent",
+		Goal:      "Say something inspiring.",
+		Backstory: "Inspirational speaker",
+		LLM:       model,
+	})
 
-	task := &tasks.Task{
+	task := &gocrew.Task{
 		Description: "Write a 1-sentence inspirational quote.",
 		Agent:       agent,
 	}
 
-	myCrew := crew.NewCrew([]core.Agent{agent}, []*tasks.Task{task})
+	myCrew := gocrew.NewCrew(gocrew.CrewConfig{
+		Agents:  []gocrew.CoreAgent{agent},
+		Tasks:   []*gocrew.Task{task},
+	})
 
 	fmt.Println("🚀 Executing Task and generating Speech (Elite Multimodal)...")
 	result, _ := myCrew.Kickoff(context.Background())

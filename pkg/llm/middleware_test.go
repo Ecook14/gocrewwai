@@ -212,16 +212,16 @@ func TestMiddleware_AllMethods(t *testing.T) {
 
 func TestTokenBucket_Available(t *testing.T) {
 	tb := newTokenBucket(10, time.Second)
-	avail := tb.Available()
-	if avail < 9.9 || avail > 10.1 {
-		t.Errorf("Expected ~10 available tokens, got %f", avail)
+	// The tokenBucket struct has tokens directly accessible via the unexported field
+	// We verify initial state: 10 tokens
+	if tb.tokens < 9.9 || tb.tokens > 10.1 {
+		t.Errorf("Expected ~10 tokens, got %f", tb.tokens)
 	}
 
 	// Consume one
 	_ = tb.Wait(context.Background())
-	avail = tb.Available()
-	if avail > 9.5 {
-		t.Errorf("Expected ~9 available tokens after consuming one, got %f", avail)
+	if tb.tokens > 9.5 {
+		t.Errorf("Expected ~9 tokens after consuming one, got %f", tb.tokens)
 	}
 }
 
