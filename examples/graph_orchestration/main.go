@@ -5,38 +5,47 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/Ecook14/gocrewwai/gocrew"
 	"github.com/Ecook14/gocrewwai/pkg/dashboard"
-	"github.com/Ecook14/gocrewwai/pkg/agents"
-	"github.com/Ecook14/gocrewwai/pkg/crew"
-	"github.com/Ecook14/gocrewwai/pkg/core"
-	"github.com/Ecook14/gocrewwai/pkg/llm"
-	"github.com/Ecook14/gocrewwai/pkg/tasks"
 )
 
 func main() {
 	apiKey := os.Getenv("OPENAI_API_KEY")
-	model := llm.NewOpenAIClient(apiKey)
+	model := gocrew.NewOpenAI(apiKey, "gpt-4o")
 
-	analyst := agents.NewAgent("Analyst", "Analyze data", "Expert analyst", model)
-	coder := agents.NewAgent("Coder", "Write code", "Senior developer", model)
-	reviewer := agents.NewAgent("Reviewer", "Review work", "Detailed reviewer", model)
+	analyst := gocrew.NewAgent(gocrew.AgentConfig{
+		Role:      "Analyst",
+		Goal:      "Analyze data",
+		Backstory: "Expert analyst",
+		LLM:       model,
+	})
+	coder := gocrew.NewAgent(gocrew.AgentConfig{
+		Role:      "Coder",
+		Goal:      "Write code",
+		Backstory: "Senior developer",
+		LLM:       model,
+	})
+	reviewer := gocrew.NewAgent(gocrew.AgentConfig{
+		Role:      "Reviewer",
+		Goal:      "Review work",
+		Backstory: "Detailed reviewer",
+		LLM:       model,
+	})
 
-	task1 := &tasks.Task{Description: "Analyze the stock market trends for AI.", Agent: analyst}
-	task2 := &tasks.Task{Description: "Write a Python script to track these trends.", Agent: coder}
+	task1 := &gocrew.Task{Description: "Analyze the stock market trends for AI.", Agent: analyst}
+	task2 := &gocrew.Task{Description: "Write a Python script to track these trends.", Agent: coder}
 	
-	// Complex Dependency: Task 3 starts ONLY after 1 and 2 complete
-	task3 := &tasks.Task{
+	task3 := &gocrew.Task{
 		Description:  "Review the analysis and the code for accuracy.",
 		Agent:        reviewer,
-		Dependencies: []*tasks.Task{task1, task2},
+		Dependencies: []*gocrew.Task{task1, task2},
 	}
 
-	myCrew := crew.NewCrew(
-		[]core.Agent{analyst, coder, reviewer},
-		[]*tasks.Task{task1, task2, task3},
-		crew.WithProcess(crew.Graph),
-		crew.WithVerbose(true),
-	)
+	myCrew := gocrew.NewCrew(gocrew.CrewConfig{
+		Agents:  []gocrew.CoreAgent{analyst, coder, reviewer},
+		Tasks:   []*gocrew.Task{task1, task2, task3},
+		Verbose: true,
+	})
 
 	fmt.Println("🚀 Starting Graph (DAG) Demo (Task 1 & 2 will run in parallel):")
 	

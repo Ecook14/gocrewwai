@@ -5,25 +5,24 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
-	"github.com/Ecook14/gocrewwai/pkg/dashboard"
-	"github.com/Ecook14/gocrewwai/pkg/agents"
-	"github.com/Ecook14/gocrewwai/pkg/crew"
-	"github.com/Ecook14/gocrewwai/pkg/core"
-	"github.com/Ecook14/gocrewwai/pkg/llm"
+	"github.com/Ecook14/gocrewwai/gocrew"
 	"github.com/Ecook14/gocrewwai/pkg/memory"
-	"github.com/Ecook14/gocrewwai/pkg/tasks"
 	"github.com/Ecook14/gocrewwai/pkg/telemetry"
-	"github.com/Ecook14/gocrewwai/pkg/tools"
 )
 
 func main() {
-	// 1. Initialize Advanced Observability (Stdout for demo)
-	tp, err := telemetry.InitTelemetry(os.Stdout)
+	// 1. Initialize Advanced Observability
+	tp, err := telemetry.InitTelemetry(telemetry.TelemetryConfig{Enabled: true, ServiceName: "gocrewwai-prod"})
 	if err != nil {
 		log.Fatalf("failed to init telemetry: %v", err)
 	}
-	defer tp.Shutdown(context.Background())
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		tp.Shutdown(ctx)
+	}()
 
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
@@ -31,74 +30,53 @@ func main() {
 		return
 	}
 
-	model := llm.NewOpenAIClient(apiKey)
+	model := gocrew.NewOpenAI(apiKey, "gpt-4o")
 
 	// 2. Setup Production Memory (Redis Backend)
-	// Assuming local Redis for this example
 	redisStore, err := memory.NewRedisStore([]string{"localhost:6379"}, "", 0, "prod_crew:")
 	if err != nil {
 		fmt.Printf("Redis not available, falling back to In-Memory: %v\n", err)
 	}
 	
-	var store memory.Store = memory.NewInMemCosineStore()
+	var store gocrew.MemoryStore = gocrew.NewInMemCosineStore()
 	if redisStore != nil {
 		store = redisStore
 	}
 
-	// 3. Define Specialized Agents
-	
-	// A Researcher who uses Docker to run data analysis scripts securely
-	interpreter := tools.NewCodeInterpreterTool(
-		tools.WithDocker("python:3.11-slim"),
-	)
-
-	researcher := &agents.Agent{
-		Role:             "Data Scientist",
-		Goal:             "Perform secure data analysis and generate visualizations.",
-		Backstory:        "Expert in Python and Docker environments.",
-		LLM:              model,
-		Tools:            []tools.Tool{interpreter},
-		Memory:           store,
-		AllowDelegation:  true,
-	}
-
-	// A Vision Analyst who can process images (Multimodal)
-	visionAnalyst := &agents.Agent{
-		Role:      "Vision Analyst",
-		Goal:      "Analyze visual data and incorporate insights into reports.",
-		Backstory: "Specializes in multimodal data synthesis.",
-		LLM:       model, // Uses GPT-4o internally
-	}
+	// 3. Create Production-Ready Agent
+	agent := gocrew.NewAgent(gocrew.AgentConfig{
+		Role:      "Senior Analyst",
+		Goal:      "Analyze market trends and provide actionable insights.",
+		Backstory: "10 years of experience in financial analysis and market research.",
+		LLM:       model,
+		Memory:    store,
+		Verbose:   true,
+	})
 
 	// 4. Define Tasks
-	task1 := &tasks.Task{
-		Description: "Run a Python script to calculate the growth of AI agents and return a summary.",
-		Agent:       researcher,
+	task1 := &gocrew.Task{
+		Description: "Research the top 3 trends in AI for 2026.",
+		Agent:       agent,
 	}
 
-	task2 := &tasks.Task{
-		Description: "Analyze the provided image-based trend chart and merge it with the researched data.",
-		Agent:       visionAnalyst,
+	task2 := &gocrew.Task{
+		Description: "Provide a summary of findings with actionable recommendations.",
+		Agent:       agent,
+		Context:     []*gocrew.Task{task1},
 	}
 
-	// 5. Kickoff the Crew using CONSENSUAL process
-	prodCrew := &crew.Crew{
-		Agents:  []core.Agent{researcher, visionAnalyst},
-		Tasks:   []*tasks.Task{task1, task2},
-		Process: crew.Consensual,
+	// 5. Assemble Crew
+	myCrew := gocrew.NewCrew(gocrew.CrewConfig{
+		Agents:  []gocrew.CoreAgent{agent},
+		Tasks:   []*gocrew.Task{task1, task2},
 		Verbose: true,
-	}
+	})
 
-	dashboard.Start("8081")
-	fmt.Println("🖥️  Dashboard active at http://localhost:8081/web-ui - Watch production execution!")
-
-	result, err := prodCrew.Kickoff(context.Background())
+	fmt.Println("🚀 Starting Production Usage Demo...")
+	_, err = myCrew.Kickoff(context.Background())
 	if err != nil {
 		log.Fatalf("Execution failed: %v", err)
 	}
 
-	fmt.Printf("\n--- PRODUCTION CREW FINAL CONSENSUS ---\n%s\n", result)
-	
-	fmt.Println("✅ Demo finished. Keep the dashboard open to review the logs!")
-	select {}
+	fmt.Println("✅ Production demo completed successfully.")
 }

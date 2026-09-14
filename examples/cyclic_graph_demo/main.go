@@ -6,45 +6,38 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Ecook14/gocrewwai/pkg/agents"
-	"github.com/Ecook14/gocrewwai/pkg/crew"
-	"github.com/Ecook14/gocrewwai/pkg/core"
-	"github.com/Ecook14/gocrewwai/pkg/llm"
-	"github.com/Ecook14/gocrewwai/pkg/tasks"
+	"github.com/Ecook14/gocrewwai/gocrew"
 )
 
 func main() {
 	apiKey := os.Getenv("OPENAI_API_KEY")
-	model := llm.NewOpenAIClient(apiKey)
+	model := gocrew.NewOpenAI(apiKey, "gpt-4o")
 
-	researcher := agents.NewAgent(
-		"Researcher",
-		"Find a unique fact about a random element in the periodic table.",
-		"Science enthusiast",
-		model,
-	)
+	researcher := gocrew.NewAgent(gocrew.AgentConfig{
+		Role:      "Researcher",
+		Goal:      "Find a unique fact about a random element in the periodic table.",
+		Backstory: "Science enthusiast",
+		LLM:       model,
+	})
 
-	verifier := agents.NewAgent(
-		"Fact Verifier",
-		"Verify if the fact is truly unique and surprising. If not, ask for a new one.",
-		"Strict judge",
-		model,
-	)
+	verifier := gocrew.NewAgent(gocrew.AgentConfig{
+		Role:      "Fact Verifier",
+		Goal:      "Verify if the fact is truly unique and surprising. If not, ask for a new one.",
+		Backstory: "Strict judge",
+		LLM:       model,
+	})
 
-	// Define Tasks
-	task1 := &tasks.Task{
+	task1 := &gocrew.Task{
 		Description: "Research a unique fact about a random element.",
 		Agent:       researcher,
 	}
 
-	task2 := &tasks.Task{
+	task2 := &gocrew.Task{
 		Description: "Verify the uniqueness of the fact. Output 'RETRY' if it's too common, or 'FINISH' if it's amazing.",
 		Agent:       verifier,
-		Dependencies: []*tasks.Task{task1},
+		Dependencies: []*gocrew.Task{task1},
 	}
 
-	// Elite: Cyclic Logic
-	// If task2 returns 'RETRY', go back to task1
 	task2.OutputCondition = func(result interface{}) string {
 		out := fmt.Sprintf("%v", result)
 		if strings.Contains(strings.ToUpper(out), "RETRY") {
@@ -52,17 +45,16 @@ func main() {
 		}
 		return "ok"
 	}
-	task2.NextPaths = map[string]*tasks.Task{
+	task2.NextPaths = map[string]*gocrew.Task{
 		"retry": task1,
 	}
-	task2.MaxCycles = 3 // Safety limit
+	task2.MaxCycles = 3
 
-	myCrew := crew.NewCrew(
-		[]core.Agent{researcher, verifier},
-		[]*tasks.Task{task1, task2},
-		crew.WithProcess(crew.Graph), // Or StateMachine
-		crew.WithVerbose(true),
-	)
+	myCrew := gocrew.NewCrew(gocrew.CrewConfig{
+		Agents:  []gocrew.CoreAgent{researcher, verifier},
+		Tasks:   []*gocrew.Task{task1, task2},
+		Verbose: true,
+	})
 
 	fmt.Println("🚀 Starting Elite Cyclic Graph Demo...")
 	fmt.Println("(The crew will loop if the fact isn't 'amazing' enough according to the verifier)")

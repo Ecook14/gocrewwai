@@ -17,7 +17,7 @@
 | | State Machine | ✅ | ❌ | ❌ | ✅ | ✅ |
 | | Reflective | ✅ | ❌ | ❌ | ❌ | ❌ |
 | | Dynamic re-planning | ✅ | ❌ | ❌ | ✅ | ❌ |
-| **Tool Ecosystem** | Built-in tools | ~30 | ~20 | **100+** | 20+ | **400+** |
+| **Tool Ecosystem** | Built-in tools | **40+** | ~20 | **100+** | 20+ | **400+** |
 | | Custom tool creation | ✅ | ✅ | ✅ | ✅ | ✅ |
 | | MCP bridge | ✅ | ❌ | ❌ | ❌ | ✅ |
 | | Tool caching | ✅ | ✅ | ✅ | ❌ | ❌ |
@@ -30,11 +30,11 @@
 | | Vector store backends | 6 | 2 | **20+** | 4 | ❌ |
 | | Document loaders | 7 | 6 | **100+** | 6 | 50+ |
 | **LLM Support** | OpenAI | ✅ | ✅ | ✅ | ✅ | ✅ |
-| | Anthropic | ✅ | ✅ | ✅ | ✅ | ✅ |
-| | Gemini | ✅ | ✅ | ✅ | ✅ | ✅ |
-| | Groq | ✅ | ✅ | ✅ | ❌ | ✅ |
-| | Local/Ollama | ❌ | ✅ | ✅ | ❌ | ✅ |
-| | Streaming | ✅ | ✅ | ✅ | ✅ | ❌ |
+|| | Anthropic | ✅ | ✅ | ✅ | ✅ | ✅ |
+|| | Gemini | ✅ | ✅ | ✅ | ✅ | ✅ |
+|| | Groq | ✅ | ✅ | ✅ | ❌ | ✅ |
+|| | Local/Ollama | ✅ | ✅ | ✅ | ❌ | ✅ |
+|| | Streaming | ✅ | ✅ | ✅ | ✅ | ❌ |
 | **Developer Experience** | Single import SDK | ✅ | ✅ | ❌ | ❌ | N/A |
 | | YAML config | ✅ | ✅ | ❌ | ❌ | ✅ |
 | | CLI scaffolding | ✅ | ✅ | ✅ | ✅ | N/A |
