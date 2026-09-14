@@ -2,79 +2,67 @@ package main
 
 import (
 	"context"
-	"log/slog"
+	"fmt"
 	"os"
 	"time"
 
+	"github.com/Ecook14/gocrewwai/gocrew"
 	"github.com/Ecook14/gocrewwai/pkg/dashboard"
-	"github.com/Ecook14/gocrewwai/pkg/agents"
-	"github.com/Ecook14/gocrewwai/pkg/crew"
-	"github.com/Ecook14/gocrewwai/pkg/core"
-	"github.com/Ecook14/gocrewwai/pkg/guardrails"
-	"github.com/Ecook14/gocrewwai/pkg/llm"
-	"github.com/Ecook14/gocrewwai/pkg/tasks"
-	"github.com/Ecook14/gocrewwai/pkg/tools"
 )
 
 func main() {
-	// 1. Initialise the Dashboard Server in the background
 	dashboard.Start("8080")
-	slog.Info("🖥️  Dashboard active at http://localhost:8080/web-ui")
-	slog.Info("Please open the dashboard in your browser before the crew starts!")
+	fmt.Println("🖥️  Dashboard active at http://localhost:8080/web-ui")
+	fmt.Println("Please open the dashboard in your browser before the crew starts!")
 	
-	time.Sleep(5 * time.Second) // Give user time to open the page
+	time.Sleep(5 * time.Second)
 
-	// 2. Setup a demo Crew
 	apiKey := os.Getenv("OPENAI_API_KEY")
-	client := llm.NewOpenAIClient(apiKey)
+	client := gocrew.NewOpenAI(apiKey, "gpt-4o")
 
-	researcher := agents.NewAgent(
-		"Researcher",
-		"Find the latest news about Go 1.24",
-		"You are a tech journalist looking for cutting-edge updates.",
-		client,
-	)
-	researcher.Tools = []tools.Tool{tools.NewSearchWebTool()}
-	researcher.Verbose = true
+	researcher := gocrew.NewAgent(gocrew.AgentConfig{
+		Role:      "Researcher",
+		Goal:      "Find the latest news about Go 1.24",
+		Backstory: "You are a tech journalist looking for cutting-edge updates.",
+		LLM:       client,
+		Tools:     []gocrew.Tool{gocrew.NewBrowserTool()},
+		Verbose:   true,
+	})
 
-	writer := agents.NewAgent(
-		"Writer",
-		"Write a blog post based on the research",
-		"You are a professional tech blogger.",
-		client,
-	)
-	
-	// Inject the new HITL Guardrail
-	// The Go thread will synchronously Pause until the user clicks "Approve" in the Dashboard
-	writer.Guardrails = []guardrails.Guardrail{
-		guardrails.NewHumanReviewGuardrail("Writer", "Final Draft Publisher"),
-	}
+	writer := gocrew.NewAgent(gocrew.AgentConfig{
+		Role:      "Writer",
+		Goal:      "Write a blog post based on the research",
+		Backstory: "You are a professional tech blogger.",
+		LLM:       client,
+		Verbose:   true,
+	})
 
-	task1 := &tasks.Task{
+	writer.Guardrails = []gocrew.Guardrail{gocrew.NewHumanReviewGuardrail("Writer", "Final Draft Publisher")}
+
+	task1 := &gocrew.Task{
 		Description: "Search for Go 1.24 release notes and key features.",
 		Agent:       researcher,
 	}
 
-	task2 := &tasks.Task{
+	task2 := &gocrew.Task{
 		Description: "Summarize the findings into a 200-word blog post.",
 		Agent:       writer,
-		Context:     []*tasks.Task{task1},
+		Context:     []*gocrew.Task{task1},
 	}
 
-	myCrew := crew.Crew{
-		Agents:  []core.Agent{researcher, writer},
-		Tasks:   []*tasks.Task{task1, task2},
-		Process: crew.Sequential,
+	myCrew := gocrew.NewCrew(gocrew.CrewConfig{
+		Agents:  []gocrew.CoreAgent{researcher, writer},
+		Tasks:   []*gocrew.Task{task1, task2},
 		Verbose: true,
-	}
+	})
 
-	slog.Info("🚀 Starting Live Demo...")
+	fmt.Println("🚀 Starting Live Demo...")
 	_, err := myCrew.Kickoff(context.Background())
 	if err != nil {
-		slog.Error("Demo failed", slog.Any("error", err))
+		fmt.Printf("Demo failed: %v\n", err)
 		os.Exit(1)
 	}
 
-	slog.Info("✅ Demo finished. Keep the dashboard open to review the logs!")
-	select {} // Keep running so user can see logs
+	fmt.Println("✅ Demo finished. Keep the dashboard open to review the logs!")
+	select {}
 }

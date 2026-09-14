@@ -29,7 +29,7 @@ func TestAgentExecute(t *testing.T) {
 }
 
 func TestSessionManager(t *testing.T) {
-	sm, err := InitSessionManager("sqlite", ":memory:")
+	sm, err := InitSessionManager("sqlite3", ":memory:")
 	if err != nil {
 		t.Skipf("SessionManager skipped: %v", err)
 	}

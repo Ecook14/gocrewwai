@@ -5,40 +5,35 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Ecook14/gocrewwai/pkg/agents"
-	"github.com/Ecook14/gocrewwai/pkg/crew"
-	"github.com/Ecook14/gocrewwai/pkg/core"
-	"github.com/Ecook14/gocrewwai/pkg/llm"
-	"github.com/Ecook14/gocrewwai/pkg/tasks"
+	"github.com/Ecook14/gocrewwai/gocrew"
 )
 
 func main() {
 	apiKey := os.Getenv("OPENAI_API_KEY")
-	model := llm.NewOpenAIClient(apiKey)
+	model := gocrew.NewOpenAI(apiKey, "gpt-4o")
 
-	writer := agents.NewAgent(
-		"Creative Writer",
-		"Write a short story about a robot learning to paint.",
-		"Whimsical storyteller",
-		model,
-		agents.WithVerbose(true),
-	)
+	writer := gocrew.NewAgent(gocrew.AgentConfig{
+		Role:      "Creative Writer",
+		Goal:      "Write a short story about a robot learning to paint.",
+		Backstory: "Whimsical storyteller",
+		LLM:       model,
+		Verbose:   true,
+	})
 
 	// Enable Self-Critique for the agent
 	writer.SelfCritique = true
 
-	task := &tasks.Task{
+	task := &gocrew.Task{
 		Description: "Write a 2-sentence story about a painting robot.",
 		Agent:       writer,
 	}
 
 	// Use Reflective process for manager review
-	myCrew := crew.NewCrew(
-		[]core.Agent{writer},
-		[]*tasks.Task{task},
-		crew.WithProcess(crew.Reflective),
-		crew.WithVerbose(true),
-	)
+	myCrew := gocrew.NewCrew(gocrew.CrewConfig{
+		Agents:  []gocrew.CoreAgent{writer},
+		Tasks:   []*gocrew.Task{task},
+		Verbose: true,
+	})
 
 	fmt.Println("🚀 Starting Reflective Crew (Agent Self-Critique + Manager Review)...")
 	result, err := myCrew.Kickoff(context.Background())

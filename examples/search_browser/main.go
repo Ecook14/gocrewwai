@@ -5,41 +5,35 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Ecook14/gocrewwai/pkg/agents"
-	"github.com/Ecook14/gocrewwai/pkg/crew"
-	"github.com/Ecook14/gocrewwai/pkg/core"
-	"github.com/Ecook14/gocrewwai/pkg/llm"
-	"github.com/Ecook14/gocrewwai/pkg/tasks"
-	"github.com/Ecook14/gocrewwai/pkg/tools"
+	"github.com/Ecook14/gocrewwai/gocrew"
 )
 
 func main() {
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	serperKey := os.Getenv("SERPER_API_KEY")
-	model := llm.NewOpenAIClient(apiKey)
+	model := gocrew.NewOpenAI(apiKey, "gpt-4o")
 
-	// Tools
-	search := tools.NewSerperTool(serperKey)
-	scraper := tools.NewScraperTool()
+	search := gocrew.NewSerperTool(serperKey)
+	scraper := gocrew.NewScraperTool()
 
-	researcher := agents.NewAgent(
-		"Researcher",
-		"Find the latest news about Go 1.25 release.",
-		"Curious technology scout",
-		model,
-		agents.WithTools([]agents.Tool{search, scraper}),
-	)
+	researcher := gocrew.NewAgent(gocrew.AgentConfig{
+		Role:      "Researcher",
+		Goal:      "Find the latest news about Go 1.25 release.",
+		Backstory: "Curious technology scout",
+		LLM:       model,
+		Tools:     []gocrew.Tool{search, scraper},
+	})
 
-	task := &tasks.Task{
+	task := &gocrew.Task{
 		Description: "Search for 'Go 1.25 release date and features' and summarize the top 3 points.",
 		Agent:       researcher,
 	}
 
-	myCrew := crew.NewCrew(
-		[]core.Agent{researcher},
-		[]*tasks.Task{task},
-		crew.WithVerbose(true),
-	)
+	myCrew := gocrew.NewCrew(gocrew.CrewConfig{
+		Agents:  []gocrew.CoreAgent{researcher},
+		Tasks:   []*gocrew.Task{task},
+		Verbose: true,
+	})
 
 	fmt.Println("🚀 Starting Web Search & Scrape Demo...")
 	result, err := myCrew.Kickoff(context.Background())

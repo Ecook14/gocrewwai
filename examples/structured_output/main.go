@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 
 	"github.com/Ecook14/gocrewwai/gocrew"
-	"github.com/Ecook14/gocrewwai/pkg/dashboard"
 )
 
 type StockInfo struct {
@@ -25,7 +25,6 @@ func main() {
 
 	model := gocrew.NewOpenAI(apiKey, "gpt-4o")
 
-	// 1. Define Agent (Elite Style)
 	analyst := gocrew.NewAgent(gocrew.AgentConfig{
 		Role:      "Stock Analyst",
 		Goal:      "Analyze stock prices and provide structured summaries.",
@@ -34,40 +33,35 @@ func main() {
 		Verbose:   true,
 	})
 
-	// 2. Define a task with a specific OutputJSON (Elite Style)
 	task := gocrew.NewTask(gocrew.TaskConfig{
-		Description:    "Get the current stock price and a brief description for NVDA.",
-		Agent:          analyst,
-		OutputJSON:     &StockInfo{},
-		MaxRetryLimit:  3,
+		Description: "Get the current stock price and a brief description for NVDA.",
+		Agent:       analyst,
+		OutputJSON:  &StockInfo{},
 	})
 
-	// 3. Assemble and Kickoff the Crew (Elite Style)
 	myCrew := gocrew.NewCrew(gocrew.CrewConfig{
 		Agents:  []gocrew.CoreAgent{analyst},
 		Tasks:   []*gocrew.Task{task},
 		Verbose: true,
 	})
 
-	fmt.Println("🚀 Executing GOCREW Structured Output Task (Elite Style)...")
-	
-	dashboard.Start("8081")
-	fmt.Println("🖥️  Dashboard active at http://localhost:8081/web-ui")
-
+	fmt.Println("🚀 Executing Structured Output Demo (Elite Style)...")
 	result, err := myCrew.Kickoff(context.Background())
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
+		fmt.Printf("❌ Error: %v\n", err)
 		return
 	}
 
-	// 4. Result should be an instance of StockInfo
-	if info, ok := result.(*StockInfo); ok {
-		fmt.Printf("\n✨ Successfully Parsed Structured Output:\n")
-		fmt.Printf("Symbol: %s\nPrice: %.2f %s\nDesc: %s\n", info.Symbol, info.Price, info.Currency, info.Description)
-	} else {
-		fmt.Printf("\nRaw Result: %v\n", result)
-	}
+	fmt.Printf("\n--- 🏁 STRUCTURED OUTPUT RESULT ---\n%s\n", result)
 
-	fmt.Println("\n✅ Demo finished. Keep the dashboard open to review the logs!")
-	select {}
+	// Parse the JSON result into our struct
+	var stock StockInfo
+	if err := json.Unmarshal([]byte(fmt.Sprintf("%v", result)), &stock); err == nil {
+		fmt.Printf("\n✅ Parsed Stock Info:\n")
+		fmt.Printf("  Symbol:      %s\n", stock.Symbol)
+		fmt.Printf("  Price:       %.2f %s\n", stock.Price, stock.Currency)
+		fmt.Printf("  Description: %s\n", stock.Description)
+	} else {
+		fmt.Printf("\n⚠️  Could not parse result as StockInfo: %v\n", err)
+	}
 }
