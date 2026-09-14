@@ -23,6 +23,7 @@ import (
 	"github.com/Ecook14/gocrewwai/pkg/files"
 	"github.com/Ecook14/gocrewwai/pkg/flow"
 	"github.com/Ecook14/gocrewwai/pkg/flows"
+	"github.com/Ecook14/gocrewwai/pkg/guardrails"
 	"github.com/Ecook14/gocrewwai/pkg/knowledge"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/memory"
@@ -39,6 +40,7 @@ import (
 type Agent = agents.Agent
 type AgentConfig = agents.AgentConfig
 type CoreAgent = core.Agent
+type Guardrail = guardrails.Guardrail
 
 // Task Types
 type Task = tasks.Task
@@ -335,6 +337,16 @@ func NewWikipediaTool() tools.Tool {
 	return tools.NewWikipediaTool()
 }
 
+// NewSerperTool creates a Serper AI search tool.
+func NewSerperTool(apiKey string) tools.Tool {
+	return tools.NewSerperTool(apiKey)
+}
+
+// NewScraperTool creates a web scraper tool.
+func NewScraperTool() tools.Tool {
+	return tools.NewScraperTool()
+}
+
 // NewFileCache creates a file-based LLM cache.
 func NewFileCache(dir string) *llm.FileCache {
 	return llm.NewFileCache(dir)
@@ -360,9 +372,29 @@ func NewBrowserTool() tools.Tool {
 	return tools.NewBrowserTool()
 }
 
+// NewHumanReviewGuardrail creates a human-in-the-loop guardrail.
+func NewHumanReviewGuardrail(agentRole, toolName string) *guardrails.HumanReviewGuardrail {
+	return guardrails.NewHumanReviewGuardrail(agentRole, toolName)
+}
+
 // NewPineconeStore securely wraps a Pinecone Vector DB initialization.
 func NewPineconeStore(host, apiKey, namespace string) (*memory.PineconeStore, error) {
 	return memory.NewPineconeStore(host, apiKey, namespace)
+}
+
+// NewRedisStore creates a Redis-backed memory store.
+func NewRedisStore(addrs []string, password string, db int, prefix string) (*memory.RedisStore, error) {
+	return memory.NewRedisStore(addrs, password, db, prefix)
+}
+
+// NewInMemCosineStore creates an in-memory cosine similarity store.
+func NewInMemCosineStore() *memory.InMemCosineStore {
+	return memory.NewInMemCosineStore()
+}
+
+// NewCodeInterpreterTool creates a code interpreter tool.
+func NewCodeInterpreterTool() *tools.CodeInterpreterTool {
+	return tools.NewCodeInterpreterTool()
 }
 
 // SplitterConfig alias for knowledge module configuration.

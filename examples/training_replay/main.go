@@ -5,34 +5,30 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Ecook14/gocrewwai/pkg/agents"
-	"github.com/Ecook14/gocrewwai/pkg/crew"
-	"github.com/Ecook14/gocrewwai/pkg/core"
-	"github.com/Ecook14/gocrewwai/pkg/llm"
-	"github.com/Ecook14/gocrewwai/pkg/tasks"
+	"github.com/Ecook14/gocrewwai/gocrew"
 )
 
 func main() {
 	apiKey := os.Getenv("OPENAI_API_KEY")
-	model := llm.NewOpenAIClient(apiKey)
+	model := gocrew.NewOpenAI(apiKey, "gpt-4o")
 
-	writer := agents.NewAgent(
-		"Technical Writer",
-		"Explain cloud computing to a 5-year-old.",
-		"Patient and clear teacher",
-		model,
-	)
+	writer := gocrew.NewAgent(gocrew.AgentConfig{
+		Role:      "Technical Writer",
+		Goal:      "Explain cloud computing to a 5-year-old.",
+		Backstory: "Patient and clear teacher",
+		LLM:       model,
+	})
 
-	task := &tasks.Task{
+	task := &gocrew.Task{
 		Description: "Explain 'serverless' using a lemonade stand analogy.",
 		Agent:       writer,
 	}
 
-	myCrew := crew.NewCrew(
-		[]core.Agent{writer},
-		[]*tasks.Task{task},
-		crew.WithVerbose(true),
-	)
+	myCrew := gocrew.NewCrew(gocrew.CrewConfig{
+		Agents:  []gocrew.CoreAgent{writer},
+		Tasks:   []*gocrew.Task{task},
+		Verbose: true,
+	})
 
 	// 1. Training Mode
 	fmt.Println("🎓 Entering Training Mode (Iterations: 1)...")

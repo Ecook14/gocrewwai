@@ -95,7 +95,8 @@ func (mc *MiddlewareClient) Inner() Client {
 // ---------------------------------------------------------------------------
 
 func (mc *MiddlewareClient) Generate(ctx context.Context, messages []Message, options GenerateOptions) (string, error) {
-	ctx = mc.applyTimeout(ctx)
+	ctx, cancel := mc.applyTimeout(ctx)
+	defer cancel()
 	if err := mc.waitRateLimit(ctx); err != nil {
 		return "", err
 	}
@@ -107,7 +108,8 @@ func (mc *MiddlewareClient) Generate(ctx context.Context, messages []Message, op
 }
 
 func (mc *MiddlewareClient) GenerateWithUsage(ctx context.Context, messages []Message, options GenerateOptions) (string, *Usage, error) {
-	ctx = mc.applyTimeout(ctx)
+	ctx, cancel := mc.applyTimeout(ctx)
+	defer cancel()
 	if err := mc.waitRateLimit(ctx); err != nil {
 		return "", nil, err
 	}
@@ -119,7 +121,8 @@ func (mc *MiddlewareClient) GenerateWithUsage(ctx context.Context, messages []Me
 }
 
 func (mc *MiddlewareClient) GenerateStructured(ctx context.Context, messages []Message, schema interface{}, options GenerateOptions) (interface{}, error) {
-	ctx = mc.applyTimeout(ctx)
+	ctx, cancel := mc.applyTimeout(ctx)
+	defer cancel()
 	if err := mc.waitRateLimit(ctx); err != nil {
 		return nil, err
 	}
@@ -131,7 +134,8 @@ func (mc *MiddlewareClient) GenerateStructured(ctx context.Context, messages []M
 }
 
 func (mc *MiddlewareClient) StreamGenerate(ctx context.Context, messages []Message, options GenerateOptions) (<-chan string, error) {
-	ctx = mc.applyTimeout(ctx)
+	ctx, cancel := mc.applyTimeout(ctx)
+	defer cancel()
 	if err := mc.waitRateLimit(ctx); err != nil {
 		return nil, err
 	}
@@ -153,11 +157,13 @@ func (mc *MiddlewareClient) StreamGenerate(ctx context.Context, messages []Messa
 // Internal Helpers
 // ---------------------------------------------------------------------------
 
-func (mc *MiddlewareClient) applyTimeout(ctx context.Context) context.Context {
+// applyTimeout returns a context with the configured timeout applied.
+// The caller is responsible for deferring the returned cancel function.
+func (mc *MiddlewareClient) applyTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
 	if mc.timeout > 0 {
-		ctx, _ = context.WithTimeout(ctx, mc.timeout)
+		return context.WithTimeout(ctx, mc.timeout)
 	}
-	return ctx
+	return ctx, func() {}
 }
 
 func (mc *MiddlewareClient) waitRateLimit(ctx context.Context) error {
@@ -178,18 +184,19 @@ func (mc *MiddlewareClient) logCall(method string, messages []Message, options G
 		promptLen += len(m.Content)
 	}
 
-	attrs := []any{
+	mc.logger.Info("LLM call",
 		slog.String("method", method),
 		slog.String("model", model),
-		slog.Int("prompt_chars", promptLen),
-		slog.Int("response_chars", len(result)),
+		slog.Int("prompt_len", promptLen),
+		slog.String("result_len", fmt.Sprintf("%d", len(result))),
 		slog.Duration("latency", latency),
-	}
-
+		slog.Bool("error", err != nil),
+	)
 	if err != nil {
-		mc.logger.Error("LLM call failed", append(attrs, slog.String("error", err.Error()))...)
-	} else {
-		mc.logger.Info("LLM call", attrs...)
+		mc.logger.Error("LLM call failed",
+			slog.String("method", method),
+			slog.String("error", err.Error()),
+		)
 	}
 }
 
@@ -204,35 +211,22 @@ func (mc *MiddlewareClient) logCallWithUsage(method string, messages []Message, 
 		promptLen += len(m.Content)
 	}
 
-	attrs := []any{
+	mc.logger.Info("LLM call with usage",
 		slog.String("method", method),
 		slog.String("model", model),
-		slog.Int("prompt_chars", promptLen),
-		slog.Int("response_chars", len(result)),
+		slog.Int("prompt_len", promptLen),
+		slog.Int("prompt_tokens", usage.PromptTokens),
+		slog.Int("completion_tokens", usage.CompletionTokens),
+		slog.Int("total_tokens", usage.TotalTokens),
 		slog.Duration("latency", latency),
-	}
-
-	if usage != nil {
-		attrs = append(attrs,
-			slog.Int("prompt_tokens", usage.PromptTokens),
-			slog.Int("completion_tokens", usage.CompletionTokens),
-			slog.Float64("cost_usd", usage.CostUSD),
-		)
-	}
-
-	if err != nil {
-		mc.logger.Error("LLM call failed", append(attrs, slog.String("error", err.Error()))...)
-	} else {
-		mc.logger.Info("LLM call", attrs...)
-	}
+		slog.Bool("error", err != nil),
+	)
 }
 
 // ---------------------------------------------------------------------------
 // Token Bucket Rate Limiter
 // ---------------------------------------------------------------------------
 
-// tokenBucket implements a simple token bucket algorithm for rate limiting.
-// It refills tokens at a steady rate within the given window.
 type tokenBucket struct {
 	mu         sync.Mutex
 	tokens     float64
@@ -280,17 +274,4 @@ func (tb *tokenBucket) Wait(ctx context.Context) error {
 			// Retry after wait
 		}
 	}
-}
-
-// Available returns the current number of available tokens (non-blocking).
-func (tb *tokenBucket) Available() float64 {
-	tb.mu.Lock()
-	defer tb.mu.Unlock()
-	now := time.Now()
-	elapsed := now.Sub(tb.lastRefill).Seconds()
-	tokens := tb.tokens + elapsed*tb.refillRate
-	if tokens > tb.maxTokens {
-		tokens = tb.maxTokens
-	}
-	return tokens
 }
