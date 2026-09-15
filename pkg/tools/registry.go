@@ -12,6 +12,13 @@ type ToolRegistry struct {
 	mu    sync.RWMutex
 }
 
+// NewToolRegistry creates a new tool registry.
+func NewToolRegistry() *ToolRegistry {
+	return &ToolRegistry{
+		tools: make(map[string]Tool),
+	}
+}
+
 var GlobalRegistry = &ToolRegistry{
 	tools: make(map[string]Tool),
 }
