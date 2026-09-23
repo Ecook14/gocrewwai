@@ -40,6 +40,14 @@ Seamlessly connect your agents to external tools and knowledge sources via the s
 ### 🤖 6. Agent-to-Agent (A2A) Protocols
 Enable true decentralized swarm intelligence. Agents can discover each other on the network, negotiate tasks, and collaborate autonomously using standardized communication protocols.
 
+### 🛡️ 7. Security-First Tooling
+- **Docker sandboxing**: Code execution runs in hardened containers (--network none, --cap-drop ALL, --read-only, --user 1000:1000, --pids-limit).
+- **SSRF protection**: URL-fetching tools validate schemes and block private/special IPs before connecting.
+- **Shell command whitelist**: Exact basename matching — empty AllowedCommands list denies all commands by default.
+- **Human review gates**: Dangerous tools (file writes, HTTP requests, database ops, code execution) require explicit approval before execution.
+- **API auth**: Constant-time token comparison (`crypto/subtle`) + 1MB request body limit to prevent memory exhaustion.
+- **HTTP timeouts**: All outbound HTTP clients have per-package timeout configs (dial, TLS, response header) — no bare `http.Get` or `http.DefaultClient`.
+
 ---
 
 ## 🚀 Quickstart (Elite Style)
@@ -58,6 +66,8 @@ package main
 
 import (
 	"context"
+	"log"
+
 	"github.com/Ecook14/gocrewwai/gocrew"
 )
 
@@ -68,7 +78,7 @@ func main() {
 	// 2. Define an Agent
 	researcher := gocrew.NewAgent(gocrew.AgentConfig{
 		Role:      "Researcher",
-		Goal:      "Find the latest trends in Go 1.23",
+		Goal:      "Find the latest trends in Go 1.25",
 		Backstory: "Expert in performance optimization.",
 		LLM:       llm,
 	})
@@ -99,14 +109,32 @@ func main() {
 	}
 
 	// If you configured OutputJSON on the task, extract it:
-	// summary := gocrew.GetOutput[SummaryResult](task)
+	// summary := gocrew.GetOutput[SummaryResult](result)
 }
 ```
 
-### 🖥️ Start the Dashboard Server
-To monitor your agents in real-time, launch the Web UI:
+### 🖥️ CLI Commands
+
 ```bash
-gocrew kickoff --ui --port=8080
+# Scaffold a new project
+gocrew create my-project
+
+# Run a project
+gocrew run
+
+# Execute the demo crew
+gocrew kickoff
+
+# Show version
+gocrew version
+```
+
+### 🖥️ Start the Dashboard Server
+
+> **Note**: The `--ui` flag opens the interactive dashboard. The dashboard communicates with the server via WebSocket.
+
+```bash
+gocrew kickoff --ui
 ```
 
 ---
@@ -122,6 +150,39 @@ Dive deep into the Gocrewwai ecosystem with our world-class documentation guides
 - **[💾 Persistence & HITL](docs/PERSISTENCE.md)**: Durable execution and human oversight.
 - **[🛡️ Self-Correction](docs/SELF_CORRECTION.md)**: Reflective reasoning and reliability.
 - **[📊 Observability](docs/features/telemetry.md)**: Native OTEL tracing and performance metrics.
+- **[🧰 MCP Hub](docs/features/mcp.md)**: Model Context Protocol integration.
+- **[🌐 A2A Protocols](docs/features/agent_delegation.md)**: Agent-to-agent communication.
+- **[🛡️ Security Architecture](docs/features/production.md)**: Sandboxing, TLS, access control.
+
+---
+
+## 🏗️ Architecture
+
+```
+gocrewwai/
+├── cmd/
+│   ├── gocrew/        # CLI entrypoint (gocrew create/run/kickoff)
+│   └── server/        # API server with mesh + dashboard support
+├── gocrew/            # Ergonomic SDK facade (gocrew.NewAgent, gocrew.NewCrew, etc.)
+├── pkg/
+│   ├── agents/        # Agent definitions and lifecycle
+│   ├── crew/          # Crew orchestration + checkpoint stores (SQLite/Redis)
+│   ├── llm/           # LLM clients (OpenAI, Ollama, etc.)
+│   ├── memory/        # Unified memory with vector search
+│   ├── tools/         # 60+ built-in tools (search, browser, DB, code interp)
+│   ├── api/           # Gin REST API + gRPC mesh server
+│   ├── flow/          # Multi-crew orchestration flows
+│   ├── knowledge/     # RAG knowledge sources
+│   ├── events/        # Event bus for cross-component communication
+│   ├── guardrails/    # Input/output validation guardrails
+│   └── core/          # Core types and interfaces
+├── internal/
+│   ├── cli/           # CLI command handlers
+│   ├── delegation/    # Agent-to-agent delegation tools
+│   └── guardrails/    # Guardrail implementations
+├── web/               # Embedded web UI assets
+└── docs/              # 40+ documentation files
+```
 
 ---
 
