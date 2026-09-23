@@ -5,7 +5,7 @@ Gocrewwai is built with production-grade observability from the ground up. Our f
 ---
 
 > [!IMPORTANT]
-> **Status: v1.0.0 (Stable).** Gocrewwai telemetry follows **W3C Trace Context** standards and supports automatic propagation across **A2A (Agent-to-Agent)** mesh networks.
+> **Status: v0.9.0 (Alpha → Beta).** Gocrewwai Telemetry follows **W3C Trace Context** standards and supports automatic propagation across **A2A (Agent-to-Agent)** mesh networks.
 
 ---
 

@@ -63,7 +63,7 @@ telemetry.GlobalBus.Publish(telemetry.Event{
 
 Because it uses isolated Go channels, this publishing has negligible impact on execution latency or frame rates.
 
-### The Dashboard WebSocket Bridge (`pkg/dashboard/dashboard.go`)
+### The Dashboard WebSocket Bridge (`web/embed.go` + `cmd/server/main.go`)
 When you launch the UI Dashboard (using `--ui` or `dashboard.Start`), the system initializes:
 1.  A lightweight Go HTTP handler for standard `html/css/js` delivery.
 2.  A WebSocket `/ws` upgrade handler.

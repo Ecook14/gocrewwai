@@ -11,7 +11,7 @@ Gocrew agents are stateful, goal-oriented entities designed for reliable orchest
 
 ## 🏗️ The Agent Config (Elite Style)
 
-In Gocrewwai v1.0, agents are constructed using the `AgentConfig` struct, providing a clean, declarative interface.
+In Gocrewwai v0.9, agents are constructed using the `AgentConfig` struct, providing a clean, declarative interface.
 
 ```go
 agent := gocrew.NewAgent(gocrew.AgentConfig{
@@ -71,7 +71,7 @@ Guardrails are strictly-typed rules that agent output MUST pass before being acc
 
 ## 🌐 Heterogeneous Swarms (`gocrew.CoreAgent`)
 
-In Gocrew v1.0, all orchestration logic utilizes the polymorphic `gocrew.CoreAgent` interface (aliased to `core.Agent`). This decouples the engine from the physical implementation of the agent.
+In Gocrew v0.9, all orchestration logic utilizes the polymorphic `gocrew.CoreAgent` interface (aliased to `core.Agent`). This decouples the engine from the physical implementation of the agent.
 
 Why does this matter?
 - **Local Agents**: Your standard `gocrew.Agent` runs queries in the same process.

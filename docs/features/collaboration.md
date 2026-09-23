@@ -5,7 +5,7 @@ Gocrewwai is built on the principle that multi-agent collaboration is superior t
 ---
 
 > [!IMPORTANT]
-> **Status: v1.0.0 (Stable).** Gocrewwai collaboration features include **Autonomous Delegation**, **Peer-Review Loops**, and **Shared Memory State**.
+> **Status: v0.9.0 (Alpha → Beta).** Gocrewwai Collaboration features include **Autonomous Delegation**, **Peer-Review Loops**, and **Shared Memory State**.
 
 ---
 
@@ -27,7 +27,7 @@ In **Hierarchical** mode, collaboration is managed by an automated "Manager Agen
 All agents in a crew share a common **Knowledge Base** (RAG) and can access the crew's **Shared Memory**. This ensures that even if two agents work on different tasks, they have a consistent understanding of the project's state.
 
 ### 4. Agent-to-Agent (A2A) Networking
-In Gocrewwai v1.0, agents can collaborate across the network using the A2A protocol.
+In Gocrewwai v0.9, agents can collaborate across the network using the A2A protocol.
 - **Discovery**: Agents can advertise their capabilities and find coworkers on the local network.
 - **Dynamic Tasking**: An agent can "reach out" to a remote agent to delegate a task, even if that agent is part of a different crew or running on a different server.
 - **Strict Auth**: All inter-agent communication is secured via Bearer tokens and mutual TLS option.

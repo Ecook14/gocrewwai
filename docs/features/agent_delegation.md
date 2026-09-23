@@ -5,13 +5,13 @@ In Gocrewwai, delegation is a core mechanic that allows a lead agent to distribu
 ---
 
 > [!IMPORTANT]
-> **Status: v1.0.0 (Stable).** Gocrewwai agents support **Recursive Delegation** with built-in loop protection and task synthesis.
+> **Status: v0.9.0 (Alpha → Beta).** Gocrewwai Agent Delegation supports **Recursive Delegation** with built-in loop protection and task synthesis.
 
 ---
 
 ## 🏗️ Enabling Delegation (Elite Style)
 
-In Gocrewwai v1.0, delegation is controlled by the `AllowDelegation` flag in your `AgentConfig`.
+In Gocrewwai v0.9, delegation is controlled by the `AllowDelegation` flag in your `AgentConfig`.
 
 ```go
 leader := gocrew.NewAgent(gocrew.AgentConfig{

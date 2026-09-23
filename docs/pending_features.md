@@ -1,6 +1,6 @@
 # Crew-GO Pending Features & Technical Debt ⚠️
 
-While Crew-GO is exceptionally feature-rich for an enterprise deployment, there are several modules, stubs, and incomplete features that require attention before a `v1.0.0` general availability release.
+While Crew-GO is exceptionally feature-rich for an enterprise deployment, there are several modules, stubs, and incomplete features that require attention before a `v0.9.0` general availability release.
 
 ## ~~1. LLM Client Stubs (Multi-modal & Audio)~~ ✅ COMPLETED
 

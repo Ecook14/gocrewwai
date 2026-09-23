@@ -23,7 +23,7 @@ High-performance, enterprise-grade agentic orchestration for the Go ecosystem. D
 
 ### Integration & Interoperability
 - **7 LLM providers** — OpenAI, Anthropic, Gemini, Groq, OpenRouter, Ollama, Failover
-- **40+ built-in tools** — spanning SaaS, databases, code execution, web, search
+- **57 built-in tools** — spanning SaaS, databases, code execution, web, search, and more
 - **MCP Protocol** — connect to any MCP-compatible tool server
 - **A2A Protocol** — agent-to-agent communication with discovery
 - **OpenTelemetry** — vendor-neutral observability, export to any OTEL backend
@@ -68,7 +68,7 @@ gocrew run --config crew.yaml
 1. **Never hardcode secrets** — use environment variables or secret managers
 2. **Enable guardrails** — at minimum, enable PII redaction and content filtering
 3. **Use HITL for mutations** — require human approval for tools that write to external systems
-4. **Sandbox untrusted code** — use the WASM sandbox for any code execution tool
+4. **Sandbox untrusted code** — use Docker or WASM sandboxing for any code execution tool
 5. **Monitor and audit** — enable OpenTelemetry and review logs regularly
 6. **Rotate credentials** — rotate API keys every 90 days
 7. **Limit tool access** — only give agents the tools they need for their specific task

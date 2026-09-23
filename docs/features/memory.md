@@ -23,7 +23,7 @@ This system stores processed insights and general knowledge in a persistent data
 A specialized system for tracking and recalling specific details about actors (users, agents, companies) across long periods.
 
 ### 4. Unified Memory (The Elite Tier)
-In Gocrewwai v1.0, we introduce **UnifiedMemory**, which orchestrates all three systems via a single `Remember/Recall/Forget` API. It automatically handles vector embedding, scoring, and context injection.
+In Gocrewwai v0.9, we introduce **UnifiedMemory**, which orchestrates all three systems via a single `Remember/Recall/Forget` API. It automatically handles vector embedding, scoring, and context injection.
 
 ---
 

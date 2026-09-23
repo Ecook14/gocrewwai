@@ -33,13 +33,11 @@ import (
 )
 
 func main() {
-	// 1. Setup API Key
-	apiKey := os.Getenv("OPENAI_API_KEY")
+	apiKey, _ := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
 		log.Fatal("Please set OPENAI_API_KEY environment variable")
 	}
 
-	// 2. Initialize LLM via SDK
 	model := gocrew.NewOpenAI(apiKey, "gpt-4o")
 
 	// 3. Define Agents

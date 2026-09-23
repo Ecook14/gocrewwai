@@ -5,7 +5,7 @@ Gocrewwai features advanced, multi-modal file handling capabilities. Agents can 
 ---
 
 > [!IMPORTANT]
-> **Status: v1.0.0 (Stable).** Gocrewwai agents support **Vision-based Processing** for images and PDF tables, with strictly-to-typed extraction logic.
+> **Status: v0.9.0 (Alpha → Beta).** Gocrewwai Files support **Vision-based Processing** for images and PDF tables, with strictly-typed extraction logic.
 
 ---
 

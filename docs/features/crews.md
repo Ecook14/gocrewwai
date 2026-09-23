@@ -5,13 +5,13 @@ A Crew is the core orchestration unit in Gocrewwai. It represents a collaborativ
 ---
 
 > [!IMPORTANT]
-> **Status: v1.0.0 (Stable).** Gocrewwai crews support **Sequential**, **Hierarchical**, and **Graph-based** orchestration with native **OpenTelemetry** tracing.
+> **Status: v0.9.0 (Alpha → Beta).** Gocrewwai Crews support **Sequential**, **Hierarchical**, and **Graph-based** orchestration with native **OpenTelemetry** tracing.
 
 ---
 
 ## 🏗️ The Crew Config (Elite Style)
 
-In Gocrewwai v1.0, crews are constructed using the `CrewConfig` struct, providing a clean, declarative interface.
+In Gocrewwai v0.9, crews are constructed using the `CrewConfig` struct, providing a clean, declarative interface.
 
 ```go
 myCrew := gocrew.NewCrew(gocrew.CrewConfig{
