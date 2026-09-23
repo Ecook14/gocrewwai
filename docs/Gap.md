@@ -17,35 +17,40 @@
 | | State Machine | ✅ | ❌ | ❌ | ✅ | ✅ |
 | | Reflective | ✅ | ❌ | ❌ | ❌ | ❌ |
 | | Dynamic re-planning | ✅ | ❌ | ❌ | ✅ | ❌ |
-| **Tool Ecosystem** | Built-in tools | **40+** | ~20 | **100+** | 20+ | **400+** |
+|| **Tool Ecosystem** | Built-in tools | **55** | ~20 | **100+** | 20+ | **400+** |
 | | Custom tool creation | ✅ | ✅ | ✅ | ✅ | ✅ |
 | | MCP bridge | ✅ | ❌ | ❌ | ❌ | ✅ |
 | | Tool caching | ✅ | ✅ | ✅ | ❌ | ❌ |
 | | Tool schema (args) | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Memory & RAG** | Short-term memory | ✅ | ✅ | ✅ | ✅ | ❌ |
-| | Long-term memory | ✅ | ✅ | ✅ | ✅ | ❌ |
-| | Entity memory | ✅ | ✅ | ❌ | ❌ | ❌ |
-| | Composite scoring | ✅ | ✅ | ❌ | ❌ | ❌ |
-| | Memory scopes | ✅ | ✅ | ❌ | ❌ | ❌ |
-| | Vector store backends | 6 | 2 | **20+** | 4 | ❌ |
-| | Document loaders | 7 | 6 | **100+** | 6 | 50+ |
-| **LLM Support** | OpenAI | ✅ | ✅ | ✅ | ✅ | ✅ |
+|| **Memory & RAG** | Short-term memory | ✅ | ✅ | ✅ | ✅ | ❌ |
+|| | Long-term memory | ✅ | ✅ | ✅ | ✅ | ❌ |
+|| | Entity memory | ✅ | ❌ | ❌ | ❌ | ❌ |
+|| | Composite scoring | ✅ | ✅ | ❌ | ❌ | ❌ |
+|| | Memory scopes | ✅ | ✅ | ❌ | ❌ | ❌ |
+|| | Vector store backends | 6 | 2 | **20+** | 4 | ❌ |
+|| | Document loaders | 8 | 6 | **100+** | 6 | 50+ |
+|| **LLM Support** | OpenAI | ✅ | ✅ | ✅ | ✅ | ✅ |
 || | Anthropic | ✅ | ✅ | ✅ | ✅ | ✅ |
 || | Gemini | ✅ | ✅ | ✅ | ✅ | ✅ |
 || | Groq | ✅ | ✅ | ✅ | ❌ | ✅ |
 || | Local/Ollama | ✅ | ✅ | ✅ | ❌ | ✅ |
+|| | OpenRouter | ✅ | ❌ | ❌ | ❌ | ❌ |
+|| | Failover client | ✅ | ❌ | ❌ | ❌ | ❌ |
 || | Streaming | ✅ | ✅ | ✅ | ✅ | ❌ |
 | **Developer Experience** | Single import SDK | ✅ | ✅ | ❌ | ❌ | N/A |
 | | YAML config | ✅ | ✅ | ❌ | ❌ | ✅ |
 | | CLI scaffolding | ✅ | ✅ | ✅ | ✅ | N/A |
 | | Type safety | **✅✅** | ❌ | ❌ | ❌ | ❌ |
 | | Compile-time errors | **✅✅** | ❌ | ❌ | ❌ | ❌ |
-| **Production** | Guardrails | ✅ | ✅ | ✅ | ❌ | ❌ |
-| | Checkpointing | ✅ | ❌ | ❌ | ✅ | ✅ |
-| | Rate limiting | ✅ | ✅ | ❌ | ❌ | ✅ |
-| | Human-in-the-loop | ✅ | ✅ | ❌ | ✅ | ✅ |
-| | Cloud deploy service | ❌ | ✅ | ✅ | ✅ | ✅ |
-| | Docker container | ✅ | ❌ | ❌ | ❌ | ✅ |
+|| **Production** | Guardrails | ✅ | ✅ | ✅ | ❌ | ❌ |
+|| | Checkpointing | ✅ | ❌ | ❌ | ✅ | ✅ |
+|| | Rate limiting | ✅ | ✅ | ❌ | ❌ | ✅ |
+|| | Human-in-the-loop | ✅ | ✅ | ❌ | ✅ | ✅ |
+|| | Cloud deploy service | ❌ | ✅ | ✅ | ✅ | ✅ |
+|| | Docker container | ✅ | ❌ | ❌ | ❌ | ✅ |
+|| | ADK adapter | ✅ | ❌ | ❌ | ❌ | ❌ |
+|| | A2A AgentCard | ✅ | ❌ | ❌ | ❌ | ❌ |
+|| | MCP bridge | ✅ | ❌ | ❌ | ❌ | ✅ |
 | **Observability** | Structured logging | ✅ | ✅ | ✅ | ✅ | ✅ |
 | | OpenTelemetry | ✅ | ❌ | ✅ | ✅ | ❌ |
 | | Dashboard/UI | ✅ | ❌ | ✅ | ✅ | ✅ |
@@ -56,28 +61,25 @@
 ## 🔴 Critical Gaps (We MUST Fix)
 
 ### 1. Tool Ecosystem Size
-> **LangChain: 100+ tools/integrations, n8n: 400+. We have ~30.**
+> **LangChain: 100+ tools/integrations, n8n: 400+. We have 48.**
 
-This is our **biggest weakness**. Missing tools:
-- **SaaS**: Notion, Airtable, HubSpot, Salesforce, Jira, Linear
-- **Cloud**: AWS (S3 ✅, Lambda ❌, SQS ❌), GCP, Azure
-- **Data**: BigQuery, Snowflake, Supabase
-- **Comms**: Twilio, SendGrid, Discord, Telegram
-- **Search**: Google Search, Bing, Tavily, Brave Search
-- **Code**: GitHub PR reviews, GitLab CI, Jupyter
+Gap narrowed from 40 → 48 tools. Most critical SaaS tools now implemented. Still missing:
+- **Cloud**: AWS Lambda, SQS, SNS, GCP, Azure Functions
+- **Data**: BigQuery, Snowflake, Elasticsearch (present), Airtable, Salesforce
+- **Comms**: Telegram, Teams, WhatsApp
+- **Code**: GitLab CI, Bitbucket PRs, HuggingFace
+- **Productivity**: Asana, Trello, Monday, ClickUp
 
-### 2. Local LLM Support (Ollama/vLLM)
-> **Every competitor supports Ollama. We don't.**
-
-Missing `OllamaClient` in `pkg/llm/` for local model inference. Critical for:
+### 2. Local LLM Support (Ollama/vLLM) — ✅ IMPLEMENTED
+`pkg/llm/ollama.go` provides full Ollama support: Generate, GenerateWithUsage, GenerateStructured, StreamGenerate, GenerateEmbedding.
+OpenRouter and Failover clients also implemented. Critical for:
 - Privacy-sensitive deployments
 - Cost reduction
 - Offline usage
 
-### 3. Document Loaders
-> **LangChain: 100+ loaders. We have 7.**
-
-Missing: Excel (.xlsx), PowerPoint, Google Docs, Notion export, Confluence, S3 objects, YouTube transcripts, email (IMAP).
+### 3. Document Loaders — 1 IMPLEMENTED, MORE NEEDED
+Existing: `pkg/tools/file_read.go` for plain text file reading. PDF library (`ledongthuc/pdf`) in go.mod but unused.
+Missing: PDF loader (library available), Excel (.xlsx), CSV, HTML, PowerPoint, Google Docs, Notion export, Confluence, S3 objects, YouTube transcripts, email (IMAP).
 
 ### 4. Cloud Deploy Service
 > **CrewAI has CrewAI+, LangChain has LangSmith, LangGraph has LangGraph Cloud.**

@@ -8,7 +8,21 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"time"
 )
+
+// HTTPClient is a shared HTTP client with timeouts for search tools.
+// Using a custom client instead of http.DefaultClient ensures:
+// - No unbounded hanging requests (30s timeout)
+// - Controlled connection pool (no resource exhaustion)
+var HTTPClient = &http.Client{
+	Timeout: 30 * time.Second,
+	Transport: &http.Transport{
+		MaxIdleConns:        10,
+		MaxIdleConnsPerHost: 2,
+		IdleConnTimeout:     90 * time.Second,
+	},
+}
 
 // SerperTool uses the Serper.dev API to perform web searches.
 type SerperTool struct {
@@ -48,7 +62,7 @@ func (t *SerperTool) Execute(ctx context.Context, input map[string]interface{}) 
 	req.Header.Set("X-API-KEY", t.APIKey)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := HTTPClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("search request failed: %w", err)
 	}
@@ -87,4 +101,5 @@ func (t *SerperTool) Execute(ctx context.Context, input map[string]interface{}) 
 	return output.String(), nil
 }
 
-func (t *SerperTool) RequiresReview() bool { return false }
+func (t *SerperTool) Name() string { return t.BaseTool.NameValue }
+func (t *SerperTool) Description() string { return t.BaseTool.DescriptionValue }

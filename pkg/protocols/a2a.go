@@ -19,6 +19,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -28,11 +29,38 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+// allowedOrigins is the list of origins permitted to open WebSocket connections
+// to the A2A server. Defaults to empty — deployers MUST set A2A_ALLOWED_ORIGINS
+// (comma-separated) or the server will reject all WebSocket connections.
+var allowedOrigins []string
+
+func init() {
+	if v := os.Getenv("A2A_ALLOWED_ORIGINS"); v != "" {
+		for _, o := range strings.Split(v, ",") {
+			if o = strings.TrimSpace(o); o != "" {
+				allowedOrigins = append(allowedOrigins, o)
+			}
+		}
+	}
+}
+
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
+	// Reject cross-origin WebSocket connections unless explicitly allowed.
+	// Production deployments MUST set CheckOrigin to validate against the
+	// expected frontend origins instead of returning true unconditionally.
 	CheckOrigin: func(r *http.Request) bool {
-		return true // In production, add origin validation
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			return false
+		}
+		for _, allowed := range allowedOrigins {
+			if strings.EqualFold(origin, allowed) {
+				return true
+			}
+		}
+		return false
 	},
 }
 

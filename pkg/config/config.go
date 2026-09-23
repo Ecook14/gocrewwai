@@ -148,6 +148,9 @@ var (
 )
 
 // Get returns the global configuration singleton.
+// It panics on first load if the config file cannot be read or parsed —
+// this is intentional: a running process with broken config is unsafe.
+// Use LoadConfigFile() for a non-panicking variant.
 func Get() *Config {
 	once.Do(func() {
 		instance = loadConfig()
@@ -155,23 +158,18 @@ func Get() *Config {
 	return instance
 }
 
-func loadConfig() *Config {
-	_ = godotenv.Load()
-
-	path := os.Getenv("CREW_CONFIG_PATH")
+// LoadConfigFile reads and parses a config file without panicking.
+// It returns an error if the file cannot be read or parsed, allowing
+// callers to handle configuration failures gracefully.
+func LoadConfigFile(path string) (*Config, error) {
 	if path == "" {
 		path = "config.json"
 	}
-
 	data, err := os.ReadFile(path)
 	if err != nil {
-		fmt.Printf("Warning: Failed to read config file at %s: %v\nUsing defaults.\n", path, err)
-		return &Config{}
+		return nil, fmt.Errorf("cannot read config file %s: %w", path, err)
 	}
-
-	// Expand environment variables
 	expanded := os.ExpandEnv(string(data))
-
 	cfg := &Config{
 		Tools:      make(map[string]interface{}),
 		Models:     make(map[string]ModelConfig),
@@ -179,10 +177,8 @@ func loadConfig() *Config {
 		Providers:  make(map[string]Provider),
 	}
 	if err := json.Unmarshal([]byte(expanded), cfg); err != nil {
-		fmt.Printf("Warning: Failed to parse config JSON: %v\n", err)
-		_ = json.Unmarshal(data, cfg)
+		return nil, fmt.Errorf("failed to parse config JSON in %s: %w", path, err)
 	}
-
 	// Double check API keys if expansion failed
 	for k, p := range cfg.Providers {
 		if p.APIKey == "" || p.APIKey == "${"+strings.ToUpper(k)+"_API_KEY}" {
@@ -193,25 +189,42 @@ func loadConfig() *Config {
 			}
 		}
 	}
-
-	// Parse durations
+	// Parse durations with safe defaults
 	if cfg.LLM.TimeoutStr != "" {
-		cfg.LLM.Timeout, _ = time.ParseDuration(cfg.LLM.TimeoutStr)
+		if d, err := time.ParseDuration(cfg.LLM.TimeoutStr); err == nil {
+			cfg.LLM.Timeout = d
+		} else {
+			cfg.LLM.Timeout = 30 * time.Second
+		}
 	}
 	if cfg.LLM.PricingTTLStr != "" {
-		cfg.LLM.PricingTTL, _ = time.ParseDuration(cfg.LLM.PricingTTLStr)
+		if d, err := time.ParseDuration(cfg.LLM.PricingTTLStr); err == nil {
+			cfg.LLM.PricingTTL = d
+		} else {
+			cfg.LLM.PricingTTL = 1 * time.Hour
+		}
 	}
 	if cfg.Memory.ChromaTimeoutStr != "" {
-		cfg.Memory.ChromaTimeout, _ = time.ParseDuration(cfg.Memory.ChromaTimeoutStr)
+		if d, err := time.ParseDuration(cfg.Memory.ChromaTimeoutStr); err == nil {
+			cfg.Memory.ChromaTimeout = d
+		} else {
+			cfg.Memory.ChromaTimeout = 10 * time.Second
+		}
 	}
 	if cfg.Persistence.Sessions.CheckpointIntervalStr != "" {
-		cfg.Persistence.Sessions.CheckpointInterval, _ = time.ParseDuration(cfg.Persistence.Sessions.CheckpointIntervalStr)
+		if d, err := time.ParseDuration(cfg.Persistence.Sessions.CheckpointIntervalStr); err == nil {
+			cfg.Persistence.Sessions.CheckpointInterval = d
+		} else {
+			cfg.Persistence.Sessions.CheckpointInterval = 30 * time.Second
+		}
 	}
 	if cfg.Persistence.Cache.Redis.TTLStr != "" {
-		cfg.Persistence.Cache.Redis.TTL, _ = time.ParseDuration(cfg.Persistence.Cache.Redis.TTLStr)
+		if d, err := time.ParseDuration(cfg.Persistence.Cache.Redis.TTLStr); err == nil {
+			cfg.Persistence.Cache.Redis.TTL = d
+		} else {
+			cfg.Persistence.Cache.Redis.TTL = 24 * time.Hour
+		}
 	}
-
-	// Elite: Push pricing and budget data to llm package to avoid circular imports
 	llm.SetGlobalBudget(cfg.LLM.MaxBudgetUSD)
 	for name, model := range cfg.Models {
 		if model.PromptPrice > 0 || model.CompletionPrice > 0 {
@@ -221,8 +234,21 @@ func loadConfig() *Config {
 			})
 		}
 	}
+	return cfg, nil
+}
 
-	return cfg
+func loadConfig() *Config {
+	_ = godotenv.Load()
+	path := os.Getenv("CREW_CONFIG_PATH")
+	if path == "" {
+		path = "config.json"
+	}
+	var err error
+	instance, err = LoadConfigFile(path)
+	if err != nil {
+		panic(fmt.Sprintf("config: %v", err))
+	}
+	return instance
 }
 
 // GetToolParam returns a tool-specific configuration parameter.

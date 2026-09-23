@@ -58,7 +58,7 @@ func (t *ExaTool) Execute(ctx context.Context, input map[string]interface{}) (st
 	req.Header.Set("x-api-key", t.APIKey)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := HTTPClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("exa search request failed: %w", err)
 	}
@@ -99,4 +99,5 @@ func (t *ExaTool) Execute(ctx context.Context, input map[string]interface{}) (st
 	return output.String(), nil
 }
 
-func (t *ExaTool) RequiresReview() bool { return false }
+func (t *ExaTool) Name() string { return t.BaseTool.NameValue }
+func (t *ExaTool) Description() string { return t.BaseTool.DescriptionValue }

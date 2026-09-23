@@ -73,7 +73,8 @@ func (t *SearchWebTool) Execute(ctx context.Context, input map[string]interface{
 	return results, nil
 }
 
-func (t *SearchWebTool) RequiresReview() bool { return false }
+func (t *SearchWebTool) Name() string { return t.BaseTool.NameValue }
+func (t *SearchWebTool) Description() string { return t.BaseTool.DescriptionValue }
 
 // extractSearchResults does a simple extraction of result snippets from DuckDuckGo HTML.
 func extractSearchResults(html string, maxResults int) string {

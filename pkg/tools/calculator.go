@@ -41,6 +41,8 @@ func (t *CalculatorTool) Execute(ctx context.Context, input map[string]interface
 }
 
 func (t *CalculatorTool) RequiresReview() bool { return false }
+func (t *CalculatorTool) Name() string { return t.BaseTool.NameValue }
+func (t *CalculatorTool) Description() string { return t.BaseTool.DescriptionValue }
 
 // evaluateExpression is a simple helper for the advanced level demo.
 // In a real production tool, we'd use a full AST parser like go-lua or gopher-lua

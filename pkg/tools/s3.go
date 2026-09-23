@@ -201,4 +201,5 @@ func (t *S3Tool) headObject(ctx context.Context, bucket, key string) (string, er
 	return string(result), nil
 }
 
-func (t *S3Tool) RequiresReview() bool { return true }
+func (t *S3Tool) Name() string { return t.BaseTool.NameValue }
+func (t *S3Tool) Description() string { return t.BaseTool.DescriptionValue }

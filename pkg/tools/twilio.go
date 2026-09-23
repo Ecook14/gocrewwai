@@ -110,6 +110,6 @@ func (t *TwilioTool) sendWhatsApp(ctx context.Context, to, body string) (string,
 	return string(b), nil
 }
 
-func (t *TwilioTool) RequiresReview() bool { return false }
+func (t *TwilioTool) RequiresReview() bool { return true }
 func (t *TwilioTool) Name() string { return t.BaseTool.NameValue }
 func (t *TwilioTool) Description() string { return t.BaseTool.DescriptionValue }

@@ -6,13 +6,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
 
 // HTTPTool is a general-purpose HTTP/REST client for agents.
-// It allows agents to make arbitrary HTTP requests to external APIs.
+// It allows agents to make HTTP requests to external APIs with SSRF protection.
 //
 // Input examples:
 //
@@ -20,10 +22,11 @@ import (
 //	{"method": "POST", "url": "https://api.example.com/data", "body": {"key": "value"}, "headers": {"Authorization": "Bearer xxx"}}
 type HTTPTool struct {
 	BaseTool
-	BaseURL    string            // Optional base URL prefix
-	Headers    map[string]string // Default headers applied to all requests
-	Timeout    time.Duration
-	httpClient *http.Client
+	BaseURL          string            // Optional base URL prefix
+	Headers          map[string]string // Default headers applied to all requests
+	Timeout          time.Duration
+	ResponseMaxBytes int               // Maximum response body size (0 = use default 5MB)
+	httpClient       *http.Client
 }
 
 // NewHTTPTool creates a general-purpose HTTP client tool.
@@ -33,8 +36,9 @@ func NewHTTPTool(opts ...func(*HTTPTool)) *HTTPTool {
 			NameValue:        "HTTPTool",
 			DescriptionValue: "Make HTTP requests to REST APIs. Input: {'method': 'GET/POST/PUT/DELETE/PATCH', 'url': '...', 'body': {...}, 'headers': {...}, 'query': {...}}. Returns response body.",
 		},
-		Headers: make(map[string]string),
-		Timeout: 30 * time.Second,
+		Headers:          make(map[string]string),
+		Timeout:          30 * time.Second,
+		ResponseMaxBytes: 5 * 1024 * 1024,
 	}
 	for _, opt := range opts {
 		opt(t)
@@ -66,6 +70,13 @@ func WithHTTPTimeout(timeout time.Duration) func(*HTTPTool) {
 	}
 }
 
+// WithHTTPMaxBytes sets the maximum response body size.
+func WithHTTPMaxBytes(n int) func(*HTTPTool) {
+	return func(t *HTTPTool) {
+		t.ResponseMaxBytes = n
+	}
+}
+
 func (t *HTTPTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	method, _ := input["method"].(string)
 	url, _ := input["url"].(string)
@@ -79,6 +90,11 @@ func (t *HTTPTool) Execute(ctx context.Context, input map[string]interface{}) (s
 	// Prepend base URL if set
 	if t.BaseURL != "" && !strings.HasPrefix(url, "http") {
 		url = t.BaseURL + "/" + strings.TrimLeft(url, "/")
+	}
+
+	// Validate the URL against SSRF and egress restrictions.
+	if err := t.validateURL(url); err != nil {
+		return "", fmt.Errorf("http request blocked: %w", err)
 	}
 
 	// Build query parameters
@@ -127,13 +143,28 @@ func (t *HTTPTool) Execute(ctx context.Context, input map[string]interface{}) (s
 		req.Header.Set("Content-Type", "application/json")
 	}
 
+	// Resolve redirects manually to validate each hop against SSRF rules.
+	t.httpClient.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 10 {
+			return fmt.Errorf("too many redirects")
+		}
+		if err := t.validateURL(req.URL.String()); err != nil {
+			return fmt.Errorf("redirect blocked: %w", err)
+		}
+		return http.ErrUseLastResponse
+	}
+
 	resp, err := t.httpClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("http request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
-	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 5*1024*1024)) // 5MB limit
+	maxBytes := t.ResponseMaxBytes
+	if maxBytes <= 0 {
+		maxBytes = 5 * 1024 * 1024
+	}
+	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, int64(maxBytes)))
 
 	// Build structured response
 	result := map[string]interface{}{
@@ -151,4 +182,88 @@ func (t *HTTPTool) Execute(ctx context.Context, input map[string]interface{}) (s
 
 	output, _ := json.MarshalIndent(result, "", "  ")
 	return string(output), nil
+}
+
+func (t *HTTPTool) RequiresReview() bool { return true }
+func (t *HTTPTool) Name() string { return t.BaseTool.NameValue }
+func (t *HTTPTool) Description() string { return t.BaseTool.DescriptionValue }
+
+// validateURL checks the target URL against SSRF and egress restrictions.
+func (t *HTTPTool) validateURL(rawURL string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid url: %w", err)
+	}
+
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("only http and https schemes are allowed, got %s", u.Scheme)
+	}
+
+	host := u.Hostname()
+	if host == "" {
+		return fmt.Errorf("url has no host")
+	}
+
+	// Block well-known cloud metadata endpoints.
+	metadataHosts := []string{
+		"169.254.169.254",
+		"metadata.google.internal",
+		"metadata.google",
+		"metadata",
+		"100.100.100.200",
+	}
+	for _, mh := range metadataHosts {
+		if strings.EqualFold(host, mh) {
+			return fmt.Errorf("access to cloud metadata endpoint %s is blocked", host)
+		}
+	}
+
+	// Block the metadata path prefix regardless of host.
+	if strings.HasPrefix(u.Path, "/metadata") || strings.HasPrefix(u.Path, "/latest/meta-data") {
+		return fmt.Errorf("access to metadata paths is blocked")
+	}
+
+	// Resolve the host to IP addresses and validate each one.
+	addrs, err := net.LookupIP(host)
+	if err != nil {
+		return fmt.Errorf("failed to resolve host %s: %w", host, err)
+	}
+
+	if len(addrs) == 0 {
+		return fmt.Errorf("no IP addresses resolved for %s", host)
+	}
+
+	for _, addr := range addrs {
+		if addr == nil {
+			continue
+		}
+		if t.isBlockedIP(addr) {
+			return fmt.Errorf("target IP %s is in a blocked range", addr.String())
+		}
+	}
+
+	if t.ResponseMaxBytes > 0 && t.ResponseMaxBytes < 1024 {
+		return fmt.Errorf("response_max_bytes must be at least 1024, got %d", t.ResponseMaxBytes)
+	}
+
+	return nil
+}
+
+func (t *HTTPTool) isBlockedIP(ip net.IP) bool {
+	if ip.IsLoopback() {
+		return true
+	}
+	if ip.IsPrivate() {
+		return true
+	}
+	if ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+		return true
+	}
+	if ip.IsMulticast() {
+		return true
+	}
+	if ip.IsUnspecified() {
+		return true
+	}
+	return false
 }

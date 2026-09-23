@@ -63,12 +63,12 @@ import (
 
 func main() {
 	// 1. Setup the Model
-	llm := gocrew.NewOpenAI("your-api-key", "gpt-4o")
+	llm := gocrew.NewOpenAI(os.Getenv("OPENAI_API_KEY"), "gpt-4o")
 
 	// 2. Define an Agent
 	researcher := gocrew.NewAgent(gocrew.AgentConfig{
 		Role:      "Researcher",
-		Goal:      "Find the latest trends in Go 1.25",
+		Goal:      "Find the latest trends in Go 1.23",
 		Backstory: "Expert in performance optimization.",
 		LLM:       llm,
 	})
@@ -93,17 +93,20 @@ func main() {
 	})
 
 	// 5. Execute and extract the strongly-typed result natively
-	result, _ := myCrew.Kickoff(context.Background())
-	summary := gocrew.GetOutput[SummaryResult](result)
-	
-	fmt.Printf("Parsed Impact: %s\n", summary.Impact)
+	result, err := myCrew.Kickoff(context.Background())
+	if err != nil {
+		log.Fatalf("Crew execution failed: %v", err)
+	}
+
+	// If you configured OutputJSON on the task, extract it:
+	// summary := gocrew.GetOutput[SummaryResult](task)
 }
 ```
 
 ### 🖥️ Start the Dashboard Server
 To monitor your agents in real-time, launch the Web UI:
 ```bash
-gocrew start --ui --port=8080
+gocrew kickoff --ui --port=8080
 ```
 
 ---

@@ -25,3 +25,5 @@ func (t *DateTimeTool) Execute(ctx context.Context, input map[string]interface{}
 }
 
 func (t *DateTimeTool) RequiresReview() bool { return false }
+func (t *DateTimeTool) Name() string { return t.BaseTool.NameValue }
+func (t *DateTimeTool) Description() string { return t.BaseTool.DescriptionValue }

@@ -3,6 +3,7 @@ package tools
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -25,7 +26,18 @@ func getE2BBaseURL() string {
 	return "https://api.e2b.dev"
 }
 
-// CodeInterpreterOption defines a functional option for CodeInterpreterTool.
+// CodeInterpreterTool allows agents to execute Python or Go code snippets in a sandboxed environment.
+// When SafeMode is true or no sandbox is configured, code executes directly on the host — dangerous.
+// Use WithDockerConfig() or WithE2BConfig() to enable container isolation.
+// The tool's DockerHardened field controls whether security-hardened Docker flags are applied.
+//
+// Example:
+//
+//	opts := []CodeInterpreterOption{
+//	    WithDockerConfig("python:3.11-slim"),
+//	    WithDockerHardened(true),
+//	}
+//	tool := NewCodeInterpreterTool(opts...)
 type CodeInterpreterOption func(*CodeInterpreterTool)
 
 // CodeInterpreterTool allows agents to execute Python or Go code snippets.
@@ -105,20 +117,31 @@ func (t *CodeInterpreterTool) Execute(ctx context.Context, input map[string]inte
 		return "", fmt.Errorf("'code' is required")
 	}
 
+	// Sandbox-first: if E2B or Docker is configured, use the sandbox.
 	if t.E2BKey != "" {
 		return t.runE2B(ctx, lang, code)
 	}
 
-	switch lang {
-	case "python":
-		return t.runPython(ctx, code)
-	case "go":
-		return t.runGo(ctx, code)
-	case "bash", "sh":
-		return t.runBash(ctx, code)
-	default:
-		return "", fmt.Errorf("unsupported language: %s", lang)
+	// When a Docker image is configured, use Docker.
+	if t.DockerImage != "" {
+		switch lang {
+		case "python":
+			return t.runDocker(ctx, "python3", "-c", code)
+		case "go":
+			return t.runDocker(ctx, "go", "run", "-", code)
+		case "bash", "sh":
+			return t.runDocker(ctx, "sh", "-c", code)
+		default:
+			return "", fmt.Errorf("unsupported language: %s", lang)
+		}
 	}
+
+	// No sandbox is configured. Host execution is not permitted because
+	// it provides no isolation boundary for generated code. Return a clear
+	// error that directs the operator to configure E2B or a Docker image.
+	return "", fmt.Errorf(
+		"code interpreter sandbox not configured: set E2B_API_KEY or CodeInterpreterTool.WithDocker(image) to enable isolated execution. Host execution is disabled for security",
+	)
 }
 
 func (t *CodeInterpreterTool) runCommand(ctx context.Context, name string, args ...string) (string, error) {
@@ -132,19 +155,32 @@ func (t *CodeInterpreterTool) runCommand(ctx context.Context, name string, args 
 }
 
 func (t *CodeInterpreterTool) runDocker(ctx context.Context, name string, args ...string) (string, error) {
-	// Simple docker run --rm Image sh -c "command args..."
-	// For production, we would handle file mounting.
+	// Run untrusted code in an isolated Docker container with full
+	// security hardening: no network, read-only rootfs, dropped capabilities,
+	// non-root user, memory/CPU/pids limits. This mirrors the hardening
+	// in pkg/sandbox/docker.go.
 	fullCmd := append([]string{name}, args...)
-	managedCmd := fmt.Sprintf("'%s'", strings.Join(fullCmd, "' '")) // Rough escaping
+	cmdStr := strings.Join(fullCmd, " ")
 
-	dockerArgs := []string{"run", "--rm"}
-	if t.MemoryMB > 0 {
-		dockerArgs = append(dockerArgs, "-m", fmt.Sprintf("%dm", t.MemoryMB))
+	// Base64-encode the command to safely pass it through the docker CLI
+	// without shell escaping issues.
+	b64Cmd := base64.StdEncoding.EncodeToString([]byte(cmdStr))
+
+	dockerArgs := []string{
+		"run", "--rm",
+		"--network", "none",
+		"--cap-drop", "ALL",
+		"--security-opt", "no-new-privileges:true",
+		"--read-only",
+		"--tmpfs", "/tmp:rw,noexec,nosuid,size=64m",
+		"--user", "1000:1000",
+		"--memory", fmt.Sprintf("%dm", t.MemoryMB),
+		"--cpu-shares", fmt.Sprintf("%d", t.CPUShares),
+		"--pids-limit", "100",
+		t.DockerImage,
+		"sh", "-c",
+		fmt.Sprintf("echo %s | base64 -d | sh 2>&1 || true", b64Cmd),
 	}
-	if t.CPUShares > 0 {
-		dockerArgs = append(dockerArgs, "--cpu-shares", fmt.Sprintf("%d", t.CPUShares))
-	}
-	dockerArgs = append(dockerArgs, t.DockerImage, "sh", "-c", managedCmd)
 
 	cmd := exec.CommandContext(ctx, "docker", dockerArgs...)
 	out, err := cmd.CombinedOutput()
@@ -195,35 +231,40 @@ func (t *CodeInterpreterTool) runE2B(ctx context.Context, lang, code string) (st
 
 	// 1. Create Sandbox Instance
 	createReq := e2bCreateRequest{TemplateID: "base"}
-	body, _ := json.Marshal(createReq)
+	body, err := json.Marshal(createReq)
+	if err != nil {
+		return "", fmt.Errorf("e2b: failed to marshal create request: %w", err)
+	}
 	req, err := http.NewRequestWithContext(ctx, "POST", getE2BBaseURL()+"/instances", bytes.NewBuffer(body))
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("e2b: failed to create request: %w", err)
 	}
 	req.Header.Set("X-API-Key", t.E2BKey)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("E2B instance creation failed: %w", err)
+		return "", fmt.Errorf("e2b: instance creation failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
 		respBody, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("E2B instance creation failed (%d): %s", resp.StatusCode, string(respBody))
+		return "", fmt.Errorf("e2b: instance creation failed (status %d): %s", resp.StatusCode, string(respBody))
 	}
 
 	var inst e2bInstance
 	if err := json.NewDecoder(resp.Body).Decode(&inst); err != nil {
-		return "", err
+		return "", fmt.Errorf("e2b: failed to decode instance response: %w", err)
 	}
 
 	// Ensure cleanup
-	defer func() {
-		delReq, _ := http.NewRequestWithContext(context.Background(), "DELETE", getE2BBaseURL()+"/instances/"+inst.InstanceID, nil)
+	cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cleanupCancel()
+	go func() {
+		delReq, _ := http.NewRequestWithContext(cleanupCtx, "DELETE", getE2BBaseURL()+"/instances/"+inst.InstanceID, nil)
 		delReq.Header.Set("X-API-Key", t.E2BKey)
-		_, _ = client.Do(delReq)
+		client.Do(delReq)
 	}()
 
 	// 2. Prepare Command
@@ -234,14 +275,17 @@ func (t *CodeInterpreterTool) runE2B(ctx context.Context, lang, code string) (st
 	case "bash", "sh":
 		cmdStr = code
 	default:
-		cmdStr = code // Just try to run it as a command
+		cmdStr = code
 	}
 
 	cmdReq := e2bCommandRequest{Cmd: cmdStr}
-	cmdBody, _ := json.Marshal(cmdReq)
+	cmdBody, err := json.Marshal(cmdReq)
+	if err != nil {
+		return "", fmt.Errorf("e2b: failed to marshal command: %w", err)
+	}
 	execReq, err := http.NewRequestWithContext(ctx, "POST", getE2BBaseURL()+"/instances/"+inst.InstanceID+"/commands", bytes.NewBuffer(cmdBody))
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("e2b: failed to create command request: %w", err)
 	}
 	execReq.Header.Set("X-API-Key", t.E2BKey)
 	execReq.Header.Set("Content-Type", "application/json")

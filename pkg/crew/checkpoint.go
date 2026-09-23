@@ -1,16 +1,13 @@
 package crew
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 )
-
-// ---------------------------------------------------------------------------
-// State Management — Checkpointing, Versioning, Auto-Save
-// ---------------------------------------------------------------------------
 
 // CheckpointManager handles automatic state persistence for crew executions.
 type CheckpointManager struct {
@@ -30,6 +27,7 @@ type Checkpoint struct {
 	State       map[string]interface{} `json:"state"`        // Arbitrary state data
 	Status      string                 `json:"status"`       // "in_progress", "completed", "failed"
 	Error       string                 `json:"error,omitempty"`
+	CreatedAt   time.Time              `json:"created_at,omitempty"`
 }
 
 // NewCheckpointManager creates a checkpoint manager.
@@ -46,7 +44,7 @@ func NewCheckpointManager(baseDir string) *CheckpointManager {
 }
 
 // Save writes a checkpoint to disk.
-func (cm *CheckpointManager) Save(cp *Checkpoint) error {
+func (cm *CheckpointManager) Save(ctx context.Context, cp *Checkpoint) error {
 	cp.Timestamp = time.Now()
 	cp.Version++
 
@@ -69,19 +67,29 @@ func (cm *CheckpointManager) Save(cp *Checkpoint) error {
 	}
 
 	// Cleanup old checkpoints
-	cm.cleanup(cp.CrewID)
+	cm.cleanup(ctx, cp.CrewID)
 
 	return nil
 }
 
+// Close is a no-op for file-based checkpoints.
+func (cm *CheckpointManager) Close() error {
+	return nil
+}
+
+// Delete removes a specific checkpoint by timestamp.
+func (cm *CheckpointManager) Delete(ctx context.Context, crewID string, timestamp int64) error {
+	return os.Remove(filepath.Join(cm.BaseDir, fmt.Sprintf("checkpoint_%s_%d.json", crewID, timestamp)))
+}
+
 // LoadLatest reads the most recent checkpoint for a crew.
-func (cm *CheckpointManager) LoadLatest(crewID string) (*Checkpoint, error) {
+func (cm *CheckpointManager) LoadLatest(ctx context.Context, crewID string) (*Checkpoint, error) {
 	path := filepath.Join(cm.BaseDir, fmt.Sprintf("checkpoint_%s_latest.json", crewID))
 	return cm.loadFromFile(path)
 }
 
 // LoadByID reads a specific checkpoint.
-func (cm *CheckpointManager) LoadByID(crewID string, timestamp int64) (*Checkpoint, error) {
+func (cm *CheckpointManager) LoadByID(ctx context.Context, crewID string, timestamp int64) (*Checkpoint, error) {
 	pattern := filepath.Join(cm.BaseDir, fmt.Sprintf("checkpoint_%s_%d.json", crewID, timestamp))
 	return cm.loadFromFile(pattern)
 }
@@ -101,7 +109,7 @@ func (cm *CheckpointManager) loadFromFile(path string) (*Checkpoint, error) {
 }
 
 // ListCheckpoints returns all checkpoints for a crew, newest first.
-func (cm *CheckpointManager) ListCheckpoints(crewID string) ([]*Checkpoint, error) {
+func (cm *CheckpointManager) ListCheckpoints(ctx context.Context, crewID string) ([]*Checkpoint, error) {
 	pattern := filepath.Join(cm.BaseDir, fmt.Sprintf("checkpoint_%s_*.json", crewID))
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
@@ -123,8 +131,8 @@ func (cm *CheckpointManager) ListCheckpoints(crewID string) ([]*Checkpoint, erro
 	return checkpoints, nil
 }
 
-func (cm *CheckpointManager) cleanup(crewID string) {
-	checkpoints, err := cm.ListCheckpoints(crewID)
+func (cm *CheckpointManager) cleanup(ctx context.Context, crewID string) {
+	checkpoints, err := cm.ListCheckpoints(ctx, crewID)
 	if err != nil || len(checkpoints) <= cm.MaxCheckpoints {
 		return
 	}
@@ -147,5 +155,5 @@ func (cm *CheckpointManager) SaveOnFailure(crewID string, taskIndex int, results
 		Status:      "failed",
 		Error:       err.Error(),
 	}
-	cm.Save(cp)
+	cm.Save(context.Background(), cp)
 }

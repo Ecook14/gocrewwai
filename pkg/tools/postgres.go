@@ -47,6 +47,9 @@ func (t *PostgresTool) Execute(ctx context.Context, input map[string]interface{}
 	if !ok {
 		return "", fmt.Errorf("'query' must be a string")
 	}
+	if len(query) > 10000 {
+		return "", fmt.Errorf("query too long (max 10000 chars)")
+	}
 
 	queryLower := strings.ToLower(strings.TrimSpace(query))
 	if strings.HasPrefix(queryLower, "select") {
@@ -109,3 +112,6 @@ func (t *PostgresTool) executeExec(ctx context.Context, query string) (string, e
 }
 
 func (t *PostgresTool) RequiresReview() bool { return true } // SQL interaction should be reviewed
+func (t *PostgresTool) Name() string { return t.BaseTool.NameValue }
+func (t *PostgresTool) Description() string { return t.BaseTool.DescriptionValue }
+func (t *PostgresTool) Close() error { return t.db.Close() }

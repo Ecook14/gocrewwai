@@ -104,6 +104,6 @@ func (d *DiscordTool) editMessage(ctx context.Context, msgID, newMessage string)
 	return fmt.Sprintf("Message %s edited", msgID), nil
 }
 
-func (d *DiscordTool) RequiresReview() bool { return false }
+func (d *DiscordTool) RequiresReview() bool { return true }
 func (d *DiscordTool) Name() string { return d.BaseTool.NameValue }
 func (d *DiscordTool) Description() string { return d.BaseTool.DescriptionValue }

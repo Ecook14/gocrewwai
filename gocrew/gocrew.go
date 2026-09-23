@@ -15,7 +15,10 @@ package gocrew
 
 import (
 	"context"
+	"encoding/json"
+	"reflect"
 	"time"
+
 	"github.com/Ecook14/gocrewwai/pkg/agents"
 	"github.com/Ecook14/gocrewwai/pkg/crew"
 	"github.com/Ecook14/gocrewwai/pkg/core"
@@ -161,6 +164,39 @@ func NewCrew(cfg CrewConfig) *Crew {
 func Kickoff(ctx context.Context, cfg CrewConfig) (interface{}, error) {
 	c := crew.New(cfg)
 	return c.Kickoff(ctx)
+}
+
+// GetOutput securely translates the raw interface{} Output on a task
+// into a strongly typed pointer. Use this after a crew completes to
+// unpack structured JSON results.
+func GetOutput[T any](task *Task) *T {
+	if task == nil || task.Output == nil {
+		return nil
+	}
+	raw, ok := task.Output.([]byte)
+	if ok && raw != nil {
+		var t T
+		if jsonErr := json.Unmarshal(raw, &t); jsonErr == nil {
+			return &t
+		}
+	}
+	rawAny, ok := task.Output.(map[string]interface{})
+	if ok && rawAny != nil {
+		b, _ := json.Marshal(rawAny)
+		var t T
+		if jsonErr := json.Unmarshal(b, &t); jsonErr == nil {
+			return &t
+		}
+	}
+	// Fallback: try direct type assertion for simple types
+	var t T
+	val := reflect.ValueOf(&t).Elem()
+	src := reflect.ValueOf(task.Output)
+	if src.Type().ConvertibleTo(val.Type()) {
+		val.Set(src.Convert(val.Type()))
+		return &t
+	}
+	return nil
 }
 
 // ============================================================

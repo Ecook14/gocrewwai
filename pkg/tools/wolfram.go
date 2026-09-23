@@ -4,10 +4,27 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
+	"time"
 )
+
+// wolframHTTPClient is a shared client with timeouts for all outbound HTTP calls.
+// Using http.DefaultClient or bare http.Get/http.Head would have no connect,
+// TLS handshake, or read timeouts — an attacker who controls the URL could hang
+// the process indefinitely (DCR-03 / go-static-checks.md).
+var wolframHTTPClient = &http.Client{
+	Transport: &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		TLSHandshakeTimeout: 5 * time.Second,
+	},
+	Timeout: 30 * time.Second,
+}
 
 // WolframAlphaTool allows agents to perform complex calculations and queries.
 type WolframAlphaTool struct {
@@ -36,7 +53,7 @@ func (t *WolframAlphaTool) Execute(ctx context.Context, input map[string]interfa
 	}
 
 	apiURL := fmt.Sprintf("http://api.wolframalpha.com/v1/result?appid=%s&i=%s", t.AppID, url.QueryEscape(query))
-	resp, err := http.Get(apiURL)
+	resp, err := wolframHTTPClient.Get(apiURL)
 	if err != nil {
 		return "", err
 	}
@@ -46,4 +63,5 @@ func (t *WolframAlphaTool) Execute(ctx context.Context, input map[string]interfa
 	return string(body), nil
 }
 
-func (t *WolframAlphaTool) RequiresReview() bool { return false }
+func (t *WolframAlphaTool) Name() string { return t.BaseTool.NameValue }
+func (t *WolframAlphaTool) Description() string { return t.BaseTool.DescriptionValue }
