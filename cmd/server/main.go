@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 
 	"github.com/Ecook14/gocrewwai/pkg/api"
 	"github.com/Ecook14/gocrewwai/pkg/config"
@@ -88,7 +91,7 @@ func main() {
 
 	// 2. Setup Gin API Server (for Visual Builder and SSE)
 	server := api.NewServer()
-	
+
 	// 3. Resolve Ports (Flag > Env > Default)
 	apiPort := *apiPortFlag
 	if apiPort == "" {
@@ -109,26 +112,72 @@ func main() {
 	// 4. Setup gRPC Mesh Server
 	meshServer := api.NewMeshServer()
 
-	// 5. Launch Mesh Server in background
+	// 5. Coordinate background services with a WaitGroup and shutdown channel
+	var wg sync.WaitGroup
+	done := make(chan struct{})
+	closeOnce := sync.Once{}
+
+	// Track first failure so we can report it after shutdown
+	var mu sync.Mutex
+	var firstErr error
+
+	setError := func(err error) {
+		mu.Lock()
+		defer mu.Unlock()
+		if firstErr == nil {
+			firstErr = err
+		}
+	}
+
+	shutdown := func() {
+		closeOnce.Do(func() { close(done) })
+	}
+
+	// 5.1 Launch Mesh Server as a coordinated goroutine
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		fmt.Printf("🕸  Agent Mesh Server starting on port %s...\n", meshPort)
 		if err := meshServer.Start(meshPort); err != nil {
-			fmt.Printf("❌ Mesh Server failed: %v\n", err)
+			setError(err)
+			shutdown()
 		}
 	}()
 
-	// 5.1 Optionally Launch Visual Builder (Frontend)
+	// 5.2 Optionally Launch Visual Builder (Frontend)
 	if *webFlag {
 		fmt.Printf("🎨 Visual Builder enabled (Serving from embedded files)\n")
-		server.ServeStatic(web.GetFS())
+		if err := server.ServeStatic(web.GetFS()); err != nil {
+			log.Printf("⚠️  Visual Builder unavailable: %v", err)
+		}
 	}
 
-	// 6. Launch Gin API Server (Blocking)
-	fmt.Printf("🚀 Crew-GO API Engine starting on port %s...\n", apiPort)
-	fmt.Printf("📡 SSE Streaming enabled at /api/v1/stream/:id\n")
-	fmt.Println("---------------------------------------------------------")
-	
-	if err := server.Run(":" + apiPort); err != nil {
-		log.Fatalf("❌ API Server failed: %v", err)
+	// 5.3 Launch API Server as a coordinated goroutine
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		fmt.Printf("🚀 Crew-GO API Engine starting on port %s...\n", apiPort)
+		fmt.Printf("📡 SSE Streaming enabled at /api/v1/stream/:id\n")
+		fmt.Println("---------------------------------------------------------")
+		if err := server.Run(":" + apiPort); err != nil {
+			setError(err)
+			shutdown()
+		}
+	}()
+
+	// 6. Wait for interrupt signal for clean shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-quit
+		log.Println("Shutting down...")
+		server.Shutdown()
+		shutdown()
+	}()
+
+	wg.Wait()
+
+	if firstErr != nil {
+		log.Printf("❌ Background service failed: %v", firstErr)
 	}
 }

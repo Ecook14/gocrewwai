@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"strings"
+	"time"
 
 	"github.com/Ecook14/gocrewwai/gocrew"
 	"github.com/Ecook14/gocrewwai/pkg/core"
@@ -93,16 +95,33 @@ func handleRun(args []string) error {
 	}
 
 	slog.Info("🏃 Running local Crew-GO project...")
-	
+
 	// Prepare go run command
 	runArgs := []string{"run", "main.go"}
 	runArgs = append(runArgs, passArgs...)
-	
-	cmd := exec.Command("go", runArgs...)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "go", runArgs...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Env = os.Environ()
-	
+	// Do not leak the full environment (which may contain secrets like API keys)
+	// to child processes. Only pass PATH and essential Go toolchain vars.
+	var safeEnv []string
+	for _, e := range os.Environ() {
+		if strings.HasPrefix(e, "PATH=") ||
+		   strings.HasPrefix(e, "GOPATH=") ||
+		   strings.HasPrefix(e, "GOROOT=") ||
+		   strings.HasPrefix(e, "GOPROXY=") ||
+		   strings.HasPrefix(e, "GOSUMDB=") ||
+		   strings.HasPrefix(e, "GOFLAGS=") ||
+		   strings.HasPrefix(e, "GOMODCACHE=") {
+			safeEnv = append(safeEnv, e)
+		}
+	}
+	cmd.Env = safeEnv
+
 	return cmd.Run()
 }
 
@@ -177,11 +196,11 @@ func handleKickoff(showUI bool) error {
 
 	slog.Info("🚀 Kicking off the Crew-GO Demo...")
 
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	var model gocrew.LLMClient
-	if apiKey != "" {
+		apiKey := os.Getenv("OPENAI_API_KEY")
+		var model gocrew.LLMClient
+		if apiKey != "" {
 		model = gocrew.NewOpenAI(apiKey, "gpt-4o")
-	}
+		}
 
 	agent := gocrew.NewAgent(gocrew.AgentConfig{
 		Role:      "System Auditor",
