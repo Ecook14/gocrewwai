@@ -4,10 +4,27 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
+
+// arxivHTTPClient is a shared client with timeouts for all outbound HTTP calls.
+// Using http.DefaultClient or bare http.Get/http.Head would have no connect,
+// TLS handshake, or read timeouts — an attacker who controls the URL could hang
+// the process indefinitely (DCR-03 / go-static-checks.md).
+var arxivHTTPClient = &http.Client{
+	Transport: &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		TLSHandshakeTimeout: 5 * time.Second,
+	},
+	Timeout: 30 * time.Second,
+}
 
 // ArxivTool allows agents to search for academic papers.
 type ArxivTool struct {
@@ -31,7 +48,7 @@ func (t *ArxivTool) Execute(ctx context.Context, input map[string]interface{}) (
 	}
 
 	apiURL := fmt.Sprintf("http://export.arxiv.org/api/query?search_query=all:%s&start=0&max_results=3", url.QueryEscape(query))
-	resp, err := http.Get(apiURL)
+	resp, err := arxivHTTPClient.Get(apiURL)
 	if err != nil {
 		return "", err
 	}

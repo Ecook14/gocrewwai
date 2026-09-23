@@ -72,6 +72,6 @@ func (s *SendGridTool) Execute(ctx context.Context, input map[string]interface{}
 	return fmt.Sprintf("Email sent to %s: %s", to, subject), nil
 }
 
-func (s *SendGridTool) RequiresReview() bool { return false }
+func (s *SendGridTool) RequiresReview() bool { return true }
 func (s *SendGridTool) Name() string { return s.BaseTool.NameValue }
 func (s *SendGridTool) Description() string { return s.BaseTool.DescriptionValue }

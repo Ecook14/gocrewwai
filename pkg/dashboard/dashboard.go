@@ -24,7 +24,20 @@ import (
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		return true // Allow all origins for the dashboard
+		// Restrict to configured frontend origins. When
+		// DASHBOARD_ALLOWED_ORIGINS is set, only those origins
+		// are permitted. When unset, all origins are allowed
+		// for the dashboard dev server.
+		if v := os.Getenv("DASHBOARD_ALLOWED_ORIGINS"); v != "" {
+			origin := r.Header.Get("Origin")
+			for _, allowed := range strings.Split(v, ",") {
+				if strings.EqualFold(strings.TrimSpace(allowed), origin) {
+					return true
+				}
+			}
+			return false
+		}
+		return true
 	},
 }
 

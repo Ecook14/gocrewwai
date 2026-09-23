@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/Ecook14/gocrewwai/pkg/utils"
 )
@@ -43,11 +44,19 @@ func (t *FileWriteTool) Execute(ctx context.Context, input map[string]interface{
 		return "", fmt.Errorf("'content' must be a string")
 	}
 
-	// Security: Validate path against chroot
+	// Security: Validate path against chroot, then sanitize the cleaned result
+	// so that a Clean'd path that escapes the chroot (e.g. CWD outside root +
+	// "foo/../../../etc/passwd") is still rejected.
 	safePath, err := utils.ValidatePath(path, t.Chroot)
 	if err != nil {
 		return "", err
 	}
+	// Re-validate after Clean to catch any escape that Clean introduced.
+	sanitized, err := utils.FileWriteSanitize(filepath.Clean(safePath), t.Chroot)
+	if err != nil {
+		return "", err
+	}
+	safePath = sanitized
 
 	err = os.WriteFile(safePath, []byte(content), 0644)
 	if err != nil {
@@ -57,4 +66,8 @@ func (t *FileWriteTool) Execute(ctx context.Context, input map[string]interface{
 	return fmt.Sprintf("Successfully wrote to %s", path), nil
 }
 
-func (t *FileWriteTool) RequiresReview() bool { return false }
+func (t *FileWriteTool) RequiresReview() bool { return true }
+func (t *FileWriteTool) Name() string { return t.BaseTool.NameValue }
+func (t *FileWriteTool) Description() string {
+	return "Writes or overwrites the contents of a local file at the given path. DANGEROUS: this tool overwrites files on disk. Input: {'file_path': 'string', 'content': 'string'}. Path is validated against the chroot directory — files outside the chroot cannot be written."
+}

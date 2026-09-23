@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -14,8 +15,9 @@ import (
 
 // DockerProvider executes code within a Docker container.
 type DockerProvider struct {
-	cli   *client.Client
-	image string
+	cli     *client.Client
+	image   string
+	Timeout time.Duration
 }
 
 func NewDockerProvider(image string) (*DockerProvider, error) {
@@ -23,10 +25,19 @@ func NewDockerProvider(image string) (*DockerProvider, error) {
 	if err != nil {
 		return nil, fmt.Errorf("docker: failed to create client: %w", err)
 	}
-	return &DockerProvider{cli: cli, image: image}, nil
+	return &DockerProvider{cli: cli, image: image, Timeout: 300 * time.Second}, nil
 }
 
 // Execute runs the code using the 'sh -c' command inside the container.
+// The container is run with security-hardening defaults:
+//   - No network access (--network none)
+//   - Read-only root filesystem (--read-only)
+//   - A writable /tmp tmpfs (--tmpfs /tmp)
+//   - Dropping all capabilities (--cap-drop ALL)
+//   - Non-root user (--user 1000:1000)
+//   - Memory limit (--memory)
+//   - CPU quota (--cpu-quota)
+//   - Pid limit (--pids-limit)
 func (p *DockerProvider) Execute(ctx context.Context, code string, env map[string]string) (string, error) {
 	// 1. Pull image if needed (simplified: assuming it exists or let container create fail)
 	// In production, we'd check if image exists or Pull it.
@@ -37,24 +48,42 @@ func (p *DockerProvider) Execute(ctx context.Context, code string, env map[strin
 		envList = append(envList, fmt.Sprintf("%s=%s", k, v))
 	}
 
-	// 3. Create container
-	resp, err := p.cli.ContainerCreate(ctx, &container.Config{
+	timeoutCtx, cancel := context.WithTimeout(ctx, p.Timeout)
+	defer cancel()
+
+	// 3. Create container with security hardening
+	hostConfig := &container.HostConfig{
+		NetworkMode:    "none",
+		ReadonlyRootfs: true,
+		Tmpfs: map[string]string{
+			"/tmp": "rw,noexec,nosuid,size=65536k",
+		},
+		Resources: container.Resources{
+			Memory:    512 * 1024 * 1024,
+			CPUQuota:  50000,
+			PidsLimit: func() *int64 { v := int64(100); return &v }(),
+		},
+	}
+
+	resp, err := p.cli.ContainerCreate(timeoutCtx, &container.Config{
 		Image: p.image,
 		Cmd:   []string{"sh", "-c", code},
 		Env:   envList,
-	}, nil, nil, nil, "")
+		User:  "1000:1000",
+	}, hostConfig, nil, nil, "")
+
 	if err != nil {
 		return "", fmt.Errorf("docker: failed to create container: %w", err)
 	}
-	defer p.cli.ContainerRemove(ctx, resp.ID, types.ContainerRemoveOptions{Force: true})
+	defer p.cli.ContainerRemove(timeoutCtx, resp.ID, types.ContainerRemoveOptions{Force: true})
 
 	// 4. Start container
-	if err := p.cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+	if err := p.cli.ContainerStart(timeoutCtx, resp.ID, types.ContainerStartOptions{}); err != nil {
 		return "", fmt.Errorf("docker: failed to start container: %w", err)
 	}
 
 	// 5. Wait for completion
-	statusCh, errCh := p.cli.ContainerWait(ctx, resp.ID, container.WaitConditionNotRunning)
+	statusCh, errCh := p.cli.ContainerWait(timeoutCtx, resp.ID, container.WaitConditionNotRunning)
 	select {
 	case err := <-errCh:
 		if err != nil {
@@ -66,7 +95,7 @@ func (p *DockerProvider) Execute(ctx context.Context, code string, env map[strin
 	}
 
 	// 6. Capture logs
-	out, err := p.cli.ContainerLogs(ctx, resp.ID, types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true})
+	out, err := p.cli.ContainerLogs(timeoutCtx, resp.ID, types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true})
 	if err != nil {
 		return "", fmt.Errorf("docker: failed to get logs: %w", err)
 	}

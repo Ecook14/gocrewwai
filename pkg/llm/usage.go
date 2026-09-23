@@ -16,6 +16,16 @@ import (
 	"time"
 )
 
+// HTTPClient is a shared HTTP client with timeouts for price cache lookups.
+var HTTPClient = &http.Client{
+	Timeout: 30 * time.Second,
+	Transport: &http.Transport{
+		MaxIdleConns:        5,
+		MaxIdleConnsPerHost: 2,
+		IdleConnTimeout:     90 * time.Second,
+	},
+}
+
 // Usage captures the resource consumption of a single LLM API call.
 type Usage struct {
 	PromptTokens     int       `json:"prompt_tokens"`
@@ -254,7 +264,7 @@ func (pc *PriceCache) fetchPrices() error {
 		return fmt.Errorf("price fetch: failed to create request: %w", err)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := HTTPClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("price fetch: request failed: %w", err)
 	}

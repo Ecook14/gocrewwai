@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"sort"
 	"time"
 
 	"github.com/Ecook14/gocrewwai/pkg/core"
@@ -211,6 +212,10 @@ func GenerateToolCardsFromRegistry(registry *tools.ToolRegistry) []*ToolCard {
 			InputSchema: toolSchemaToMap(tool),
 		})
 	}
+	// Sort by name for deterministic output.
+	sort.Slice(cards, func(i, j int) bool {
+		return cards[i].Name < cards[j].Name
+	})
 	return cards
 }
 

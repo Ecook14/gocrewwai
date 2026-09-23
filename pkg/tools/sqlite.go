@@ -6,42 +6,40 @@ import (
 	"fmt"
 	"strings"
 
-	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/mattn/go-sqlite3"
 )
 
-// MySQLTool allows agents to interact with a MySQL/MariaDB database.
-type MySQLTool struct {
+// SQLiteTool allows agents to interact with a SQLite database.
+type SQLiteTool struct {
 	BaseTool
-	ConnectionString string
-	db               *sql.DB
+	DBPath string
+	db     *sql.DB
 }
 
-// NewMySQLTool creates a new MySQL tool with the given DSN.
-func NewMySQLTool(dsn string) (*MySQLTool, error) {
-	db, err := sql.Open("mysql", dsn)
+// NewSQLiteTool creates a new SQLite tool with the given database path.
+func NewSQLiteTool(dbPath string) (*SQLiteTool, error) {
+	if dbPath == "" {
+		dbPath = "gocrew.db"
+	}
+	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open mysql: %w", err)
+		return nil, fmt.Errorf("failed to open sqlite: %w", err)
 	}
 	if err := db.Ping(); err != nil {
-		return nil, fmt.Errorf("failed to ping mysql: %w", err)
+		return nil, fmt.Errorf("failed to ping sqlite: %w", err)
 	}
-	db.SetMaxOpenConns(10)
-	db.SetMaxIdleConns(5)
 
-	return &MySQLTool{
+	return &SQLiteTool{
 		BaseTool: BaseTool{
-			NameValue: "MySQLTool",
-			DescriptionValue: "Execute SQL queries against a MySQL/MariaDB database. " +
-				"Input: {'query': 'SQL statement'}. Supports SELECT, INSERT, UPDATE, DELETE. " +
-				"Returns formatted result rows or affected count.",
+			NameValue:        "SQLiteTool",
+			DescriptionValue: "Execute SQL queries against a SQLite database. Input: {'query': 'SQL statement'}. Supports SELECT, INSERT, UPDATE, DELETE. Returns formatted result rows or affected count.",
 		},
-		ConnectionString: dsn,
-		db:               db,
+		DBPath: dbPath,
+		db:     db,
 	}, nil
 }
 
-
-func (t *MySQLTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
+func (t *SQLiteTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	query, ok := input["query"].(string)
 	if !ok {
 		return "", fmt.Errorf("missing or invalid 'query' in input")
@@ -52,16 +50,18 @@ func (t *MySQLTool) Execute(ctx context.Context, input map[string]interface{}) (
 
 	queryLower := strings.ToLower(strings.TrimSpace(query))
 	if strings.HasPrefix(queryLower, "select") || strings.HasPrefix(queryLower, "show") ||
-		strings.HasPrefix(queryLower, "describe") || strings.HasPrefix(queryLower, "explain") {
+		strings.HasPrefix(queryLower, "pragma") {
 		return t.executeSelect(ctx, query)
 	}
 	return t.executeExec(ctx, query)
 }
 
-func (t *MySQLTool) executeSelect(ctx context.Context, query string) (string, error) {
+func (t *SQLiteTool) CacheFunction(input map[string]interface{}) string { return "" }
+
+func (t *SQLiteTool) executeSelect(ctx context.Context, query string) (string, error) {
 	rows, err := t.db.QueryContext(ctx, query)
 	if err != nil {
-		return "", fmt.Errorf("mysql query failed: %w", err)
+		return "", fmt.Errorf("sqlite query failed: %w", err)
 	}
 	defer rows.Close()
 
@@ -98,10 +98,10 @@ func (t *MySQLTool) executeSelect(ctx context.Context, query string) (string, er
 	return sb.String(), nil
 }
 
-func (t *MySQLTool) executeExec(ctx context.Context, query string) (string, error) {
+func (t *SQLiteTool) executeExec(ctx context.Context, query string) (string, error) {
 	res, err := t.db.ExecContext(ctx, query)
 	if err != nil {
-		return "", fmt.Errorf("mysql exec failed: %w", err)
+		return "", fmt.Errorf("sqlite exec failed: %w", err)
 	}
 	affected, _ := res.RowsAffected()
 	lastID, _ := res.LastInsertId()
@@ -111,7 +111,7 @@ func (t *MySQLTool) executeExec(ctx context.Context, query string) (string, erro
 	return fmt.Sprintf("Success. Rows affected: %d", affected), nil
 }
 
-func (t *MySQLTool) RequiresReview() bool { return true }
-func (t *MySQLTool) Name() string { return t.BaseTool.NameValue }
-func (t *MySQLTool) Description() string { return t.BaseTool.DescriptionValue }
-func (t *MySQLTool) Close() error { return t.db.Close() }
+func (t *SQLiteTool) RequiresReview() bool { return true }
+func (t *SQLiteTool) Name() string { return t.BaseTool.NameValue }
+func (t *SQLiteTool) Description() string { return t.BaseTool.DescriptionValue }
+func (t *SQLiteTool) Close() error { return t.db.Close() }

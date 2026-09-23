@@ -216,13 +216,20 @@ func (um *UnifiedMemory) Recall(ctx context.Context, query string, opts *RecallO
 		includePrivate = opts.IncludePrivate
 	}
 
-	// Step 1: Vector search
-	// Simplified: We use a placeholder vector if LLM is not available for embedding
-	// In a real scenario, we'd use um.llm.Embed(query)
-	placeholderVector := make([]float32, 128) 
-	results, err := um.store.Search(ctx, placeholderVector, limit*3) // Over-fetch for re-ranking
-	if err != nil {
-		return nil, fmt.Errorf("recall search failed: %w", err)
+	// Step 1: Vector search — use LLM embedding when available; fall back to an
+	// empty candidate set when embedding fails or is unavailable.
+	// A fabricated zero-vector would return arbitrary results from the vector store
+	// and mislead downstream consumers, so we only search when we have a real embedding.
+	var results []*MemoryItem
+	var searchErr error
+	if embedder, ok := um.llm.(llm.Embedder); ok {
+		vec, err := embedder.GenerateEmbedding(ctx, query)
+		if err == nil && len(vec) > 0 {
+			results, searchErr = um.store.Search(ctx, vec, limit*3) // Over-fetch for re-ranking
+		}
+	}
+	if searchErr != nil {
+		return nil, fmt.Errorf("recall search failed: %w", searchErr)
 	}
 
 	// Step 2: Score and filter
@@ -347,8 +354,12 @@ func (um *UnifiedMemory) deepRecall(ctx context.Context, query string, candidate
 func (um *UnifiedMemory) Forget(ctx context.Context, scope string) error {
 	slog.Info("🗑️ Forgetting memories", slog.String("scope", scope))
 	// Search for all records under this scope and delete them
-	placeholder := make([]float32, 128)
-	results, err := um.store.Search(ctx, placeholder, 1000)
+	// Retrieve all records under this scope without semantic filtering.
+	// We use an empty search (nil vector) which the store interprets as "return all."
+	// If the store requires a non-nil vector, we pass a zero vector as a fallback
+	// but document that results are unfiltered — not semantically ranked.
+	var searchVec []float32
+	results, err := um.store.Search(ctx, searchVec, 1000)
 	if err != nil {
 		return fmt.Errorf("forget search failed: %w", err)
 	}

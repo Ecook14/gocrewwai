@@ -155,7 +155,8 @@ func (t *ElasticsearchTool) Execute(ctx context.Context, input map[string]interf
 	}
 }
 
-func (t *ElasticsearchTool) RequiresReview() bool { return false }
+func (t *ElasticsearchTool) Name() string { return t.BaseTool.NameValue }
+func (t *ElasticsearchTool) Description() string { return t.BaseTool.DescriptionValue }
 
 func prettyJSON(data []byte) string {
 	var buf bytes.Buffer

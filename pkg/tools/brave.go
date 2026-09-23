@@ -54,7 +54,7 @@ func (b *BraveSearchTool) Execute(ctx context.Context, input map[string]interfac
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("X-Subscription-Token", b.APIKey)
 
-	resp, err := http.DefaultClient.Do(req.WithContext(ctx))
+	resp, err := HTTPClient.Do(req.WithContext(ctx))
 	if err != nil { return "", fmt.Errorf("Brave search failed: %w", err) }
 	defer resp.Body.Close()
 

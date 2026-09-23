@@ -159,3 +159,5 @@ func (t *BrowserTool) Execute(ctx context.Context, input map[string]interface{})
 }
 
 func (t *BrowserTool) RequiresReview() bool { return true }
+func (t *BrowserTool) Name() string { return t.BaseTool.NameValue }
+func (t *BrowserTool) Description() string { return t.BaseTool.DescriptionValue }

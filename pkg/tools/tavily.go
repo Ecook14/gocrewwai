@@ -4,10 +4,27 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
+
+// tavilyHTTPClient is a shared client with timeouts for all outbound HTTP calls.
+// Using http.DefaultClient or bare http.Get/http.Head would have no connect,
+// TLS handshake, or read timeouts — an attacker who controls the URL could hang
+// the process indefinitely (DCR-03 / go-static-checks.md).
+var tavilyHTTPClient = &http.Client{
+	Transport: &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   10 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		TLSHandshakeTimeout: 5 * time.Second,
+	},
+	Timeout: 30 * time.Second,
+}
 
 // TavilyTool provides AI-powered web search using Tavily API.
 type TavilyTool struct {
@@ -31,10 +48,10 @@ func NewTavilyTool(apiKey string) *TavilyTool {
 
 // tavilyResponse represents the Tavily search API response.
 type tavilyResponse struct {
-	Query     string              `json:"query"`
-	Results   []tavilyResult      `json:"results"`
-	TotalResults int             `json:"total_results"`
-	ExecutionTime float64         `json:"execution_time"`
+	Query         string        `json:"query"`
+	Results       []tavilyResult `json:"results"`
+	TotalResults  int           `json:"total_results"`
+	ExecutionTime float64       `json:"execution_time"`
 }
 
 type tavilyResult struct {
@@ -74,7 +91,7 @@ func (t *TavilyTool) Execute(ctx context.Context, input map[string]interface{}) 
 		url += "&include_domains=" + includeDomains
 	}
 
-	resp, err := http.Get(url)
+	resp, err := tavilyHTTPClient.Get(url)
 	if err != nil {
 		return "", fmt.Errorf("tavily search failed: %w", err)
 	}
@@ -106,11 +123,6 @@ func (t *TavilyTool) Execute(ctx context.Context, input map[string]interface{}) 
 	return sb.String(), nil
 }
 
-// RequiresReview returns false - search is safe.
-func (t *TavilyTool) RequiresReview() bool { return false }
-
-// Name returns the tool name.
+func (t *TavilyTool) RequiresReview() bool { return true }
 func (t *TavilyTool) Name() string { return t.BaseTool.NameValue }
-
-// Description returns the tool description.
 func (t *TavilyTool) Description() string { return t.BaseTool.DescriptionValue }

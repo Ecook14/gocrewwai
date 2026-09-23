@@ -10,6 +10,8 @@ import (
 	"time"
 )
 
+const notionAPIVersion = "2022-06-28"
+
 // NotionTool allows agents to interact with Notion.
 type NotionTool struct {
 	BaseTool
@@ -65,7 +67,7 @@ func (n *NotionTool) searchPages(ctx context.Context, query string) (string, err
 	req, _ := http.NewRequest("POST", "https://api.notion.com/v1/search", strings.NewReader(string(reqBody)))
 	req.Header.Set("Authorization", "Bearer "+n.token)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Notion-Version", "2022-06-28")
+	req.Header.Set("Notion-Version", notionAPIVersion)
 	resp, err := n.client.Do(req.WithContext(ctx))
 	if err != nil { return "", fmt.Errorf("Notion search failed: %w", err) }
 	defer resp.Body.Close()
@@ -79,7 +81,7 @@ func (n *NotionTool) readPage(ctx context.Context, pageID string) (string, error
 	url := fmt.Sprintf("https://api.notion.com/v1/blocks/%s", pageID)
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("Authorization", "Bearer "+n.token)
-	req.Header.Set("Notion-Version", "2022-06-28")
+	req.Header.Set("Notion-Version", notionAPIVersion)
 	resp, err := n.client.Do(req.WithContext(ctx))
 	if err != nil { return "", fmt.Errorf("Notion read failed: %w", err) }
 	defer resp.Body.Close()
@@ -116,7 +118,7 @@ func (n *NotionTool) createPage(ctx context.Context, title, content string) (str
 	req, _ := http.NewRequest("POST", "https://api.notion.com/v1/pages", strings.NewReader(string(reqBody)))
 	req.Header.Set("Authorization", "Bearer "+n.token)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Notion-Version", "2022-06-28")
+	req.Header.Set("Notion-Version", notionAPIVersion)
 	resp, err := n.client.Do(req.WithContext(ctx))
 	if err != nil { return "", fmt.Errorf("Notion create failed: %w", err) }
 	defer resp.Body.Close()
@@ -129,7 +131,7 @@ func (n *NotionTool) createPage(ctx context.Context, title, content string) (str
 func (n *NotionTool) listDatabases(ctx context.Context) (string, error) {
 	req, _ := http.NewRequest("GET", "https://api.notion.com/v1/databases", nil)
 	req.Header.Set("Authorization", "Bearer "+n.token)
-	req.Header.Set("Notion-Version", "2022-06-28")
+	req.Header.Set("Notion-Version", notionAPIVersion)
 	resp, err := n.client.Do(req.WithContext(ctx))
 	if err != nil { return "", fmt.Errorf("Notion list databases failed: %w", err) }
 	defer resp.Body.Close()
@@ -144,7 +146,7 @@ func (n *NotionTool) queryDatabase(ctx context.Context, dbID string) (string, er
 	req, _ := http.NewRequest("POST", url, nil)
 	req.Header.Set("Authorization", "Bearer "+n.token)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Notion-Version", "2022-06-28")
+	req.Header.Set("Notion-Version", notionAPIVersion)
 	resp, err := n.client.Do(req.WithContext(ctx))
 	if err != nil { return "", fmt.Errorf("Notion query database failed: %w", err) }
 	defer resp.Body.Close()

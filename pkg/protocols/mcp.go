@@ -204,7 +204,67 @@ func (t *StdioTransport) SetNotificationHandler(handler func(method string, para
 	t.onNotify = handler
 }
 
+// validateCommand checks that the command is an absolute path to an executable
+// in an allowed directory. This prevents MCP stdio transports from spawning
+// arbitrary binaries found via PATH lookup.
+func (t *StdioTransport) validateCommand() error {
+	if t.Command == "" {
+		return fmt.Errorf("mcp stdio transport: command is empty")
+	}
+
+	// Require absolute paths so that PATH-based resolution is not used.
+	if !strings.HasPrefix(t.Command, "/") {
+		return fmt.Errorf("mcp stdio transport: command must be an absolute path, got %s", t.Command)
+	}
+
+	// Verify the executable exists and is a regular file.
+	info, err := os.Stat(t.Command)
+	if err != nil {
+		return fmt.Errorf("mcp stdio transport: command not found or not accessible: %s: %w", t.Command, err)
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("mcp stdio transport: command is not a regular file: %s", t.Command)
+	}
+
+	// Verify the file has execute permission for the current user.
+	if info.Mode()&0111 == 0 {
+		return fmt.Errorf("mcp stdio transport: command is not executable: %s", t.Command)
+	}
+
+	// Verify the resolved path is under an allowed parent directory.
+	// By default, allow /usr/bin, /usr/local/bin, and /opt.
+	allowedPrefixes := []string{
+		"/usr/bin/",
+		"/usr/local/bin/",
+		"/opt/",
+	}
+	resolved, err := os.Readlink(t.Command)
+	if err != nil {
+		// If Readlink fails (not a symlink), use the command as-is.
+		resolved = t.Command
+	}
+	allowed := false
+	for _, prefix := range allowedPrefixes {
+		if strings.HasPrefix(resolved, prefix) {
+			allowed = true
+			break
+		}
+	}
+	if !allowed {
+		return fmt.Errorf("mcp stdio transport: command %s is not in an allowed directory", t.Command)
+	}
+
+	return nil
+}
+
 func (t *StdioTransport) Initialize(ctx context.Context) error {
+	// Validate the executable against the allowlist. When no allowlist is
+	// configured, the default system path (/usr/bin, /usr/local/bin) is used
+	// as a baseline so that arbitrary PATH lookups are not permitted.
+	if err := t.validateCommand(); err != nil {
+		return fmt.Errorf("mcp stdio transport blocked: %w", err)
+	}
+
 	t.cmd = exec.CommandContext(ctx, t.Command, t.Args...)
 	
 	// Better stderr handling: pipe to a logger instead of raw os.Stderr

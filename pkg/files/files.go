@@ -4,11 +4,28 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
+
+// defaultHTTPClient is used for all outbound HTTP calls in this package.
+// Using http.DefaultClient or bare http.Get/http.Head would have no connect,
+// TLS handshake, or read timeouts — an attacker who controls the source URL
+// could hang the process indefinitely (DCR-03 / go-static-checks.md).
+var defaultHTTPClient = &http.Client{
+	Transport: &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   10 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		TLSHandshakeTimeout: 5 * time.Second,
+	},
+	Timeout: 30 * time.Second,
+}
 
 // ============================================================
 // File Types
@@ -82,7 +99,7 @@ func (f *baseFile) MimeType() string      { return f.mimeType }
 
 func (f *baseFile) Data() ([]byte, error) {
 	if strings.HasPrefix(f.source, "http://") || strings.HasPrefix(f.source, "https://") {
-		resp, err := http.Get(f.source)
+		resp, err := defaultHTTPClient.Get(f.source)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch URL %s: %w", f.source, err)
 		}
@@ -102,7 +119,7 @@ func (f *baseFile) Base64() (string, error) {
 
 func (f *baseFile) SizeBytes() (int64, error) {
 	if strings.HasPrefix(f.source, "http://") || strings.HasPrefix(f.source, "https://") {
-		resp, err := http.Head(f.source)
+		resp, err := defaultHTTPClient.Head(f.source)
 		if err != nil {
 			return 0, err
 		}
