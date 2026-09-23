@@ -5,7 +5,7 @@ Gocrewwai is designed for mission-critical production environments. Unlike other
 ---
 
 > [!IMPORTANT]
-> **Status: v1.0.0 (Stable).** Gocrewwai production features include **Sandboxed Execution**, **Durable Persistence**, and **Strict Type Safety**.
+> **Status: v0.9.0 (Alpha → Beta).** Gocrewwai production features include **Sandboxed Execution**, **Durable Persistence**, and **Strict Type Safety**.
 
 ---
 
@@ -15,14 +15,11 @@ Gocrewwai is designed for mission-critical production environments. Unlike other
 Never run agentic code directly on your host machine. Gocrewwai provides native support for:
 - **Docker**: Run Python and Shell tools in ephemeral containers. You MUST configure hard resource limits in your Agent config to prevent memory leaks or crypto-mining attacks:
   ```go
-  sandbox := gocrew.NewDockerSandbox(gocrew.DockerConfig{
-      Image:   "python:3.11-slim",
-      Timeout: 30 * time.Second,
-      Memory:  "512m", 
-      CPUs:    "0.5",
-      Network: "none", // Prevent external exfiltration
-  })
+  tool := gocrew.NewCodeInterpreter(
+      gocrew.WithSafeMode(false), // use Docker sandbox when available
+  )
   ```
+  The Docker container runs with `--network none`, `--cap-drop ALL`, `--read-only`, `--user 1000:1000`, `--pids-limit 100`, and memory/CPU limits. Host execution is disabled by default when no sandbox is configured.
 - **WASM (wazero)**: Lightning-fast, zero-dependency sandboxing for Go-based tools natively inside the host process.
 - **E2B**: Offload execution to remote, secure cloud sandboxes via Firecracker microVMs.
 
@@ -43,7 +40,9 @@ Leverage Go's goroutines to run hundreds of agents in parallel. Gocrewwai's engi
 Integrate Gocrewwai with your production monitoring stack using **OpenTelemetry**. Trace every reasoning step and monitor token costs in real-time across your entire agentic cluster.
 
 ### 🏁 Single-Binary Deployment
-Compile your entire orchestrator, including your agents, tasks, and even the **Dashboard**, into a single 20MB static binary. Deploy to Kubernetes, AWS Lambda, or Edge devices with ease.
+Compile your entire orchestrator, including your agents, tasks,
+and even the **Dashboard**, into a single ~44MB stripped binary.
+Deploy to Kubernetes, AWS Lambda, or Edge devices with ease.
 
 ---
 
