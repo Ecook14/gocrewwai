@@ -5,7 +5,7 @@ Memory is the persistent state of your agents and crews. Gocrewwai includes an a
 ---
 
 > [!IMPORTANT]
-> **Status: v1.0.0 (Stable).** Gocrewwai memory systems support **Recency + Relevance** scoring and persistent vector storage via SQLite, Redis, and Chroma.
+> **Status: v0.9.0 (Alpha → Beta).** Gocrewwai memory systems support **Recency + Relevance** scoring and persistent vector storage via SQLite, Redis, and Chroma.
 
 ---
 
@@ -34,7 +34,11 @@ Using the `gocrew` SDK, you can initialize and assign vector stores to your agen
 ```go
 package main
 
-import "github.com/Ecook14/gocrewwai/gocrew"
+import (
+    "os"
+
+    "github.com/Ecook14/gocrewwai/gocrew"
+)
 
 func main() {
     // Option 1: SQLite (Local & Fast)
@@ -42,18 +46,19 @@ func main() {
     defer localStore.Close()
 
     // Option 2: Redis (Distributed & Fast)
-    redisStore, _ := gocrew.NewRedisStore(gocrew.RedisConfig{
-        Address:  "localhost:6379",
-        Password: "secure_password",
-        DB:       0,
-        Index:    "crew_memory_idx",
-    })
+    redisStore, _ := gocrew.NewRedisStore(
+        []string{"localhost:6379"}, // Addresses
+        "",                          // Password (empty if none; use env var in production)
+        0,                           // DB number
+        "crew_memory:",             // Key prefix
+    )
     defer redisStore.Close()
 
     // Option 3: Pinecone (Cloud Enterprise)
-    pineconeStore := gocrew.NewPineconeStore(
-        os.Getenv("PINECONE_API_KEY"), 
-        "https://my-index-xxxx.svc.pinecone.io",
+    pineconeStore, _ := gocrew.NewPineconeStore(
+        "https://my-index-xxxx.svc.pinecone.io", // Host
+        os.Getenv("PINECONE_API_KEY"),           // API Key
+        "my-namespace",                           // Namespace
     )
 
     // Assign Memory to Agent

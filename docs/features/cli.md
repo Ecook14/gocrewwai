@@ -20,49 +20,77 @@ go install github.com/Ecook14/gocrewwai/cmd/gocrew@latest
 ## 🚀 Key Commands
 
 ### 1. Project Scaffolding (`create`)
-Scaffold a complete, production-ready Gocrewwai project in seconds. This creates a standard folder structure with `agents/`, `tasks/`, and a `main.go` using the **Elite Style** configuration.
+Scaffold a complete, production-ready Gocrewwai project in seconds. This creates a standard folder structure with `src/`, `config/`, and `tools/` using the **Elite Style** configuration.
 
 ```bash
 gocrew create my-awesome-project
 ```
 
-### 2. Live Dashboard & Server (`server`)
-Launch the backend REST API and the real-time **Glassmorphic Dashboard** to watch your agents' thought processes and handle **Human-in-the-Loop** approvals. 
+### 2. Live Dashboard & Server
+Launch the backend REST API and the real-time **Glassmorphic Dashboard** to watch your agents' thought processes and handle **Human-in-the-Loop** approvals.
 
 ```bash
-# Start the backend server alongside the React UI
-go run cmd/server/main.go --port 8080 --ui-dir ./web/dist
+go run cmd/server/main.go --api-port 8080 --web
 ```
+
+The `--api-port` flag sets the REST API port (default: 8080 or `API_PORT` env). The `--web` flag enables the embedded Visual Builder from `web/src/`. The `--mesh-port` flag sets the gRPC Agent Mesh port (default: 50051 or `MESH_PORT` env).
 
 ### 3. Single-Binary Distribution
-Because Crew-GO is idiomatic Go, you can embed the entire React `web/dist` dashboard directly into the CLI runner using `go:embed`. This yields a highly portable, single ~20MB static binary deployable anywhere:
+Because Crew-GO is idiomatic Go, you can embed the entire React
+`web/src/` dashboard directly into the server binary using `go:embed`.
+This yields a highly portable, single ~44MB stripped binary
+deployable anywhere:
 
 ```bash
-CGO_ENABLED=0 go build -ldflags="-w -s" -o gocrew-agent cmd/gocrew/main.go
-./gocrew-agent run
+CGO_ENABLED=0 go build -ldflags="-w -s" -o gocrew-agent cmd/server/main.go
+./gocrew-agent --api-port 8080 --web
 ```
 
-### 3. Crew Replay (`replay`)
-If a crew execution fails or you need to reproduce a specific behavior, use the `replay` command. It uses the persistence layer to "rewind" the execution to a specific **ThreadID** or **TaskID**.
+### 4. Publisher Operations (`kickoff`)
+Run a crew with your project config. Gocrew merges the project config
+with environment variables and executes the crew in a dedicated process
+with full OpenTelemetry tracing.
 
 ```bash
-gocrew replay thread_abc123
+gocrew kickoff
 ```
 
----
+### 5. Runner Execution (`run`)
+Execute a specific mission file. This is the delegator's default workflow
+for running agent assignments with full tool access and CLI output.
 
+```bash
+# Run a mission file directly
+gocrew run ./mission.go
+
+# Run with an explicit API key (overrides config)
+gocrew run ./mission.go -k $OPENAI_API_KEY
+```
+
+### 6. Version Check (`version`)
+Print the current Gocrewwai CLI version and build information.
+
+```bash
+gocrew version
+```
+
+---\n\n
 ## 🛡️ Production Deployment (Headless Mode)
-
-For servers and CI/CD environments, Gocrewwai supports a **Headless Mode**. This allows you to run crews without the interactive TUI, while still providing full **OpenTelemetry** tracing and logging to your remote O11y collector.
+\n\n
+For servers and CI/CD environments, Gocrewwai supports a **Headless Mode**.
+This allows you to run crews without the interactive TUI, while still
+providing full **OpenTelemetry** tracing and logging to your remote O11y
+collector.
 
 ```bash
-gocrew run mission.go --headless
+gocrew run
 ```
 
 ## 📊 CLI Observability
+\n\n
+All CLI commands in Gocrewwai are automatically instrumented. You can
+monitor the performance of your `create`, `run`, `kickoff`, and `version`
+commands using the same **OTEL** standards used in the core engine.
 
-All CLI commands in Gocrewwai are automatically instrumented. You can monitor the performance of your `create`, `run`, and `replay` commands using the same **OTEL** standards used in the core engine.
-
----
-
+---\n\n
 [Back to Production Guide](./production.md) | [Next: Testing](./testing.md)

@@ -5,7 +5,7 @@ Tools are the interface between your agents and the outside world. Gocrewwai age
 ---
 
 > [!IMPORTANT]
-> **Status: v1.0.0 (Stable).** Gocrewwai includes 24+ high-performance, built-in tools with native support for **Sandboxed Code Execution** and **Browser Automation**.
+> **Status: v0.9.0 (Alpha → Beta).** Gocrewwai includes 57 built-in tools with native support for **Docker Sandbox**, **WASM (wazero)**, and **E2B** sandboxing for code execution, plus **Browser Automation** and **MCP** integration.
 
 ---
 
@@ -15,16 +15,61 @@ Gocrewwai includes a rich set of production-ready tools available directly via t
 
 | Tool | SDK Constructor | Description |
 | :--- | :--- | :--- |
-| **SearchWeb** | `gocrew.NewSearchWebTool` | Generic web search (Serper, Google, etc.). |
-| **Exa Search** | `gocrew.NewExaTool` | Vector-indexed neural search for high-quality results. |
-| **Browser** | `gocrew.NewBrowserTool` | Automated web navigation and scraping (multi-modal). |
-| **Calculator** | `gocrew.NewCalculatorTool` | Precise mathematical operations. |
-| **Code Interpreter** | `gocrew.NewCodeInterpreter` | Safe, sandboxed Python and Shell execution. |
-| **File Systems** | `gocrew.NewFileReadTool` | Chrooted file reading, writing, and editing. |
-| **Arxiv** | `gocrew.NewArxivTool` | Search academic papers on Arxiv. |
-| **Wikipedia** | `gocrew.NewWikipediaTool` | Extract information from Wikipedia. |
-| **Shell** | `gocrew.NewShellTool` | Execute local or remote shell commands. |
-| **AskHuman** | `gocrew.NewAskHumanTool` | Explicitly prompt for human input mid-task. |
+|| **SearchWeb** | `gocrew.NewSearchWebTool` | Generic web search (Serper, Google, etc.). |
+|| **Exa Search** | `gocrew.NewExaTool` | Vector-indexed neural search for high-quality results. |
+|| **Tavily** | `gocrew.NewTavilyTool` | AI-oriented web search with extractive answers. |
+|| **Brave** | `gocrew.NewBraveTool` | Brave Search API integration. |
+|| **Wikipedia** | `gocrew.NewWikipediaTool` | Extract information from Wikipedia. |
+|| **Arxiv** | `gocrew.NewArxivTool` | Search academic papers on Arxiv. |
+|| **Browser** | `gocrew.NewBrowserTool` | Automated web navigation and scraping. |
+|| **Scraper** | `gocrew.NewScraperTool` | SSRF-protected URL content fetching. |
+|| **ScrapeWebsite** | `gocrew.NewScrapeWebsiteTool` | Structured website scraping with SSRF protection. |
+|| **Calculator** | `gocrew.NewCalculatorTool` | Precise mathematical operations. |
+|| **Code Interpreter** | `gocrew.NewCodeInterpreter(opts...)` | Sandboxed Python/Shell/Go via Docker, WASM (wazero), or E2B. |
+|| **Code Sandbox** | `gocrew.NewCodeSandboxTool()` | Isolated Docker container for Python/JS code execution. |
+|| **File Read** | `gocrew.NewFileReadTool()` | Read files with extension-based auto-detection. |
+|| **File Write** | `gocrew.NewFileWriteTool()` | Write content to files (requires review). |
+|| **File Edit** | `gocrew.NewFileEditTool()` | Edit files with old/new string replacement. |
+|| **Directory** | `gocrew.NewDirectoryTool()` | List directory contents. |
+|| **CSV** | `gocrew.NewCSVTool()` | Read and parse CSV files. |
+|| **HTML** | `gocrew.NewHTMLTool()` | Read and parse HTML files. |
+|| **XML** | `gocrew.NewXMLTool()` | Read and parse XML files. |
+|| **YAML** | `gocrew.NewYamlTool()` | Read and parse YAML files. |
+|| **JSON Parse** | `gocrew.NewJSONParseTool()` | Parse and query JSON data. |
+|| **PDF** | `gocrew.NewPDFFile(source)` | Extract text from PDF documents. |
+|| **Excel** | `gocrew.NewExcelTool()` | Read .xlsx files. |
+|| **HTTP Client** | `gocrew.NewHTTPClientTool()` | Make HTTP requests with SSRF protection (requires review). |
+|| **Shell** | `gocrew.NewShellTool()` | Execute shell commands with exact-match whitelist (default: deny all). |
+|| **AskHuman** | `gocrew.NewAskHumanTool()` | Explicitly prompt for human input mid-task. |
+|| **Human Review** | `gocrew.NewHumanReviewGuardrail()` | Guardrail that pauses for manual approval. |
+|| **AskQuestion** | `gocrew.NewAskQuestionTool()` | Ask a coworker agent a question (delegation). |
+|| **DelegateWork** | `gocrew.NewDelegateWorkTool()` | Delegate a task to a coworker agent. |
+|| **GitHub** | `gocrew.NewGitHubTool()` | GitHub API integration. |
+|| **GitLab** | `gocrew.NewGitLabTool()` | GitLab API integration. |
+|| **Jira** | `gocrew.NewJiraTool()` | Jira API integration. |
+|| **Linear** | `gocrew.NewLinearTool()` | Linear API integration. |
+|| **Slack** | `gocrew.NewSlackTool()` | Slack API integration. |
+|| **Discord** | `gocrew.NewDiscordTool()` | Discord API integration. |
+|| **SendGrid** | `gocrew.NewSendGridTool()` | Email sending via SendGrid. |
+|| **Notion** | `gocrew.NewNotionTool()` | Notion API integration. |
+|| **HubSpot** | `gocrew.NewHubSpotTool()` | HubSpot CRM integration. |
+|| **Supabase** | `gocrew.NewSupabaseTool()` | Supabase database integration. |
+|| **MongoDB** | `gocrew.NewMongoDBTool()` | MongoDB database integration. |
+|| **MySQL** | `gocrew.NewMySQLTool()` | MySQL database integration (requires review). |
+|| **PostgreSQL** | `gocrew.NewPostgresTool()` | PostgreSQL database integration (requires review). |
+|| **SQLite** | `gocrew.NewSQLiteTool()` | SQLite database integration (requires review). |
+|| **Elasticsearch** | `gocrew.NewElasticsearchTool()` | Elasticsearch integration. |
+|| **Google Sheets** | `gocrew.NewGoogleSheetsTool()` | Google Sheets API integration. |
+|| **Twilio** | `gocrew.NewTwilioTool()` | SMS/voice via Twilio. |
+|| **S3** | `gocrew.NewS3Tool()` | AWS S3 object storage. |
+|| **WASM Sandbox** | `gocrew.NewWASMSandboxTool()` | WebAssembly-based code sandbox (wazero). |
+|| **MCP Bridge** | `gocrew.NewMCPTool()` | Model Context Protocol server bridge. |
+|| **WebMCP** | — | Web-based MCP protocol support. |
+|| **RagTool** | `gocrew.NewRagTool()` | Retrieval-augmented generation tool. |
+|| **DateTime** | `gocrew.NewDateTimeTool()` | Date/time utilities. |
+|| **Developer** | `gocrew.NewDeveloperTool()` | Developer utilities. |
+|| **Regex** | `gocrew.NewRegexTool()` | Regular expression operations. |
+|| **JSON Tool** | `gocrew.NewJSONTool()` | JSON manipulation utilities. |
 
 ## 🚀 Using a Tool
 
