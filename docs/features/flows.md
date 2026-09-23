@@ -5,13 +5,13 @@ Flows in Gocrewwai represent the highest level of orchestration. They allow you 
 ---
 
 > [!IMPORTANT]
-> **Status: v1.0.0 (Stable).** Gocrewwai Flows 2.0 utilize Go Generics for **Typed State** management and support **Durable Checkpointing** to SQLite or Redis.
+> **Status: v0.9.0 (Alpha → Beta).** Gocrewwai Flows 2.0 utilize Go Generics for **Typed State** management and support **Durable Checkpointing** to SQLite or Redis.
 
 ---
 
 ## 🏗️ The Typed Flow (Elite Style)
 
-In Gocrewwai v1.0, flows are built using a revolutionary, typed approach that ensures the source of truth for your data is always consistent.
+In Gocrewwai v0.9, flows are built using a revolutionary, typed approach that ensures the source of truth for your data is always consistent.
 
 ```go
 package main

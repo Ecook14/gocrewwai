@@ -5,7 +5,7 @@ Reliability is the greatest challenge in agentic AI. Gocrewwai addresses this wi
 ---
 
 > [!IMPORTANT]
-> **Status: v1.0.0 (Stable).** Gocrewwai testing supports **Multi-run Evaluation**, **Task Scoring**, and **Regreession Tracing** via OpenTelemetry.
+> **Status: v0.9.0 (Alpha → Beta).** Gocrewwai Testing supports **Multi-run Evaluation**, **Task Scoring**, and **Regression Tracing** via OpenTelemetry.
 
 ---
 

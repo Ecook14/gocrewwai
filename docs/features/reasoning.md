@@ -5,7 +5,7 @@ Gocrewwai agents are not just linear task executors; they are sophisticated reas
 ---
 
 > [!IMPORTANT]
-> **Status: v1.0.0 (Stable).** Gocrewwai reasoning utilizes **Recursive Self-Critique** and **Consensus-based Reflection** to ensure 100% adherence to mission goals.
+> **Status: v0.9.0 (Alpha → Beta).** Gocrewwai Reasoning mode utilizes **Recursive Self-Critique** and **Consensus-based Reflection** to improve agent output reliability.
 
 ---
 

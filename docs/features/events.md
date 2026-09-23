@@ -5,7 +5,7 @@ Gocrewwai features a high-performance, asynchronous event system that allows you
 ---
 
 > [!IMPORTANT]
-> **Status: v1.0.0 (Stable).** Gocrewwai events support **Real-time Callbacks**, **WebSocket Streams**, and **OpenTelemetry** audit logs.
+> **Status: v0.9.0 (Alpha → Beta).** Gocrewwai events support **Real-time Callbacks**, **Streaming**, and **OpenTelemetry** audit logs.
 
 ---
 

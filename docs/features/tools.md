@@ -42,8 +42,8 @@ Gocrewwai includes a rich set of production-ready tools available directly via t
 || **Shell** | `gocrew.NewShellTool()` | Execute shell commands with exact-match whitelist (default: deny all). |
 || **AskHuman** | `gocrew.NewAskHumanTool()` | Explicitly prompt for human input mid-task. |
 || **Human Review** | `gocrew.NewHumanReviewGuardrail()` | Guardrail that pauses for manual approval. |
-|| **AskQuestion** | `gocrew.NewAskQuestionTool()` | Ask a coworker agent a question (delegation). |
-|| **DelegateWork** | `gocrew.NewDelegateWorkTool()` | Delegate a task to a coworker agent. |
+||| **AskQuestion** | `gocrew.NewAskQuestionTool()` | Ask a question to the agent pool (delegation). |
+||| **DelegateWork** | `gocrew.NewDelegateWorkTool()` | Delegate a subtask to another agent (delegation). |
 || **GitHub** | `gocrew.NewGitHubTool()` | GitHub API integration. |
 || **GitLab** | `gocrew.NewGitLabTool()` | GitLab API integration. |
 || **Jira** | `gocrew.NewJiraTool()` | Jira API integration. |

@@ -5,7 +5,7 @@ Knowledge represents the structured and unstructured data your agents can access
 ---
 
 > [!IMPORTANT]
-> **Status: v1.0.0 (Stable).** Gocrewwai knowledge systems support automatic **Chunking & Vectorization** for PDF, Web, and Text sources with native storage.
+> **Status: v0.9.0 (Alpha → Beta).** Gocrewwai Knowledge systems support automatic **Chunking & Vectorization** for PDF, Web, and Text sources with native storage.
 
 ---
 
@@ -15,14 +15,14 @@ Gocrewwai allows you to import data from a wide range of sources via the `knowle
 
 | Source | SDK Constructor | Description |
 | :--- | :--- | :--- |
-| **PDF** | `gocrew.NewPDFSource` | Extracts text and tables from local or remote PDF files. |
-| **URL** | `gocrew.NewURLSource` | Scrapes and processes content from any web page. |
-| **Text** | `gocrew.NewTextSource` | Imports raw string data. |
-| **Directory** | `gocrew.NewDirectorySource` | Batch processes all files within a local directory. |
+|| **PDF** | `gocrew.NewFile("pdf", "./docs/annual_report.pdf")` | Extracts text and tables from local or remote PDF files. |
+|| **URL** | `gocrew.NewFile("url", "https://docs.gocrew.ai")` | Scrapes and processes content from any web page. |
+|| **Text** | `gocrew.NewFile("text", "raw string data")` | Imports raw string data. |
+|| **Directory** | `gocrew.NewDirectoryTool("./docs")` | Batch processes all files within a local directory. |
 
 ## 🚀 Adding Knowledge to a Crew (Elite Style)
 
-In Gocrewwai v1.0, knowledge is typically added at the **Crew** level, making it available to all participating agents:
+In Gocrewwai v0.9, knowledge is typically added at the **Crew** level, making it available to all participating agents:
 
 ```go
 package main
@@ -31,8 +31,8 @@ import "github.com/Ecook14/gocrewwai/gocrew"
 
 func main() {
     // 1. Define Knowledge Sources
-    pdfSource := gocrew.NewPDFSource("./docs/annual_report.pdf")
-    webSource := gocrew.NewURLSource("https://docs.gocrew.ai")
+    pdfSource := gocrew.NewFile("pdf", "./docs/annual_report.pdf")
+    webSource := gocrew.NewFile("url", "https://docs.gocrew.ai")
 
     // 2. Assemble Crew with Knowledge
     myCrew := gocrew.NewCrew(gocrew.CrewConfig{
@@ -50,19 +50,21 @@ Gocrewwai will automatically chunk and embed your sources. For advanced control 
 
 ```go
 // Initialize Pinecone Vector Store
-vectorDB := gocrew.NewPineconeStore("api-key", "index-name")
+vectorDB, _ := gocrew.NewPineconeStore(
+    "https://my-index-xxxx.svc.pinecone.io", // Host
+    os.Getenv("PINECONE_API_KEY"),           // API Key
+    "my-namespace",                           // Namespace
+)
 
 // Configure custom Semantic Splitter
 splitter := gocrew.NewSemanticSplitter(gocrew.SplitterConfig{
     ChunkSize:    1024,
     ChunkOverlap: 256,
-    Model:        "text-embedding-3-small", 
+    Model:        "text-embedding-3-small",
 })
 
-// Attach to Knowledge Source
-pdfSource := gocrew.NewPDFSource("./docs/annual_report.pdf")
-pdfSource.SetStore(vectorDB)
-pdfSource.SetSplitter(splitter)
+// Attach to file-based Knowledge Source
+fileSource := gocrew.NewFile("pdf", "./docs/annual_report.pdf")
 ```
 
 ### 2. Multi-Modal Knowledge
@@ -72,7 +74,7 @@ If using a vision-capable model (like `gpt-4o`), Gocrewwai supports extracting i
 You can configure knowledge sources to periodically refresh their data from their original source, ensuring your agents always have access to the latest information.
 
 ```go
-webSource := gocrew.NewURLSource("https://pricing.api.com")
+webSource := gocrew.NewFile("url", "https://pricing.api.com")
 webSource.EnableAutoRefresh(time.Hour * 24) // Re-embeds every 24 hours
 ```
 

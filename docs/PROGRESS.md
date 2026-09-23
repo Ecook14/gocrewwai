@@ -66,7 +66,7 @@
 
 ### 📈 Roadmap Progress
 
-#### v0.9.0 → v1.0.0-beta Checklist
+#### v0.9.0 → v1.0.0-roadmap Checklist
 - [x] Ollama local LLM client
 - [x] 57 tool integrations
 - [x] GitHub Actions CI/CD

@@ -38,43 +38,43 @@ import (
 
 func main() {
 	// 1. Setup the Brain (LLM)
-	apiKey := os.Getenv("OPENAI_API_KEY")
+	apiKey, _ := os.Getenv("OPENAI_API_KEY")
 	model := gocrew.NewOpenAI(apiKey, "gpt-4o")
 
 	// 2. Build the Agents
-	researcher := gocrew.NewAgentBuilder().
-		Role("Technical Researcher").
-		Goal("Identify 3 key features of the latest Go 1.24 release.").
-		LLM(model).
-		Tools(gocrew.NewSearchWebTool()).
-		Verbose(true).
-		Build()
+	researcher := gocrew.NewAgent(gocrew.AgentConfig{
+		Role:            "Technical Researcher",
+		Goal:            "Identify 3 key features of the latest Go release.",
+		LLM:             model,
+		Tools:           []gocrew.Tool{gocrew.NewSearchWebTool()},
+		Verbose:         true,
+	})
 
-	writer := gocrew.NewAgentBuilder().
-		Role("Tech Content Creator").
-		Goal("Write a 3-paragraph blog post summarizing the research.").
-		LLM(model).
-		Build()
+	writer := gocrew.NewAgent(gocrew.AgentConfig{
+		Role:            "Tech Content Creator",
+		Goal:            "Write a 3-paragraph blog post summarizing the research.",
+		LLM:             model,
+		Verbose:         true,
+	})
 
 	// 3. Define the Mission
-	researchTask := gocrew.NewTaskBuilder().
-		Description("Search for Go 1.24 release notes and list 3 major changes.").
-		Agent(researcher).
-		Build()
+	researchTask := gocrew.NewTask(gocrew.TaskConfig{
+		Description: "Search for Go release notes and list 3 major changes.",
+		Agent:       researcher,
+	})
 
-	blogTask := gocrew.NewTaskBuilder().
-		Description("Write a blog post based on the research provided.").
-		Agent(writer).
-		Context(researchTask). // Writer waits for Researcher
-		Build()
+	blogTask := gocrew.NewTask(gocrew.TaskConfig{
+		Description: "Write a blog post based on the research provided.",
+		Agent:       writer,
+		Context:     []*gocrew.Task{researchTask},
+	})
 
 	// 4. Assemble and Kickoff
-	myCrew := gocrew.NewCrewBuilder().
-		Agents(researcher, writer).
-		Tasks(researchTask, blogTask).
-		Process(gocrew.Sequential).
-		Verbose(true).
-		Build()
+	myCrew := gocrew.NewCrew(gocrew.CrewConfig{
+		Agents:  []gocrew.CoreAgent{researcher, writer},
+		Tasks:   []*gocrew.Task{researchTask, blogTask},
+		Verbose: true,
+	})
 
 	result, err := myCrew.Kickoff(context.Background())
 	if err != nil {
@@ -102,11 +102,11 @@ Watch the terminal as your Researcher performs web searches and hands off the da
 
 ## 🖥️ 4. Using the Dashboard
 
-Want to watch your agents live in a stunning web interface? Gocrew has a built-in dashboard.
+Want to watch your agents live? Gocrew includes a web UI that runs alongside the server.
 
-1. Add the dashboard import: `"github.com/Ecook14/gocrewwai/pkg/dashboard"`
-2. Start the server before `Kickoff`:
-   ```go
+1. Start the server: `go run cmd/server/main.go --api-port 8080 --web`
+2. Open http://localhost:8080 in your browser
+3. The embedded UI shows real-time agent activity via OpenTelemetry events
    dashboard.Start("8080")
    ```
 3. Run your app and visit `http://localhost:8080/web-ui`.
@@ -117,4 +117,4 @@ Want to watch your agents live in a stunning web interface? Gocrew has a built-i
 
 - **[Usage Guide](../USAGE.md)**: Explore advanced sandboxing (Docker/E2B) and configuration.
 - **[Memory Deep Dive](features/memory.md)**: Give your agents persistent long-term memory.
-- **[Tool Alignment](tools_alignment.md)**: See our full list of 24+ native tools.
+- **[Tool Alignment](features/tools.md)**: See our full list of 57 built-in tools.

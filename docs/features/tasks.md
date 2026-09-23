@@ -5,13 +5,13 @@ Tasks are the specific units of work that your agents must perform. In Gocrewwai
 ---
 
 > [!IMPORTANT]
-> **Status: v1.0.0 (Stable).** Gocrewwai tasks support advanced **Context Chaining** and **Strict JSON Output** validation out-of-the-box.
+> **Status: v0.9.0 (Alpha → Beta).** Gocrewwai Tasks support advanced **Context Chaining** and **Strict JSON Output** validation out-of-the-box.
 
 ---
 
 ## 🏗️ The Task Config (Elite Style)
 
-In Gocrewwai v1.0, tasks are constructed using the `TaskConfig` struct, providing a clean, declarative interface.
+In Gocrewwai v0.9, tasks are constructed using the `TaskConfig` struct, providing a clean, declarative interface.
 
 ```go
 summaryTask := gocrew.NewTask(gocrew.TaskConfig{

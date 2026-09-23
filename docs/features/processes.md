@@ -5,7 +5,7 @@ Processes in Gocrewwai define the "Rules of Engagement" for your crew. They dete
 ---
 
 > [!IMPORTANT]
-> **Status: v1.0.0 (Stable).** Gocrewwai supports **Sequential**, **Hierarchical**, and **Consensus-based** processes with native **Human-in-the-Loop** interrupts.
+> **Status: v0.9.0 (Alpha → Beta).** Gocrewwai Processes support **Sequential**, **Hierarchical**, and **Consensus-based** execution with native **Human-in-the-Loop** interrupts.
 
 ---
 

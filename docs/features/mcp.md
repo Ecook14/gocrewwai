@@ -5,7 +5,7 @@ Model Context Protocol (MCP) is the industry standard for connecting AI agents t
 ---
 
 > [!IMPORTANT]
-> **Status: v1.0.0 (Stable).** Gocrewwai supports **HTTP**, **Stdio**, and **SSE (Server-Sent Events)** MCP transports with native tool filtering and validation.
+> **Status: v0.9.0 (Alpha → Beta).** Gocrewwai supports **HTTP**, **Stdio**, and **SSE (Server-Sent Events)** MCP transports with native tool filtering and validation.
 
 ---
 
@@ -23,7 +23,7 @@ Gocrewwai allows agents to consume tools from any remote MCP server with zero co
 
 ## 🚀 Connecting to an MCP Server (Elite Style)
 
-In Gocrewwai v1.0, MCP servers can be connected directly via the `AgentConfig` using a DSL-like string array:
+In Gocrewwai v0.9, MCP servers can be connected directly via the `AgentConfig` using a DSL-like string array:
 
 ```go
 agent := gocrew.NewAgent(gocrew.AgentConfig{

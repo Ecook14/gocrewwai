@@ -45,7 +45,8 @@ Explore the core components and features of the Gocrewwai framework through our 
 ## 💎 Elite Performance Features
 - **[Planning](./features/planning.md)**: Intelligent task decomposition.
 - **[Collaboration](./features/collaboration.md)**: Delegation and coworker communication.
+- **[Agent Delegation](./features/agent_delegation.md)**: Recursive delegation with loop protection.
 - **[Testing](./features/testing.md)**: Automated multi-run evaluation frameworks.
-- **[Training](./features/training.md)**: Human-in-the-loop advice persistence.
+- **[Training](./features/training.md)**: Human-in-the-Loop advice persistence.
 
 Join the high-performance AI revolution with Gocrewwai! 🚀⚓🛡️🏆🏁

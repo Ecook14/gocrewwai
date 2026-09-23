@@ -25,17 +25,19 @@ Gocrew supports **Directed Acyclic Graphs (DAGs)** that can contain **cycles**. 
 
 ```go
 // 1. Define the Tasks
-codeTask := gocrew.NewTaskBuilder().
-    Description("Write a Go function for quicksort.").
-    Build()
+codeTask := gocrew.NewTask(gocrew.TaskConfig{
+    Description: "Write a Go function for quicksort.",
+    Build:       true,
+})
 
-testTask := gocrew.NewTaskBuilder().
-    Description("Test the code. Output 'FAIL' if it breaks, 'PASS' otherwise.").
-    Context(codeTask).
-    Build()
+testTask := gocrew.NewTask(gocrew.TaskConfig{
+    Description: "Test the code. Output 'FAIL' if it breaks, 'PASS' otherwise.",
+    Context:     []*gocrew.Task{codeTask},
+    Build:       true,
+})
 
-// 2. Define the Cycle
-testTask.NextPaths = map[string]*tasks.Task{
+// 1. Define the Cycle
+testTask.NextPaths = map[string]*gocrew.Task{
     "retry":   codeTask,   // Loop back!
     "success": deployTask, // Move forward!
 }
@@ -62,10 +64,10 @@ type Analysis struct {
 
 var result Analysis
 
-task := gocrew.NewTaskBuilder().
-    Description("Analyze AAPL earnings.").
-    OutputJSON(&result). // Bind the struct pointer
-    Build()
+task := gocrew.NewTask(gocrew.TaskConfig{
+    Description: "Analyze AAPL earnings.",
+    OutputJSON:  &result,
+})
 
 // After Kickoff:
 fmt.Println(result.Score)
@@ -102,7 +104,7 @@ f.AddRouter(&gocrew.RouterNode{
 
 ## 5. Creator Studio
 
-Launch the dashboard with `dashboard.Start("8080")` and visit the **Creator Studio**. You can hot-swap models, edit task descriptions live, and watch agent thought streams in real-time.
+Launch the dashboard with: `go run cmd/server/main.go --api-port 8080 --web`
 
 ---
 **Gocrew** - Mastery in agentic orchestration.

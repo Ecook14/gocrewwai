@@ -11,7 +11,7 @@
 - Human-in-the-Loop (HITL) interrupts
 - Rate limiting (MaxRPM, MaxTokens)
 
-### Tool Ecosystem (51+ tools)
+### Tool Ecosystem (57 tools)
 - Search: Tavily, Brave, Exa, Serper
 - Databases: Supabase, Snowflake, PostgreSQL, MySQL, Redis
 - CRM: HubSpot, Salesforce
@@ -20,14 +20,14 @@
 - Spreadsheets: Google Sheets, Excel
 - Local: Ollama, File Read/Write/Edit, Code Interpreter
 
-### LLM Providers (8+)
-- OpenAI, Anthropic, Google, DeepSeek, Groq, OpenRouter, Ollama
+### LLM Providers (7)
+- **7 LLM providers** — OpenAI, Anthropic, Gemini, Groq, OpenRouter, Ollama, Failover
 
-### Memory & RAG (19 backends)
-- SQLite, Redis, Chroma, Pinecone, Qdrant, Weaviate, Milvus, PGVector, ElasticSearch
+### Memory & RAG (7 backends)
+- SQLite, Redis, Chroma, Pinecone, Qdrant, Weaviate
 
 ### Protocols
-- MCP, A2A, AAMARVA, gRPC, WebSocket
+- MCP, A2A, gRPC, WebSocket
 
 ### Infrastructure
 - Sandbox: Docker, WASM (wazero)
