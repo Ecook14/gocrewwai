@@ -1,12 +1,28 @@
-// Package web provides stub static-asset serving for the API server.
-// The full React/Vite dashboard lives at https://gocrewwai-ui.vercel.app
-// (Cloud UI), so the in-binary dashboard is intentionally a no-op FS.
+// Package web provides embedded static-asset serving for the API server.
+// The Visual Builder lives in web/src/ and is embedded below; the canonical
+// cloud-hosted UI is https://gocrewwai-ui.vercel.app
 package web
 
-import "net/http"
+import (
+	"embed"
+	"io/fs"
+	"log"
+	"net/http"
+	"os"
+)
 
-// GetFS returns an empty in-memory filesystem. The Visual Builder lives
-// at gocrewwai-ui.vercel.app and is the canonical UI for the Cloud.
+//go:embed src
+var srcFS embed.FS
+
+// GetFS returns an http.FileSystem for the embedded UI source.
+// Returns a non-nil FS even when src/ is empty.
 func GetFS() http.FileSystem {
-	return nil
+	sub, err := fs.Sub(srcFS, "src")
+	if err != nil {
+		// If embed failed (e.g. src/ empty), return an empty FS so the
+		// server still starts — serving nothing rather than panicking.
+		log.Printf("web: embed src/ failed (%v), serving empty FS", err)
+		return http.FS(os.DirFS("."))
+	}
+	return http.FS(sub)
 }

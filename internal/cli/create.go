@@ -52,8 +52,8 @@ func GenerateScaffolding(projectName string) error {
 		return err
 	}
 
-	// 3. Write .env
-	envFile := `OPENAI_API_KEY=sk-your-key-here
+	// 3. Write .env template (key placeholder — user must supply their own)
+	envFile := `#OPENAI_API_KEY=sk-...  # Replace with your actual key
 `
 	if err := os.WriteFile(filepath.Join(baseDir, ".env"), []byte(envFile), 0644); err != nil {
 		return err

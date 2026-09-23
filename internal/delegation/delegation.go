@@ -99,10 +99,9 @@ func (t *DelegateWorkTool) Execute(ctx context.Context, input map[string]interfa
 	return fmt.Sprintf("%v", result), nil
 }
 
-func (t *DelegateWorkTool) RequiresReview() bool { return false }
+func (t *DelegateWorkTool) RequiresReview() bool { return true }
 
 // AskQuestionTool implements tools.Tool and allows an agent to ask a question
-// to a coworker agent. Similar to DelegateWork but for information gathering.
 type AskQuestionTool struct {
 	Coworkers []Agent
 }
@@ -183,4 +182,4 @@ func (t *AskQuestionTool) Execute(ctx context.Context, input map[string]interfac
 	return fmt.Sprintf("%v", result), nil
 }
 
-func (t *AskQuestionTool) RequiresReview() bool { return false }
+func (t *AskQuestionTool) RequiresReview() bool { return true }

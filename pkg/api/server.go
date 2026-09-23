@@ -2,6 +2,7 @@ package api
 
 import (
 	"crypto/subtle"
+	"fmt"
 	"net/http"
 	"os"
 	"sync"
@@ -153,6 +154,12 @@ func authenticationMiddleware(authToken string) gin.HandlerFunc {
 }
 
 // ServeStatic enables the delivery of static files from an embedded filesystem.
-func (s *Server) ServeStatic(fs http.FileSystem) {
-	s.router.NoRoute(gin.WrapH(http.StripPrefix("", http.FileServer(fs))))
+// Returns an error if fs is nil (which happens when the web flag is set but
+// no embedded UI is available).
+func (s *Server) ServeStatic(fs http.FileSystem) error {
+    if fs == nil {
+        return fmt.Errorf("static file server: nil filesystem — embed UI source into web/embed.go or set --web flag with real assets")
+    }
+    s.router.NoRoute(gin.WrapH(http.StripPrefix("/", http.FileServer(fs))))
+    return nil
 }
