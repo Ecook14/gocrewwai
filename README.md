@@ -168,13 +168,13 @@ gocrewwai/
 │   │   ├── agents/        # Agent definitions and lifecycle
 │   │   ├── crew/          # Crew orchestration + checkpoint stores (SQLite/Redis)
 │   │   ├── llm/           # LLM clients (OpenAI, Anthropic, Gemini, Groq, OpenRouter, Ollama, Failover) and caching
-│   │   ├── memory/        # Unified memory with vector search (12 store types: SQLite, Redis, Chroma, Pinecone, Qdrant, Weaviate, InMemCosine, Conversation, Entity, ShortTerm, LongTerm, Unified)
+│   │   ├── memory/        # Unified memory with vector search (11 backends: SQLite, Redis, Chroma, Pinecone, Qdrant, Weaviate, InMemCosine, Conversation, Entity, ShortTerm, LongTerm)
 │   │   ├── tools/         # 57 built-in tools (search, browser, DB, code interp, SaaS integrations)
 │   │   ├── api/           # Gin REST API + gRPC mesh server
 │   │   ├── flow/          # Multi-crew orchestration flows
 │   │   ├── knowledge/     # RAG knowledge sources (PDFs, URLs, text, directories, CSV, JSON)
 │   │   ├── events/        # Event bus for cross-component communication
-│   │   ├── guardrails/    # Input/output validation guardrails (8 types: MaxToken, ContentFilter, Schema, PIIRedaction, Toxicity, LLMReview, Validator, HumanReview)
+│   │   ├── guardrails/    # Input/output validation guardrails (10+ types: MaxToken, ContentFilter, Schema, PIIRedaction, Toxicity, LLMReview, Validator, HumanReview, JSONValid, Sanitizer)
 │   │   ├── protocols/     # MCP, A2A, WebMCP protocol implementations
 │   │   ├── sandbox/       # Docker and WASM code sandboxing
 │   │   ├── server/        # Production HTTP server with health/metrics/graceful shutdown
