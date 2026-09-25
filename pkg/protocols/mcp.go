@@ -6,13 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
-	"os/exec"
-	"sync"
-	"strings"
 	"os"
-	"log/slog"
+	"os/exec"
+	"strings"
+	"sync"
 	"time"
 )
 
@@ -176,7 +176,7 @@ type StdioTransport struct {
 	stdin   io.WriteCloser
 	stdout  io.ReadCloser
 	encoder *json.Encoder
-	
+
 	mu       sync.Mutex
 	pending  map[int64]chan *rpcResponse
 	onNotify func(string, json.RawMessage)
@@ -266,7 +266,7 @@ func (t *StdioTransport) Initialize(ctx context.Context) error {
 	}
 
 	t.cmd = exec.CommandContext(ctx, t.Command, t.Args...)
-	
+
 	// Better stderr handling: pipe to a logger instead of raw os.Stderr
 	t.cmd.Stderr = os.Stderr
 
@@ -379,12 +379,12 @@ type SSETransport struct {
 	URL        string
 	httpClient *http.Client
 	Headers    map[string]string
-	
-	mu         sync.RWMutex
-	postURL    string
-	onNotify   func(string, json.RawMessage)
-	ready      chan struct{}
-	closing    chan struct{}
+
+	mu       sync.RWMutex
+	postURL  string
+	onNotify func(string, json.RawMessage)
+	ready    chan struct{}
+	closing  chan struct{}
 }
 
 func NewSSETransport(url string) *SSETransport {
@@ -433,7 +433,7 @@ func (t *SSETransport) Initialize(ctx context.Context) error {
 
 func (t *SSETransport) consumeStream(body io.ReadCloser) {
 	defer body.Close()
-	
+
 	// Simple SSE line parser
 	var currentEvent string
 	buf := make([]byte, 4096)
@@ -475,7 +475,7 @@ func (t *SSETransport) consumeStream(body io.ReadCloser) {
 						t.postURL = base.ResolveReference(rel).String()
 					}
 					t.mu.Unlock()
-					
+
 					// Signal readiness
 					select {
 					case <-t.ready:
@@ -562,11 +562,11 @@ func (t *SSETransport) Close() error {
 // MCPClient connects to an MCP server to list and invoke tools, resources, and prompts.
 type MCPClient struct {
 	mu        sync.RWMutex
-	Transport MCPTransport          `json:"-"`
+	Transport MCPTransport            `json:"-"`
 	Tools     []MCPToolDefinition     `json:"tools"`
 	Resources []MCPResourceDefinition `json:"resources"`
 	Prompts   []MCPPromptDefinition   `json:"prompts"`
-	
+
 	// Sampling callback (Server asking Client for LLM completion)
 	OnSample func(ctx context.Context, prompt string) (string, error)
 }
@@ -595,7 +595,7 @@ func (c *MCPClient) handleNotification(method string, params json.RawMessage) {
 			} `json:"messages"`
 		}
 		if err := json.Unmarshal(params, &req); err == nil && len(req.Messages) > 0 {
-			// In a real implementation we'd return a JSON-RPC response, 
+			// In a real implementation we'd return a JSON-RPC response,
 			// but for notifications/sampling we need to bridge this back.
 			// Currently Gocrew MCP handles sampling as an async callback.
 			go func() {
@@ -744,7 +744,6 @@ func (c *MCPClient) listPrompts(ctx context.Context) ([]MCPPromptDefinition, err
 	return res.Prompts, nil
 }
 
-
 // ---------------------------------------------------------------------------
 // MCP Server — Expose Crew-GO Tools via MCP
 // ---------------------------------------------------------------------------
@@ -793,7 +792,7 @@ func (s *MCPServer) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/sse", s.handleSSE)
 	mux.HandleFunc("/message", s.handleMessage)
-	
+
 	// Legacy support for single POST endpoint
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {

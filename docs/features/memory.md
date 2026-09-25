@@ -5,7 +5,7 @@ Memory is the persistent state of your agents and crews. Gocrewwai includes an a
 ---
 
 > [!IMPORTANT]
-> **Status: v0.9.0 (Alpha → Beta).** Gocrewwai memory systems support **Recency + Relevance** scoring and persistent vector storage via SQLite, Redis, and Chroma.
+> **Status: v0.9.0 (Alpha → Beta).** Gocrewwai memory systems support **Recency + Relevance** scoring and 12 persistent/memory store backends: SQLite, Redis, Chroma, Pinecone, Qdrant, Weaviate, InMemCosine, Conversation, Entity, ShortTerm, LongTerm, and UnifiedMemory.
 
 ---
 

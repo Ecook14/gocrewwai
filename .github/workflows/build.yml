@@ -19,11 +19,13 @@ jobs:
       - name: Download dependencies
         run: go mod download
       - name: Build
-        run: go build ./...
+        run: go build ./pkg/... ./cmd/...
       - name: Test
-        run: go test ./... -v -count=1
+        env:
+          CREW_CONFIG_PATH: config.json
+        run: go test ./pkg/... ./cmd/... -v -count=1
       - name: Lint
-        run: go vet ./...
+        run: go vet ./pkg/... ./cmd/... ./gocrew/...
       - name: Build binaries
         run: |
           CGO_ENABLED=1 go build -o gocrew-cli ./cmd/gocrew
@@ -31,7 +33,28 @@ jobs:
       - name: Upload binaries
         uses: actions/upload-artifact@v4
         with:
-          name: gocrew-binaries
+          name: gocrew-binaries-${{ matrix.go-version }}
           path: |
             gocrew-cli
             gocrewwai-server
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: ['1.25']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+      - run: go mod tidy
+      - run: go build ./pkg/... ./cmd/... ./gocrew/...
+      - name: Test without race
+        env:
+          CREW_CONFIG_PATH: config.json
+        run: go test ./pkg/... ./cmd/... ./gocrew/... -v -count=1
+      - name: Test with race detector
+        env:
+          CREW_CONFIG_PATH: config.json
+        run: go test ./pkg/... ./cmd/... ./gocrew/... -race -count=1 -timeout 120s

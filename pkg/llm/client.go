@@ -1,12 +1,21 @@
 package llm
 
-import "context"
+import (
+	"context"
+	"encoding/json"
+)
 
 // Message represents a general message structure used in LLM communication.
 type Message struct {
 	Role    string
 	Content string
 	Images  []string // URLs or base64-encoded image data
+	// ToolCall fields — used when the LLM responds with a function/tool call
+	ToolCallID    string
+	ToolName      string
+	ToolArguments map[string]interface{}
+	// ToolResult fields — used when sending tool results back to the LLM
+	ToolResult string
 }
 
 // GenerateOptions configures a single LLM request.
@@ -16,6 +25,24 @@ type GenerateOptions struct {
 	MaxTokens   int                    `json:"max_tokens"`
 	Stop        []string               `json:"stop,omitempty"`
 	Extra       map[string]interface{} `json:"extra,omitempty"` // Provider-specific extensions
+	// Function-calling fields — used to pass tool definitions and control tool selection
+	Tools       []ToolDefinition       `json:"tools,omitempty"`
+	ToolChoice  ToolChoice             `json:"tool_choice,omitempty"`
+	// Structured output — when set, the LLM must return JSON matching this schema
+	JSONSchema  string                 `json:"json_schema,omitempty"`
+}
+
+// ToolDefinition describes a tool/function that the LLM may call.
+type ToolDefinition struct {
+	Name        string          `json:"name"`
+	Description string          `json:"description"`
+	Parameters  json.RawMessage `json:"parameters"` // JSON Schema for input parameters
+}
+
+// ToolChoice controls whether the LLM may call tools.
+type ToolChoice struct {
+	Type       string          `json:"type"` // "auto", "any", "none"
+	ToolName   string          `json:"name,omitempty"` // specific tool name when Type is "any"
 }
 
 // Client represents the base capabilities for language model generation.

@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Ecook14/gocrewwai/pkg/tools"
 	"github.com/Ecook14/gocrewwai/pkg/core"
+	"github.com/Ecook14/gocrewwai/pkg/tools"
 )
 
 // DelegateWorkTool implements tools.Tool and allows an agent to delegate work

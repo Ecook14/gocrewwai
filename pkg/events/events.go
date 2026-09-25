@@ -33,10 +33,10 @@ const (
 	AgentFeedbackReceived   EventType = "agent.feedback.received"
 
 	// Task Events
-	TaskStarted    EventType = "task.started"
-	TaskCompleted  EventType = "task.completed"
-	TaskFailed     EventType = "task.failed"
-	TaskEvaluated  EventType = "task.evaluated"
+	TaskStarted   EventType = "task.started"
+	TaskCompleted EventType = "task.completed"
+	TaskFailed    EventType = "task.failed"
+	TaskEvaluated EventType = "task.evaluated"
 
 	// Tool Events
 	ToolUsageStarted       EventType = "tool.usage.started"
@@ -53,20 +53,20 @@ const (
 	KnowledgeQueryFailed        EventType = "knowledge.query.failed"
 
 	// LLM Events
-	LLMCallStarted     EventType = "llm.call.started"
-	LLMCallCompleted   EventType = "llm.call.completed"
-	LLMCallFailed      EventType = "llm.call.failed"
-	LLMStreamChunk     EventType = "llm.stream.chunk"
+	LLMCallStarted        EventType = "llm.call.started"
+	LLMCallCompleted      EventType = "llm.call.completed"
+	LLMCallFailed         EventType = "llm.call.failed"
+	LLMStreamChunk        EventType = "llm.stream.chunk"
 	LLMGuardrailStarted   EventType = "llm.guardrail.started"
 	LLMGuardrailCompleted EventType = "llm.guardrail.completed"
 
 	// Memory Events
-	MemoryQueryStarted     EventType = "memory.query.started"
-	MemoryQueryCompleted   EventType = "memory.query.completed"
-	MemoryQueryFailed      EventType = "memory.query.failed"
-	MemorySaveStarted      EventType = "memory.save.started"
-	MemorySaveCompleted    EventType = "memory.save.completed"
-	MemorySaveFailed       EventType = "memory.save.failed"
+	MemoryQueryStarted   EventType = "memory.query.started"
+	MemoryQueryCompleted EventType = "memory.query.completed"
+	MemoryQueryFailed    EventType = "memory.query.failed"
+	MemorySaveStarted    EventType = "memory.save.started"
+	MemorySaveCompleted  EventType = "memory.save.completed"
+	MemorySaveFailed     EventType = "memory.save.failed"
 
 	// Flow Events
 	FlowCreated  EventType = "flow.created"
@@ -83,7 +83,7 @@ const (
 type Event struct {
 	Type      EventType              `json:"type"`
 	Timestamp time.Time              `json:"timestamp"`
-	Source    string                 `json:"source,omitempty"`     // e.g., Agent role, Task name
+	Source    string                 `json:"source,omitempty"` // e.g., Agent role, Task name
 	Payload   map[string]interface{} `json:"payload,omitempty"`
 	Error     error                  `json:"error,omitempty"`
 }
@@ -168,7 +168,7 @@ func (b *Bus) ScopedHandlers(handler Handler) func() {
 		b.mu.Lock()
 		defer b.mu.Unlock()
 		for i, h := range b.handlers {
-			// Note: This comparison is tricky in Go for functions, 
+			// Note: This comparison is tricky in Go for functions,
 			// but works if we use a unique pointer/wrapper if necessary.
 			// For now, simpler to just use it for temporary lifetime.
 			_ = i

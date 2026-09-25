@@ -43,7 +43,7 @@ func (s *InMemCosineStore) Search(ctx context.Context, queryVector []float32, li
 		if len(t.Vector) != len(queryVector) {
 			continue // Skip mismatched embeddings
 		}
-		
+
 		sim, err := CosineSimilarity(queryVector, t.Vector)
 		if err != nil {
 			return nil, err

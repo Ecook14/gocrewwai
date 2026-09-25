@@ -11,8 +11,8 @@ import (
 // LongTermMemory handles cross-execution persistent memory.
 // It uses a vector-backed store for semantic retrieval.
 type LongTermMemory struct {
-	Store     Store
-	Embedder  llm.Client // Used to generate vectors for searches
+	Store    Store
+	Embedder llm.Client // Used to generate vectors for searches
 }
 
 func NewLongTermMemory(store Store, embedder llm.Client) *LongTermMemory {

@@ -243,7 +243,7 @@ func toolSchemaToMap(tool tools.Tool) map[string]interface{} {
 	}
 
 	result := map[string]interface{}{
-		"type": "object",
+		"type":       "object",
 		"properties": properties,
 	}
 	if len(required) > 0 {

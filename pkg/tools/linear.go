@@ -70,7 +70,9 @@ func (l *LinearTool) query(query string, variables map[string]interface{}) (stri
 	req.Header.Set("Authorization", "Bearer "+l.token)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := l.client.Do(req.WithContext(context.Background()))
-	if err != nil { return "", fmt.Errorf("Linear request failed: %w", err) }
+	if err != nil {
+		return "", fmt.Errorf("Linear request failed: %w", err)
+	}
 	defer resp.Body.Close()
 	var result map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&result)
@@ -104,5 +106,5 @@ func (l *LinearTool) updateIssue(ctx context.Context, issueID string, updates ma
 }
 
 func (l *LinearTool) RequiresReview() bool { return true }
-func (l *LinearTool) Name() string { return l.BaseTool.NameValue }
-func (l *LinearTool) Description() string { return l.BaseTool.DescriptionValue }
+func (l *LinearTool) Name() string         { return l.BaseTool.NameValue }
+func (l *LinearTool) Description() string  { return l.BaseTool.DescriptionValue }

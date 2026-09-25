@@ -78,7 +78,7 @@ func (f *TypedFlow[T]) Kickoff(ctx context.Context) (T, error) {
 			// Convert T to map[string]interface{} for standard persistence
 			// Simplified representation
 			stateMap := make(State)
-			stateMap["__typed_state"] = f.state 
+			stateMap["__typed_state"] = f.state
 			_ = f.persistence.SaveState(ctx, f.flowID, stateMap)
 		}
 	}

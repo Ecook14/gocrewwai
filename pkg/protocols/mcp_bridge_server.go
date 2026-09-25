@@ -18,7 +18,7 @@ func NewAgentMCPBridge(server *MCPServer) *AgentMCPBridge {
 // ExposeAgent registers an agent's execution capability as an MCP tool.
 func (b *AgentMCPBridge) ExposeAgent(agent core.Agent, role string, goal string) {
 	name := fmt.Sprintf("ask_%s", sanitizeName(role))
-	
+
 	def := MCPToolDefinition{
 		Name:        name,
 		Description: fmt.Sprintf("Consult the %s agent. Goal: %s", role, goal),

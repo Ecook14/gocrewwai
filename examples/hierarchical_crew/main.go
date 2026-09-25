@@ -49,16 +49,16 @@ func main() {
 
 	// 4. Assemble Crew with Hierarchical Process (Elite Style)
 	myCrew := gocrew.NewCrew(gocrew.CrewConfig{
-		Agents:      []gocrew.CoreAgent{researcher, writer},
-		Tasks:       []*gocrew.Task{researchTask, writeTask},
-		Process:     gocrew.Hierarchical,
-		ManagerLLM:  model, // Required for hierarchical mode
-		Verbose:     true,
+		Agents:     []gocrew.CoreAgent{researcher, writer},
+		Tasks:      []*gocrew.Task{researchTask, writeTask},
+		Process:    gocrew.Hierarchical,
+		ManagerLLM: model, // Required for hierarchical mode
+		Verbose:    true,
 	})
 
 	// 5. Kickoff
 	fmt.Println("## Starting Hierarchical Crew Execution (Elite Style) ##")
-	
+
 	dashboard.Start("8081")
 	fmt.Println("🖥️  Dashboard active at http://localhost:8081/web-ui - Watch the manager orchestrate!")
 
@@ -69,7 +69,7 @@ func main() {
 	}
 
 	fmt.Printf("\n## Final Result ##\n%v\n", result)
-	
+
 	fmt.Println("✅ Demo finished. Keep the dashboard open to review the logs!")
 	select {}
 }

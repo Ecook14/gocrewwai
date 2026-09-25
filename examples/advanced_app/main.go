@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/Ecook14/gocrewwai/pkg/agents"
-	"github.com/Ecook14/gocrewwai/pkg/crew"
 	"github.com/Ecook14/gocrewwai/pkg/core"
+	"github.com/Ecook14/gocrewwai/pkg/crew"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/tasks"
 	"github.com/Ecook14/gocrewwai/pkg/tools"
@@ -17,9 +17,9 @@ import (
 
 // MarketReport is the structured JSON output we want our final agent to produce
 type MarketReport struct {
-	Trend     string   `json:"trend"`
-	Keywords  []string `json:"keywords"`
-	Summary   string   `json:"summary"`
+	Trend    string   `json:"trend"`
+	Keywords []string `json:"keywords"`
+	Summary  string   `json:"summary"`
 }
 
 func main() {
@@ -84,7 +84,7 @@ func main() {
 	defer cancel()
 
 	slog.Info("🚀 Kicking off Pipeline.")
-	
+
 	_, err := marketPipeline.Kickoff(ctx)
 	if err != nil {
 		slog.Error("Pipeline failed", slog.Any("error", err))

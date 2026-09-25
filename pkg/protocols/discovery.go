@@ -36,18 +36,18 @@ func (d *AgentDiscovery) StartScanning(ctx context.Context, interval time.Durati
 
 func (d *AgentDiscovery) scan(ctx context.Context) {
 	slog.Debug("🔍 Scanning for A2A agents via mDNS...")
-	
+
 	// For each agent in registry, perform a health check
 	agents := d.Registry.ListAll()
 	client := NewA2AClient("") // Simplified, real discovery might use shared tokens
-	
+
 	for _, agent := range agents {
 		// If it's a remote agent, check heartbeat
 		if agent.Endpoint != "" {
 			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			status, err := client.GetStatus(ctx, agent.Endpoint, "discovery_service", agent.ID)
 			cancel()
-			
+
 			if err != nil {
 				slog.Warn("💔 Agent heartbeat failed", slog.String("id", agent.ID), slog.Any("error", err))
 				// Optionally unregister if failures exceed threshold

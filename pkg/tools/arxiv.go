@@ -40,7 +40,6 @@ func NewArxivTool() *ArxivTool {
 	}
 }
 
-
 func (t *ArxivTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	query, ok := input["query"].(string)
 	if !ok {

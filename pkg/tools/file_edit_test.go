@@ -20,8 +20,8 @@ func TestFileEditTool_Execute(t *testing.T) {
 
 	tool := tools.NewFileEditTool(tmpDir)
 	input := map[string]interface{}{
-		"file_path":       tmpFile,
-		"target_text":     "Line 2",
+		"file_path":        tmpFile,
+		"target_text":      "Line 2",
 		"replacement_text": "Updated Line 2",
 	}
 

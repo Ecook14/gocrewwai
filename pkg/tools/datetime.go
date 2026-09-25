@@ -19,11 +19,10 @@ func NewDateTimeTool() *DateTimeTool {
 	}
 }
 
-
 func (t *DateTimeTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	return time.Now().Format(time.RFC3339), nil
 }
 
 func (t *DateTimeTool) RequiresReview() bool { return false }
-func (t *DateTimeTool) Name() string { return t.BaseTool.NameValue }
-func (t *DateTimeTool) Description() string { return t.BaseTool.DescriptionValue }
+func (t *DateTimeTool) Name() string         { return t.BaseTool.NameValue }
+func (t *DateTimeTool) Description() string  { return t.BaseTool.DescriptionValue }

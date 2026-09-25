@@ -110,6 +110,6 @@ func (t *MongoDBTool) Execute(ctx context.Context, input map[string]interface{})
 }
 
 func (t *MongoDBTool) RequiresReview() bool { return true }
-func (t *MongoDBTool) Name() string { return t.BaseTool.NameValue }
-func (t *MongoDBTool) Description() string { return t.BaseTool.DescriptionValue }
-func (t *MongoDBTool) Close() error { return nil }
+func (t *MongoDBTool) Name() string         { return t.BaseTool.NameValue }
+func (t *MongoDBTool) Description() string  { return t.BaseTool.DescriptionValue }
+func (t *MongoDBTool) Close() error         { return nil }

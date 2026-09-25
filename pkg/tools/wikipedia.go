@@ -39,7 +39,6 @@ func NewWikipediaTool() *WikipediaTool {
 	}
 }
 
-
 func (t *WikipediaTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	query, ok := input["query"].(string)
 	if !ok {
@@ -58,5 +57,5 @@ func (t *WikipediaTool) Execute(ctx context.Context, input map[string]interface{
 	return string(body), nil
 }
 
-func (t *WikipediaTool) Name() string { return t.BaseTool.NameValue }
+func (t *WikipediaTool) Name() string        { return t.BaseTool.NameValue }
 func (t *WikipediaTool) Description() string { return t.BaseTool.DescriptionValue }

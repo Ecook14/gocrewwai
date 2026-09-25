@@ -7,10 +7,10 @@ import (
 
 // Monitor tracks the state and health of sandbox providers.
 type Monitor struct {
-	ActiveSessions int
+	ActiveSessions  int
 	TotalExecutions int
-	LastStatus     string
-	mu             sync.Mutex
+	LastStatus      string
+	mu              sync.Mutex
 }
 
 func (m *Monitor) RecordStart() {
@@ -35,7 +35,7 @@ type Provider interface {
 	// code: The script or commands to run.
 	// env: Optional environment variables to inject.
 	Execute(ctx context.Context, code string, env map[string]string) (string, error)
-	
+
 	// Close cleans up any resources used by the provider.
 	Close() error
 }

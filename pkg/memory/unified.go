@@ -19,13 +19,13 @@ import (
 
 // UnifiedMemoryConfig configures the unified memory scoring and behavior.
 type UnifiedMemoryConfig struct {
-	RecencyWeight        float64 // Weight for recency in composite scoring (default: 0.3)
-	SemanticWeight       float64 // Weight for semantic similarity (default: 0.5)
-	ImportanceWeight     float64 // Weight for importance (default: 0.2)
-	RecencyHalfLifeDays  int     // Days until recency score decays to 0.5 (default: 7)
+	RecencyWeight          float64 // Weight for recency in composite scoring (default: 0.3)
+	SemanticWeight         float64 // Weight for semantic similarity (default: 0.5)
+	ImportanceWeight       float64 // Weight for importance (default: 0.2)
+	RecencyHalfLifeDays    int     // Days until recency score decays to 0.5 (default: 7)
 	ConsolidationThreshold float64 // Similarity threshold for dedup (default: 0.85)
-	BatchDedupThreshold  float64 // Cosine threshold for intra-batch dedup (default: 0.98)
-	QueryAnalysisThreshold int   // Char length below which LLM analysis is skipped (default: 200)
+	BatchDedupThreshold    float64 // Cosine threshold for intra-batch dedup (default: 0.98)
+	QueryAnalysisThreshold int     // Char length below which LLM analysis is skipped (default: 200)
 }
 
 // RecallDepth controls how deep the recall search goes.
@@ -39,11 +39,11 @@ const (
 // ScoredMemory is a memory record with its composite score attached.
 type ScoredMemory struct {
 	MemoryRecord
-	Score        float64   `json:"score"`
-	Similarity   float64   `json:"similarity"`
-	Recency      float64   `json:"recency"`
-	Importance   float64   `json:"importance"`
-	CreatedAt    time.Time `json:"created_at"`
+	Score      float64   `json:"score"`
+	Similarity float64   `json:"similarity"`
+	Recency    float64   `json:"recency"`
+	Importance float64   `json:"importance"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 // UnifiedMemory provides Remember/Recall/Forget API with composite scoring.
@@ -66,22 +66,36 @@ type writeRequest struct {
 // NewUnifiedMemory creates a new UnifiedMemory with the given store and optional config.
 func NewUnifiedMemory(store Store, llmClient llm.Client, cfg *UnifiedMemoryConfig) *UnifiedMemory {
 	config := UnifiedMemoryConfig{
-		RecencyWeight:        0.3,
-		SemanticWeight:       0.5,
-		ImportanceWeight:     0.2,
-		RecencyHalfLifeDays:  7,
+		RecencyWeight:          0.3,
+		SemanticWeight:         0.5,
+		ImportanceWeight:       0.2,
+		RecencyHalfLifeDays:    7,
 		ConsolidationThreshold: 0.85,
-		BatchDedupThreshold:  0.98,
+		BatchDedupThreshold:    0.98,
 		QueryAnalysisThreshold: 200,
 	}
 	if cfg != nil {
-		if cfg.RecencyWeight > 0 { config.RecencyWeight = cfg.RecencyWeight }
-		if cfg.SemanticWeight > 0 { config.SemanticWeight = cfg.SemanticWeight }
-		if cfg.ImportanceWeight > 0 { config.ImportanceWeight = cfg.ImportanceWeight }
-		if cfg.RecencyHalfLifeDays > 0 { config.RecencyHalfLifeDays = cfg.RecencyHalfLifeDays }
-		if cfg.ConsolidationThreshold > 0 { config.ConsolidationThreshold = cfg.ConsolidationThreshold }
-		if cfg.BatchDedupThreshold > 0 { config.BatchDedupThreshold = cfg.BatchDedupThreshold }
-		if cfg.QueryAnalysisThreshold > 0 { config.QueryAnalysisThreshold = cfg.QueryAnalysisThreshold }
+		if cfg.RecencyWeight > 0 {
+			config.RecencyWeight = cfg.RecencyWeight
+		}
+		if cfg.SemanticWeight > 0 {
+			config.SemanticWeight = cfg.SemanticWeight
+		}
+		if cfg.ImportanceWeight > 0 {
+			config.ImportanceWeight = cfg.ImportanceWeight
+		}
+		if cfg.RecencyHalfLifeDays > 0 {
+			config.RecencyHalfLifeDays = cfg.RecencyHalfLifeDays
+		}
+		if cfg.ConsolidationThreshold > 0 {
+			config.ConsolidationThreshold = cfg.ConsolidationThreshold
+		}
+		if cfg.BatchDedupThreshold > 0 {
+			config.BatchDedupThreshold = cfg.BatchDedupThreshold
+		}
+		if cfg.QueryAnalysisThreshold > 0 {
+			config.QueryAnalysisThreshold = cfg.QueryAnalysisThreshold
+		}
 	}
 
 	um := &UnifiedMemory{
@@ -209,8 +223,12 @@ func (um *UnifiedMemory) Recall(ctx context.Context, query string, opts *RecallO
 	includePrivate := false
 
 	if opts != nil {
-		if opts.Limit > 0 { limit = opts.Limit }
-		if opts.Depth != "" { depth = opts.Depth }
+		if opts.Limit > 0 {
+			limit = opts.Limit
+		}
+		if opts.Depth != "" {
+			depth = opts.Depth
+		}
 		scopeFilter = opts.Scope
 		sourceFilter = opts.Source
 		includePrivate = opts.IncludePrivate

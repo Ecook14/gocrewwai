@@ -14,7 +14,7 @@ func main() {
 	dashboard.Start("8080")
 	fmt.Println("🖥️  Dashboard active at http://localhost:8080/web-ui")
 	fmt.Println("Please open the dashboard in your browser before the crew starts!")
-	
+
 	time.Sleep(5 * time.Second)
 
 	apiKey := os.Getenv("OPENAI_API_KEY")

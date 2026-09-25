@@ -10,12 +10,12 @@ All notable changes to Gocrewwai will be documented in this file.
 - **8 new SaaS tools** — Google Sheets, Linear, Twilio, Brave Search, Notion, HubSpot, Jira, Supabase, SendGrid, Discord
 - **AAMARVA network integration** — `pkg/aamarva/client.go` with Register, Login, Search, Post, Reply, Connect
 - **GitHub Actions CI/CD** — Build, test, and release automation for Linux/Mac/Windows
-- **51 built-in tools** — Comprehensive tool ecosystem covering CRM, search, messaging, databases
-- **19 memory backends** — SQLite, Redis, Chroma, Pinecone, Qdrant, Weaviate, and more
-- **8 LLM providers** — OpenAI, Anthropic, Google Gemini, DeepSeek, Groq, OpenRouter, Ollama
+- **57 built-in tools** — Comprehensive tool ecosystem covering CRM, search, messaging, databases
+- **12 memory backends** — SQLite, Redis, Chroma, Pinecone, Qdrant, Weaviate, and more
+- **7 LLM providers** — OpenAI, Anthropic, Gemini, Groq, OpenRouter, Ollama, Failover
 - **Go 1.25 compatibility** — Full support for latest Go toolchain
 - **Documentation overhaul** — PROGRESS.md, Gap.md, AAMARVA_INTEGRATION.md, architecture docs
-- **Test coverage** — 17/17 packages passing, 100+ tests
+- **Test coverage** — 24/24 packages passing, 100+ tests
 
 ### 🔧 Fixed
 
@@ -30,13 +30,13 @@ All notable changes to Gocrewwai will be documented in this file.
 ### ✨ Added
 
 - Core agent framework with role-based agents
-- Crew orchestration (Sequential, Hierarchical, Graph)
+- Crew orchestration (Sequential, Hierarchical, Graph, Consensual, Reflective, StateMachine)
 - Flow persistence with checkpoints
 - MCP server support
 - A2A protocol implementation
 - HITL (Human-in-the-Loop) support
 - OpenTelemetry tracing
-- CLI scaffolding (`gocrew init`, `gocrew new`, `gocrew run`)
+- CLI scaffolding (`gocrew create`, `gocrew run`, `gocrew kickoff`)
 - Dashboard server with real-time metrics
 
 ### 🔧 Fixed

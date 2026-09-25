@@ -25,8 +25,8 @@ func main() {
 	}
 
 	myCrew := gocrew.NewCrew(gocrew.CrewConfig{
-		Agents:  []gocrew.CoreAgent{agent},
-		Tasks:   []*gocrew.Task{task},
+		Agents: []gocrew.CoreAgent{agent},
+		Tasks:  []*gocrew.Task{task},
 	})
 
 	fmt.Println("🚀 Executing Task and generating Speech (Elite Multimodal)...")

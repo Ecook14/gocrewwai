@@ -69,16 +69,16 @@ func AgentLogger(parent *slog.Logger, agentRole, taskDesc string) *slog.Logger {
 
 // AuditEntry represents a single auditable event.
 type AuditEntry struct {
-	Timestamp   time.Time              `json:"timestamp"`
-	EventType   string                 `json:"event_type"` // "llm_call", "tool_exec", "task_complete", etc
-	AgentRole   string                 `json:"agent_role,omitempty"`
-	Action      string                 `json:"action"`
-	Input       string                 `json:"input,omitempty"`  // Truncated and redacted for security
-	Output      string                 `json:"output,omitempty"` // Truncated and redacted for security
-	Duration    time.Duration          `json:"duration_ms,omitempty"`
-	Success     bool                   `json:"success"`
-	Error       string                 `json:"error,omitempty"` // Redacted for security
-	Metadata    map[string]interface{} `json:"metadata,omitempty"`
+	Timestamp time.Time              `json:"timestamp"`
+	EventType string                 `json:"event_type"` // "llm_call", "tool_exec", "task_complete", etc
+	AgentRole string                 `json:"agent_role,omitempty"`
+	Action    string                 `json:"action"`
+	Input     string                 `json:"input,omitempty"`  // Truncated and redacted for security
+	Output    string                 `json:"output,omitempty"` // Truncated and redacted for security
+	Duration  time.Duration          `json:"duration_ms,omitempty"`
+	Success   bool                   `json:"success"`
+	Error     string                 `json:"error,omitempty"` // Redacted for security
+	Metadata  map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // AuditLogger writes structured, append-only audit entries for compliance.
@@ -225,12 +225,12 @@ func redactSlice(s []interface{}) []interface{} {
 
 // Precompiled regex patterns for sensitive data detection.
 var (
-	apiKeyPattern       = regexp.MustCompile(`(api[_-]?key["']?[:=]\s*["']?)[A-Za-z0-9_\-]{8,}(["']?)`)
+	apiKeyPattern      = regexp.MustCompile(`(api[_-]?key["']?[:=]\s*["']?)[A-Za-z0-9_\-]{8,}(["']?)`)
 	bearerTokenPattern = regexp.MustCompile(`(Bearer\s+)[A-Za-z0-9\-._~+/=]{10,}`)
-	passwordPattern     = regexp.MustCompile(`(password["']?[:=]\s*["']?)[^\s"']{4,}(["']?)`)
-	secretPattern       = regexp.MustCompile(`(secret["']?[:=]\s*["']?)[^\s"']{8,}(["']?)`)
-	emailPattern        = regexp.MustCompile(`[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`)
-	phonePattern        = regexp.MustCompile(`(?:\+?\d{1,3}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{4}`)
+	passwordPattern    = regexp.MustCompile(`(password["']?[:=]\s*["']?)[^\s"']{4,}(["']?)`)
+	secretPattern      = regexp.MustCompile(`(secret["']?[:=]\s*["']?)[^\s"']{8,}(["']?)`)
+	emailPattern       = regexp.MustCompile(`[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`)
+	phonePattern       = regexp.MustCompile(`(?:\+?\d{1,3}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{4}`)
 )
 
 // ---------------------------------------------------------------------------

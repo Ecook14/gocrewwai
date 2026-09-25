@@ -65,5 +65,5 @@ func (t *YAMLReadTool) ArgsSchema() []ArgSchema {
 	}
 }
 func (t *YAMLReadTool) CacheFunction(input map[string]interface{}) string { return "" }
-func (t *YAMLReadTool) Name() string { return t.BaseTool.NameValue }
-func (t *YAMLReadTool) Description() string { return t.BaseTool.DescriptionValue }
+func (t *YAMLReadTool) Name() string                                      { return t.BaseTool.NameValue }
+func (t *YAMLReadTool) Description() string                               { return t.BaseTool.DescriptionValue }

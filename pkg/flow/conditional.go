@@ -139,6 +139,7 @@ func (f *Flow) AddParallelNodes(nodes []Node) {
 	}
 	f.AddNode(wrapped)
 }
+
 // OnEvent is a DX-friendly wrapper for registering event listeners.
 // It allows for cleaner flow definitions in a builder-like style.
 func (f *Flow) OnEvent(event string, handler Node) *Flow {

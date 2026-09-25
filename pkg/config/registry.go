@@ -26,7 +26,7 @@ func GetClient(modelName string) (llm.Client, error) {
 
 	cfg := Get()
 	modelCfg, ok := cfg.Models[modelName]
-	
+
 	var providerID, actualModelID string
 	if ok {
 		providerID = modelCfg.ProviderID

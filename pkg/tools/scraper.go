@@ -26,7 +26,6 @@ func NewScraperTool() *ScraperTool {
 	}
 }
 
-
 func (t *ScraperTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	urlStr, ok := input["url"].(string)
 	if !ok {
@@ -108,7 +107,7 @@ func (t *ScraperTool) validateURL(rawURL string) error {
 			return fmt.Errorf("access to cloud metadata endpoint %s is blocked", host)
 		}
 	}
-	
+
 	// Block the metadata path prefix regardless of host.
 	if strings.HasPrefix(u.Path, "/metadata") || strings.HasPrefix(u.Path, "/latest/meta-data") {
 		return fmt.Errorf("access to metadata paths is blocked")
@@ -174,5 +173,5 @@ func stripHTMLText(html string) string {
 	return sb.String()
 }
 
-func (t *ScraperTool) Name() string { return t.BaseTool.NameValue }
+func (t *ScraperTool) Name() string        { return t.BaseTool.NameValue }
 func (t *ScraperTool) Description() string { return t.BaseTool.DescriptionValue }

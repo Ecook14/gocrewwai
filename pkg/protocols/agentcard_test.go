@@ -44,15 +44,15 @@ func TestAgentCard_Validate(t *testing.T) {
 		{
 			name: "missing endpoint",
 			card: &AgentCard{
-				ID:    "test-agent",
-				Name:  "Test Agent",
+				ID:      "test-agent",
+				Name:    "Test Agent",
 				Version: "1.0.0",
 			},
 			wantErr: true,
 		},
 		{
-			name: "missing all required fields",
-			card: &AgentCard{},
+			name:    "missing all required fields",
+			card:    &AgentCard{},
 			wantErr: true,
 		},
 	}
@@ -69,12 +69,12 @@ func TestAgentCard_Validate(t *testing.T) {
 
 func TestAgentCard_ToJSON(t *testing.T) {
 	card := &AgentCard{
-		ID:          "test-agent",
-		Name:        "Test Agent",
-		Description: "A test agent for serialization",
-		Endpoint:    "http://localhost:8080",
-		Role:        "agent",
-		Version:     "1.0.0",
+		ID:           "test-agent",
+		Name:         "Test Agent",
+		Description:  "A test agent for serialization",
+		Endpoint:     "http://localhost:8080",
+		Role:         "agent",
+		Version:      "1.0.0",
 		Capabilities: []string{"agent_framework", "tool_use"},
 		Metadata: map[string]string{
 			"source": "test",

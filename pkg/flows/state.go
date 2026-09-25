@@ -51,25 +51,25 @@ type FlowNode struct {
 	ID          string
 	Description string
 	Type        NodeType
-	
+
 	// Action is the primary logic for NodeStep and NodeMap items.
 	Action func(ctx context.Context, state State) (State, error)
-	
+
 	// Router used for NodeRouter to determine next hop.
 	Router func(state State) string
-	
+
 	// Parallel branches used for NodeParallel.
 	ParallelBranches []string
-	
+
 	// MapConfig used for NodeMap items.
 	MapSourceKey string // Key in state.Data that contains []interface{}
 	MapResultKey string // Key in state.Data to store results
-	
+
 	// Merge is used for NodeReduce to combine states from multiple branches.
 	Merge func(states []State) State
 
 	// Next is the default sequel for NodeStep and NodeReduce.
-	Next []string 
+	Next []string
 }
 
 // Flow is the top-level orchestration unit for complex multi-crew workflows.

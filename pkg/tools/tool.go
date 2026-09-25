@@ -1,6 +1,8 @@
 package tools
 
-import "context"
+import (
+	"context"
+)
 
 // ArgSchema describes a single input argument for a tool.
 type ArgSchema struct {

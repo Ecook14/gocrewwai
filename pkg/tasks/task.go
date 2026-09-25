@@ -5,63 +5,63 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
-	"os"
-	"strings"
-	"time"
 	"github.com/Ecook14/gocrewwai/pkg/core"
 	crewErrors "github.com/Ecook14/gocrewwai/pkg/errors"
-	"github.com/Ecook14/gocrewwai/pkg/guardrails"
 	"github.com/Ecook14/gocrewwai/pkg/events"
+	"github.com/Ecook14/gocrewwai/pkg/guardrails"
+	"github.com/Ecook14/gocrewwai/pkg/i18n"
 	"github.com/Ecook14/gocrewwai/pkg/telemetry"
 	"github.com/Ecook14/gocrewwai/pkg/tools"
-	"github.com/Ecook14/gocrewwai/pkg/i18n"
+	"log/slog"
+	"os"
 	"path/filepath"
+	"strings"
+	"time"
 )
 
 // TaskConfig defines the parameters for creating a new Task in a declarative style.
 type TaskConfig struct {
-	Name               string
-	Description        string
-	ExpectedOutput     string
-	Agent              core.Agent
-	AgentRole          string // Optional: For late binding
-	Tools              []tools.Tool
-	AsyncExecution     bool
-	OutputFile         string
-	CreateDirectory    bool
-	OutputJSON         interface{} // Struct to unmarshal the result into
-	Markdown           bool
-	OutputSchema       string      // JSON schema for validation
-	MaxRetries         int
+	Name                string
+	Description         string
+	ExpectedOutput      string
+	Agent               core.Agent
+	AgentRole           string // Optional: For late binding
+	Tools               []tools.Tool
+	AsyncExecution      bool
+	OutputFile          string
+	CreateDirectory     bool
+	OutputJSON          interface{} // Struct to unmarshal the result into
+	Markdown            bool
+	OutputSchema        string // JSON schema for validation
+	MaxRetries          int
 	GuardrailMaxRetries int
-	Context            []*Task
-	HumanInput         bool
-	Guardrails         []guardrails.Guardrail
-	CallbackOnComplete func(result interface{})
-	Timeout            time.Duration
-	Language           string // NEW: Preferred language for task prompts/errors
+	Context             []*Task
+	HumanInput          bool
+	Guardrails          []guardrails.Guardrail
+	CallbackOnComplete  func(result interface{})
+	Timeout             time.Duration
+	Language            string // NEW: Preferred language for task prompts/errors
 }
 
 // Task translates the `class Task` python abstraction into idiomatic Go.
 type Task struct {
-	Name           string `json:"name,omitempty"`
-	Description    string `json:"description"`
-	ExpectedOutput string `json:"expected_output"`
-	Agent          core.Agent `json:"-"`
-	AgentRole      string `json:"agent_role"` // For late binding, especially from UI
-	Tools          []tools.Tool `json:"-"`
-	AsyncExecution bool `json:"-"`
-	OutputFile     string `json:"-"` // Path to save the final task output (.md, .json, etc.)
-	CreateDirectory bool  `json:"-"`
+	Name            string       `json:"name,omitempty"`
+	Description     string       `json:"description"`
+	ExpectedOutput  string       `json:"expected_output"`
+	Agent           core.Agent   `json:"-"`
+	AgentRole       string       `json:"agent_role"` // For late binding, especially from UI
+	Tools           []tools.Tool `json:"-"`
+	AsyncExecution  bool         `json:"-"`
+	OutputFile      string       `json:"-"` // Path to save the final task output (.md, .json, etc.)
+	CreateDirectory bool         `json:"-"`
 
 	// Output Formatting
-	OutputJSON   interface{} `json:"-"`
-	Markdown     bool        `json:"-"`
-	OutputPydan  interface{} `json:"-"` // Deprecated
-	OutputSchema string      `json:"-"` // JSON Schema string
-	MaxRetries   int         `json:"-"` // Retries for schema validation failures
-	GuardrailMaxRetries int  `json:"-"` 
+	OutputJSON          interface{} `json:"-"`
+	Markdown            bool        `json:"-"`
+	OutputPydan         interface{} `json:"-"` // Deprecated
+	OutputSchema        string      `json:"-"` // JSON Schema string
+	MaxRetries          int         `json:"-"` // Retries for schema validation failures
+	GuardrailMaxRetries int         `json:"-"`
 
 	// Execution Tracking
 	Processed bool        `json:"processed"`
@@ -84,14 +84,14 @@ type Task struct {
 
 	// Elite Tier: State Machine & Cyclic Logic
 	// OutputCondition returns a key used to select the next task from NextPaths.
-	OutputCondition func(result interface{}) string  `json:"-"`
-	
+	OutputCondition func(result interface{}) string `json:"-"`
+
 	// NextPaths maps condition keys to the successor tasks.
 	NextPaths map[string]*Task `json:"-"`
 
 	// MaxCycles limits how many times this task can be re-executed in a cycle.
 	MaxCycles int `json:"-"`
-	
+
 	// Timeout enforces a maximum duration for the task execution.
 	Timeout time.Duration `json:"timeout"`
 
@@ -114,25 +114,25 @@ func NewTask(description string, agent core.Agent) *Task {
 // New creates a new Task using a declarative configuration struct (Elite Style).
 func New(cfg TaskConfig) *Task {
 	t := &Task{
-		Name:               cfg.Name,
-		Description:        cfg.Description,
-		ExpectedOutput:     cfg.ExpectedOutput,
-		Agent:              cfg.Agent,
-		AgentRole:          cfg.AgentRole,
-		Tools:              cfg.Tools,
-		AsyncExecution:     cfg.AsyncExecution,
-		OutputFile:         cfg.OutputFile,
-		CreateDirectory:    cfg.CreateDirectory,
-		OutputJSON:         cfg.OutputJSON,
-		Markdown:           cfg.Markdown,
-		OutputSchema:       cfg.OutputSchema,
-		MaxRetries:         cfg.MaxRetries,
+		Name:                cfg.Name,
+		Description:         cfg.Description,
+		ExpectedOutput:      cfg.ExpectedOutput,
+		Agent:               cfg.Agent,
+		AgentRole:           cfg.AgentRole,
+		Tools:               cfg.Tools,
+		AsyncExecution:      cfg.AsyncExecution,
+		OutputFile:          cfg.OutputFile,
+		CreateDirectory:     cfg.CreateDirectory,
+		OutputJSON:          cfg.OutputJSON,
+		Markdown:            cfg.Markdown,
+		OutputSchema:        cfg.OutputSchema,
+		MaxRetries:          cfg.MaxRetries,
 		GuardrailMaxRetries: cfg.GuardrailMaxRetries,
-		Context:            cfg.Context,
-		HumanInput:         cfg.HumanInput,
-		Guardrails:         cfg.Guardrails,
-		CallbackOnComplete: cfg.CallbackOnComplete,
-		Timeout:            cfg.Timeout,
+		Context:             cfg.Context,
+		HumanInput:          cfg.HumanInput,
+		Guardrails:          cfg.Guardrails,
+		CallbackOnComplete:  cfg.CallbackOnComplete,
+		Timeout:             cfg.Timeout,
 	}
 
 	// Initialize I18N
@@ -251,7 +251,7 @@ func (t *Task) Execute(ctx context.Context) (interface{}, error) {
 						result = validated
 						break
 					}
-					err = vErr 
+					err = vErr
 				} else {
 					// result is already a struct/map from structured generation
 					break
@@ -260,7 +260,7 @@ func (t *Task) Execute(ctx context.Context) (interface{}, error) {
 				break
 			}
 		}
-		
+
 		if i < maxRetries-1 {
 			slog.Warn("[⚠️ Task Retry] Validation failed, retrying", slog.Int("iter", i+1), slog.Int("max", maxRetries), slog.Any("error", err))
 			continue
@@ -277,7 +277,7 @@ func (t *Task) Execute(ctx context.Context) (interface{}, error) {
 		if gRetries <= 0 {
 			gRetries = 1
 		}
-		
+
 		for gr := 0; gr < gRetries; gr++ {
 			if resultStr, ok := result.(string); ok {
 				if gErr := guardrails.RunAll(t.Guardrails, resultStr); gErr != nil {
@@ -314,7 +314,7 @@ func (t *Task) Execute(ctx context.Context) (interface{}, error) {
 		} else {
 			outputBytes = []byte(fmt.Sprintf("%v", result))
 		}
-		
+
 		err := os.WriteFile(t.OutputFile, outputBytes, 0644)
 		if err != nil {
 			slog.Error("Failed to auto-save task output", slog.String("file", t.OutputFile), slog.Any("error", err))
@@ -332,7 +332,7 @@ func (t *Task) Execute(ctx context.Context) (interface{}, error) {
 	if t.HumanInput {
 		slog.Info("[🤖 HITL REVIEW] Agent finished task", slog.String("role", t.Agent.GetRole()), slog.Any("result", result))
 		fmt.Print("Press Enter to approve, or type 'edit' to modify the output: ")
-		
+
 		reader := bufio.NewReader(os.Stdin)
 		input, _ := reader.ReadString('\n')
 		input = strings.TrimSpace(input)
@@ -397,8 +397,8 @@ func GetOutput[T any](t *Task) (*T, error) {
 	return nil, fmt.Errorf("task output is of type %T, expected *%T", t.Output, new(T))
 }
 
-func (t *Task) GetDescription() string { return t.Description }
-func (t *Task) GetAgentRole() string   { return t.AgentRole }
+func (t *Task) GetDescription() string    { return t.Description }
+func (t *Task) GetAgentRole() string      { return t.AgentRole }
 func (t *Task) SetOutput(out interface{}) { t.Output = out }
-func (t *Task) SetError(err error)       { t.Error = err }
-func (t *Task) SetProcessed(p bool)      { t.Processed = p }
+func (t *Task) SetError(err error)        { t.Error = err }
+func (t *Task) SetProcessed(p bool)       { t.Processed = p }

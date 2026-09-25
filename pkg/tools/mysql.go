@@ -40,7 +40,6 @@ func NewMySQLTool(dsn string) (*MySQLTool, error) {
 	}, nil
 }
 
-
 func (t *MySQLTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	query, ok := input["query"].(string)
 	if !ok {
@@ -112,6 +111,6 @@ func (t *MySQLTool) executeExec(ctx context.Context, query string) (string, erro
 }
 
 func (t *MySQLTool) RequiresReview() bool { return true }
-func (t *MySQLTool) Name() string { return t.BaseTool.NameValue }
-func (t *MySQLTool) Description() string { return t.BaseTool.DescriptionValue }
-func (t *MySQLTool) Close() error { return t.db.Close() }
+func (t *MySQLTool) Name() string         { return t.BaseTool.NameValue }
+func (t *MySQLTool) Description() string  { return t.BaseTool.DescriptionValue }
+func (t *MySQLTool) Close() error         { return t.db.Close() }

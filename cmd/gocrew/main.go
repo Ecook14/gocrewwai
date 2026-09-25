@@ -1,8 +1,8 @@
 package main
 
 import (
-	"os"
 	"github.com/Ecook14/gocrewwai/internal/cli"
+	"os"
 )
 
 func main() {

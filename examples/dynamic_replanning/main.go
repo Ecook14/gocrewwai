@@ -32,7 +32,7 @@ func main() {
 
 	fmt.Println("🚀 Starting Dynamic Re-planning Demo...")
 	fmt.Println("(The manager might decide to add a 'Packing Suggestion' task after seeing the weather)")
-	
+
 	_, err := myCrew.Kickoff(context.Background())
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)

@@ -112,6 +112,6 @@ func (t *SQLiteTool) executeExec(ctx context.Context, query string) (string, err
 }
 
 func (t *SQLiteTool) RequiresReview() bool { return true }
-func (t *SQLiteTool) Name() string { return t.BaseTool.NameValue }
-func (t *SQLiteTool) Description() string { return t.BaseTool.DescriptionValue }
-func (t *SQLiteTool) Close() error { return t.db.Close() }
+func (t *SQLiteTool) Name() string         { return t.BaseTool.NameValue }
+func (t *SQLiteTool) Description() string  { return t.BaseTool.DescriptionValue }
+func (t *SQLiteTool) Close() error         { return t.db.Close() }

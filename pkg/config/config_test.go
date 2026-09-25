@@ -9,7 +9,7 @@ import (
 func TestConfig_WithFile(t *testing.T) {
 	// Reset the singleton for this test
 	resetGetForTest()
-	
+
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "test_config.json")
 	configContent := `{
@@ -20,7 +20,7 @@ func TestConfig_WithFile(t *testing.T) {
 	os.WriteFile(configPath, []byte(configContent), 0644)
 	os.Setenv("CREW_CONFIG_PATH", configPath)
 	defer os.Unsetenv("CREW_CONFIG_PATH")
-	
+
 	cfg := Get()
 	if cfg == nil {
 		t.Fatal("Expected non-nil config")

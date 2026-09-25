@@ -137,8 +137,8 @@ func stripDockerErrors(out string) string {
 	return out
 }
 
-func (t *CodeSandboxTool) Name() string { return t.BaseTool.NameValue }
-func (t *CodeSandboxTool) Description() string { return t.BaseTool.DescriptionValue }
+func (t *CodeSandboxTool) Name() string         { return t.BaseTool.NameValue }
+func (t *CodeSandboxTool) Description() string  { return t.BaseTool.DescriptionValue }
 func (t *CodeSandboxTool) RequiresReview() bool { return true }
 func (t *CodeSandboxTool) ArgsSchema() map[string]interface{} {
 	return map[string]interface{}{

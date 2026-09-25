@@ -37,7 +37,7 @@ func main() {
 	if err != nil {
 		fmt.Printf("Redis not available, falling back to In-Memory: %v\n", err)
 	}
-	
+
 	var store gocrew.MemoryStore = gocrew.NewInMemCosineStore()
 	if redisStore != nil {
 		store = redisStore

@@ -37,7 +37,7 @@ func (s *InMemEntityStore) Add(ctx context.Context, item *MemoryItem) error {
 	// Internal helper for entity extraction hits
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	if name, ok := item.Metadata["entity"].(string); ok {
 		desc := ""
 		if d, ok := item.Metadata["description"].(string); ok {
@@ -58,7 +58,7 @@ func (s *InMemEntityStore) Search(ctx context.Context, query string, limit int) 
 
 	var results []*MemoryItem
 	query = strings.ToLower(query)
-	
+
 	for name, entity := range s.entities {
 		if strings.Contains(name, query) || strings.Contains(strings.ToLower(entity.Value), query) {
 			results = append(results, &MemoryItem{

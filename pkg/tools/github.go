@@ -36,7 +36,6 @@ func NewGitHubTool(token string) *GitHubTool {
 	}
 }
 
-
 func (t *GitHubTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	action, ok := input["action"].(string)
 	if !ok {

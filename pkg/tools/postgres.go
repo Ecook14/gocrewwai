@@ -37,7 +37,6 @@ func NewPostgresTool(connStr string) (*PostgresTool, error) {
 	}, nil
 }
 
-
 func (t *PostgresTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	queryRaw, ok := input["query"]
 	if !ok {
@@ -112,6 +111,6 @@ func (t *PostgresTool) executeExec(ctx context.Context, query string) (string, e
 }
 
 func (t *PostgresTool) RequiresReview() bool { return true } // SQL interaction should be reviewed
-func (t *PostgresTool) Name() string { return t.BaseTool.NameValue }
-func (t *PostgresTool) Description() string { return t.BaseTool.DescriptionValue }
-func (t *PostgresTool) Close() error { return t.db.Close() }
+func (t *PostgresTool) Name() string         { return t.BaseTool.NameValue }
+func (t *PostgresTool) Description() string  { return t.BaseTool.DescriptionValue }
+func (t *PostgresTool) Close() error         { return t.db.Close() }

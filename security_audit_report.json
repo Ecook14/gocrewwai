@@ -1,0 +1,229 @@
+{
+  "gaps": [
+    {
+      "id": "G-001",
+      "title": "No rate limiting on API server routes",
+      "severity": "High",
+      "location": "pkg/api/server.go setupRoutes()",
+      "whats_missing": "The API server (pkg/api) applies authentication middleware to all routes but has no rate limiting. A single authenticated client can hammer any endpoint — kickoff crews, fetch sessions, open SSE streams — without throttling. The separate pkg/server/server.go has rate limiting, but it runs on a different port (:9090) and is not wired to the API server.",
+      "recommended_fix": "Add rate limiting middleware to the API server's gin router, either port the tokenBucket from pkg/server or use golang.org/x/time/rate. Apply per-IP and per-session-ID limits. Example: r.Use(ginrate.LimitByIP(100, time.Minute)) before authenticationMiddleware, or use a custom middleware that increments a token bucket keyed by IP + session.",
+      "effort": "M"
+    },
+    {
+      "id": "G-002",
+      "title": "No circuit breaker on LLM provider calls",
+      "severity": "High",
+      "location": "pkg/llm/openai.go, pkg/llm/anthropic.go, pkg/llm/middleware.go",
+      "whats_missing": "The retryRoundTripper in openai.go retries 429/5xx with exponential backoff, and the middleware has rate limiting and timeouts, but there is no circuit breaker. If OpenAI/Anthropic starts failing at >15% error rate, requests continue to pile up against the failing provider, wasting time and money. The crew hangs waiting for LLM responses that will never succeed.",
+      "recommended_fix": "Add a circuit breaker wrapper using github.com/sony/gobreaker or a custom implementation. Trip after N consecutive failures or >15% error rate over a sliding window. Return a structured error that the crew engine can use to fail over to an alternate model. Example: cb := gobreaker.NewCircuitBreaker(gobreaker.Settings{Timeout: 30*time.Second, MaxRequests: 5, Interval: 60*time.Second, ReadyToTrip: func(stats gobreaker.Stats) bool { return stats.Failures > 5 } }) then wrap the Generate call.",
+      "effort": "L"
+    },
+    {
+      "id": "G-003",
+      "title": "No input body size limit on API handlers",
+      "severity": "Medium",
+      "location": "pkg/api/handlers.go handleKickoff, pkg/api/server.go",
+      "whats_missing": "The gin server has no MaxRequestBodySize set. A client can send an arbitrarily large JSON payload to handleKickoff, consuming memory and CPU for parsing. No limit is enforced on the size of the crew definition, agent descriptions, or task tools arrays.",
+      "recommended_fix": "Set gin.SetMode(gin.ReleaseMode) and configure http.Server.ReadHeaderTimeout + ReadTimeout. Add a MaxBytesReader or set c.Request.Body with a limit. Example: in handleKickoff, before ShouldBindJSON, wrap the body: c.Request.Body = io.LimitReader(c.Request.Body, 1<<20) // 1MB. Or set router.MaxMultipartFormSize and use a custom middleware that checks Content-Length.",
+      "effort": "S"
+    },
+    {
+      "id": "G-004",
+      "title": "Unbounded goroutine spawn in handleKickoff",
+      "severity": "Medium",
+      "location": "pkg/api/handlers.go handleKickoff lines 106-112",
+      "whats_missing": "handleKickoff spawns a new goroutine per request with no bounded pool, no context propagation to the spawned goroutine's parent (uses context.Background()), and no tracking to prevent goroutine leaks. Under load, an attacker or misbehaving client can exhaust the process's goroutine limit by firing many concurrent kickoff requests.",
+      "recommended_fix": "Use a bounded worker pool (semaphore pattern) with errgroup or a channel-based dispatch. Propagate the request context. Example: sem := make(chan struct{}, 10); go func() { sem <- struct{}{}; defer func() { <-sem }(); if _, err := crw.Kickoff(c.Request.Context()); err != nil { ... } }()",
+      "effort": "M"
+    },
+    {
+      "id": "G-005",
+      "title": "http.DefaultClient in production tool code",
+      "severity": "High",
+      "location": "pkg/tools/serper.go:51, pkg/tools/exa.go:61, pkg/tools/brave.go:57, pkg/llm/usage.go:257",
+      "whats_missing": "Four tools and the price cache use http.DefaultClient.Do() which has no timeout, no custom Transport, and shares a global connection pool. Calls can hang indefinitely, leak connections, or be subject to the default transport's idle connection behavior. This violates the coding standards requirement of no http.DefaultClient.",
+      "recommended_fix": "Replace every http.DefaultClient.Do() with a configured client. For serper, exa, brave: create a package-level http.Client with Timeout: 30*time.Second and a Transport with MaxIdleConns, MaxIdleConnsPerHost, and IdleConnTimeout. For llm/usage.go price cache: same pattern. Example: var httpClient = &http.Client{Timeout: 30*time.Second, Transport: &http.Transport{MaxIdleConns: 10, MaxIdleConnsPerHost: 2, IdleConnTimeout: 90*time.Second}}",
+      "effort": "S"
+    },
+    {
+      "id": "G-006",
+      "title": "Panics in production config loading path",
+      "severity": "High",
+      "location": "pkg/config/config.go lines 168, 181",
+      "whats_missing": "loadConfig() calls panic() when the config file cannot be read or parsed. In a production server, this crashes the process rather than returning a graceful error. If CREW_CONFIG_PATH is unset or the file is malformed, the entire process dies. This also violates DCR-01 (no placeholders/stubs on security paths — a panic is an uncontrolled exit).",
+      "recommended_fix": "Return an error from loadConfig and handle it gracefully in NewServer or main. Log the error and exit with os.Exit(1) only after logging. Example: func Get() (*Config, error) { ... if err != nil { return nil, fmt.Errorf(\"config load failed: %w\", err) } }. Callers must check the error. In main.go, log.Fatalf(\"config: %v\", err) after attempting recovery.",
+      "effort": "M"
+    },
+    {
+      "id": "G-007",
+      "title": "Docker sandbox in code_interpreter uses weak hardening",
+      "severity": "High",
+      "location": "pkg/tools/code_interpreter.go runDocker() lines 145-163",
+      "whats_missing": "The Docker container spawned by CodeInterpreterTool.runDocker() only sets --rm, -m, and --cpu-shares. It does NOT set --network none, --cap-drop ALL, --user 1000:1000, --read-only, --tmpfs /tmp, or --pids-limit. This is a much weaker sandbox than the dedicated pkg/sandbox/docker.go provider which applies all these flags. An attacker who reaches the code interpreter can get network access, capabilities, and root inside the container.",
+      "recommended_fix": "Apply the same hardening flags as pkg/sandbox/docker.go. Use exec.Command with full args array instead of string interpolation. Example: dockerArgs := []string{\"run\", \"--rm\", \"--network\", \"none\", \"--cap-drop\", \"ALL\", \"--user\", \"1000:1000\", \"--read-only\", \"--tmpfs\", \"/tmp:rw,noexec,nosuid\", \"-m\", fmt.Sprintf(\"%dm\", t.MemoryMB), \"--cpu-shares\", fmt.Sprintf(\"%d\", t.CPUShares), \"--pids-limit\", \"100\", t.DockerImage, \"sh\", \"-c\", managedCmd}",
+      "effort": "M"
+    },
+    {
+      "id": "G-008",
+      "title": "ScraperTool and ScrapeWebsiteTool have no SSRF protection",
+      "severity": "High",
+      "location": "pkg/tools/scraper.go Execute(), pkg/tools/scrape_website.go Execute()",
+      "whats_missing": "Both scraping tools perform raw HTTP GETs to arbitrary URLs without any SSRF validation, IP blocking, metadata endpoint filtering, or redirect limits. An attacker can use these tools to probe internal services, access cloud metadata (169.254.169.254), or scan the local network. The HTTPTool has good SSRF protection, but these two tools bypass it entirely.",
+      "recommended_fix": "Add the same validateURL() function from HTTPTool to both scraper tools. Reject private IPs, loopback, cloud metadata endpoints, and limit redirects. Example: reuse the isBlockedIP and metadataHosts checks from HTTPTool.validateURL(). Alternatively, deprecate these tools and route all web fetching through HTTPTool which already has SSRF protection.",
+      "effort": "M"
+    },
+    {
+      "id": "G-009",
+      "title": "DiscordTool, ScraperTool, ScrapeWebsiteTool do not require human review",
+      "severity": "Medium",
+      "location": "pkg/tools/discord.go line 107, pkg/tools/scraper.go line 87, pkg/tools/scrape_website.go line 76",
+      "whats_missing": "DiscordTool.RequiresReview() returns false, allowing an agent to send messages, delete messages, and edit messages in Discord without human approval. ScraperTool and ScrapeWebsiteTool also return false despite being able to fetch arbitrary URLs (SSRF vector). Tools that can post to social platforms or fetch external content should require review by default.",
+      "recommended_fix": "Set RequiresReview() to return true for DiscordTool (message posting/deletion is a privileged action). For scraper tools, either set to true or migrate to HTTPTool which has SSRF protection but still may need review for arbitrary URL fetching. Example: func (d *DiscordTool) RequiresReview() bool { return true }",
+      "effort": "S"
+    },
+    {
+      "id": "G-010",
+      "title": "Config duration parsing silently ignores errors",
+      "severity": "Medium",
+      "location": "pkg/config/config.go lines 197, 200, 203, 206, 209",
+      "whats_missing": "All duration parsing in loadConfig uses time.ParseDuration with the error ignored: cfg.LLM.Timeout, _ = time.ParseDuration(...). If the string is malformed, the duration silently defaults to zero (immediate timeout or infinite TTL depending on context). This can cause LLM calls to timeout instantly or cache entries to never expire.",
+      "recommended_fix": "Log a warning and fall back to a safe default when parsing fails. Example: if cfg.LLM.TimeoutStr != \"\" { if d, err := time.ParseDuration(cfg.LLM.TimeoutStr); err == nil { cfg.LLM.Timeout = d } else { cfg.LLM.Timeout = 30 * time.Second; slog.Warn(\"config: invalid LLM.timeout, using default 30s\", \"error\", err) } }",
+      "effort": "S"
+    },
+    {
+      "id": "G-011",
+      "title": "Auth token comparison is not constant-time",
+      "severity": "Medium",
+      "location": "pkg/api/server.go authenticationMiddleware line 126",
+      "whats_missing": "The auth check uses a direct string comparison: authHeader != \"Bearer \"+authToken. Go's == operator for strings is not guaranteed constant-time and could theoretically leak information about the token via timing side channels. While the practical risk is low for an API token, this is a deviation from secure coding standards.",
+      "recommended_fix": "Use subtle.ConstantTimeCompare or hash.Compare for the token comparison. Example: import \"crypto/subtle\"; expected := []byte(\"Bearer \" + authToken); actual := []byte(authHeader); if subtle.ConstantTimeCompare(actual, expected) != 1 { c.AbortWithStatusJSON(http.StatusUnauthorized, ...) }",
+      "effort": "S"
+    },
+    {
+      "id": "G-012",
+      "title": "No TLS/mTLS on gRPC mesh server",
+      "severity": "High",
+      "location": "pkg/api/mesh_server.go, pkg/api/mesh_client.go",
+      "whats_missing": "The agent mesh gRPC server and client have no TLS configuration visible. The checklist asks whether the client uses credentials.NewTLS or credentials/insecure.NewCredentials(). Without TLS, agent-to-agent communication over the mesh is plaintext and vulnerable to interception or spoofing on the network.",
+      "recommended_fix": "Add TLS to the gRPC server using credentials.NewTLS(tlsConfig) and require clients to use credentials.NewClient with appropriate certificates. For dev environments, allow an insecure mode toggle but default to TLS. Example: server := grpc.NewServer(grpc.Creds(credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS12}))). Client: conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{})))",
+      "effort": "L"
+    },
+    {
+      "id": "G-013",
+      "title": "No API key rotation or secret management",
+      "severity": "Medium",
+      "location": "pkg/config/config.go, pkg/api/server.go, all tool constructors",
+      "whats_missing": "API keys are loaded once at startup from env vars or config.json and never rotated. There is no support for key versioning, multiple active keys, or hot-reloading secrets. If a key is compromised, the process must be restarted to pick up a new key. The config singleton (sync.Once) makes runtime updates difficult.",
+      "recommended_fix": "Add a secret provider interface that can refresh keys at runtime (e.g., from Vault, AWS Secrets Manager, or a file watch). For immediate mitigation, make the config reloadable with a mutex and expose a Refresh() method. Example: type SecretProvider interface { Get(key string) (string, error); Watch(callback func(string, string)) }. For config: replace sync.Once with a reloadable struct protected by a RWMutex.",
+      "effort": "L"
+    },
+    {
+      "id": "G-014",
+      "title": "No multi-tenancy isolation in sessions or checkpoints",
+      "severity": "High",
+      "location": "pkg/api/handlers.go handleGetSession, persistSessionStart, pkg/crew/checkpoint.go",
+      "whats_missing": "Sessions are keyed only by sessionID with no tenant/user scoping. handleGetSession loads any session by ID without checking who requested it. There is no concept of tenant_id or user_id attached to sessions. In a multi-user deployment, any authenticated client can access any other client's session state by guessing or iterating session IDs.",
+      "recommended_fix": "Add a tenant/user identity to the auth context and scope all session queries. Example: in authenticationMiddleware, extract a tenant ID from a claims token or header and store in context. In handleGetSession: tenantID := c.GetString(\"tenant_id\"); if tenantID == \"\" { return 401 }; state, err := s.loadSessionState(tenantID, id) where loadSessionState queries with WHERE tenant_id = $1 AND session_id = $2. Checkpoint store needs the same tenant scoping.",
+      "effort": "L"
+    },
+    {
+      "id": "G-015",
+      "title": "Global event bus broadcasts to all subscribers without session filtering",
+      "severity": "Medium",
+      "location": "pkg/telemetry/events.go GlobalBus.Publish, Subscribe",
+      "whats_missing": "The GlobalBus broadcasts all events to every subscriber regardless of session. An SSE client subscribed to /stream/:id receives events from all sessions, not just its own. The handleSSEStream subscribes to the global bus and streams everything. There is no session-scoped filtering on publish or subscribe.",
+      "recommended_fix": "Add session ID tagging to events and filter at subscribe time. Example: add SessionID field to Event struct. Subscribe(sessionID string) returns a channel that only receives events where e.SessionID == sessionID. Publish filters by checking subscriber session affinity. Alternatively, create per-session buses.",
+      "effort": "M"
+    },
+    {
+      "id": "G-016",
+      "title": "CPU usage metric hardcoded to 0.0",
+      "severity": "Low",
+      "location": "pkg/telemetry/metrics.go startSystemMonitoring line 307",
+      "whats_missing": "The system monitoring goroutine publishes CPU usage as a hardcoded 0.0 with a comment that real CPU tracking requires OS-specific calls. This metric is misleading in dashboards and provides no signal for detecting abnormal load or DoS conditions.",
+      "recommended_fix": "Use a proper CPU measurement library like github.com/shirou/gopsutil/v3/cpu or compute a rolling average from runtime. Read the difference in total CPU time between ticks. Example with gopsutil: percent, _ := cpu.Percent(2*time.Second, false); snap.CPUUsage = percent[0]. For a dependency-free approach: read /proc/stat on Linux, compute delta.",
+      "effort": "S"
+    },
+    {
+      "id": "G-017",
+      "title": "No request timeout on the API server's HTTP handler beyond default",
+      "severity": "Medium",
+      "location": "pkg/api/server.go Run() line 106",
+      "whats_missing": "The API server calls s.router.Run(addr) which creates an http.Server with zero values for ReadTimeout, WriteTimeout, IdleTimeout. This means the server uses Go's defaults (no read timeout, no write timeout), allowing slowloris-style attacks or hanging connections to exhaust resources.",
+      "recommended_fix": "Configure the gin HTTP server explicitly with timeouts. Example: s.router.Run() internally uses http.ListenAndServe which has no timeouts. Instead, create an http.Server manually: srv := &http.Server{Addr: addr, Handler: s.router, ReadTimeout: 10*time.Second, WriteTimeout: 30*time.Second, IdleTimeout: 60*time.Second}; return srv.ListenAndServe()",
+      "effort": "S"
+    },
+    {
+      "id": "G-018",
+      "title": "No webhook signature validation framework",
+      "severity": "Medium",
+      "location": "pkg/protocols/mcp_bridge.go, pkg/protocols/webmcp.go",
+      "whats_missing": "The MCP bridge and web MCP protocols accept incoming connections but there is no webhook signature verification pattern implemented. DCR-03 requires signature + timestamp + server-side re-confirmation for integration endpoints. If these protocols are used to receive webhooks from external systems, there is no cryptographic verification of the sender.",
+      "recommended_fix": "Add a signature verification middleware for any webhook-receiving endpoints. Implement HMAC-SHA256 verification with timestamp skew checking. Example: func VerifyWebhookSignature(payload []byte, signature, secret string, maxAge time.Duration) error { expected := hmacSHA256(payload, secret); if !hmac.Equal(expected, []byte(signature)) { return ErrInvalidSignature }; ... timestamp check ... }",
+      "effort": "L"
+    },
+    {
+      "id": "G-019",
+      "title": "SQLite checkpoint store lacks WAL and concurrency tuning",
+      "severity": "Low",
+      "location": "pkg/crew/sqlite_checkpoint.go",
+      "whats_missing": "No visible configuration of SQLite WAL mode, busy timeout, or connection pool settings. Under concurrent writes (multiple crews, async execution), SQLite may return \"database is locked\" errors without a busy timeout retry. The checkpoint store may also be using a single connection without WAL journal mode.",
+      "recommended_fix": "Enable WAL mode and set a busy timeout on the SQLite connection. Example: conn.Exec(\"PRAGMA journal_mode=WAL\"); conn.Exec(\"PRAGMA busy_timeout=5000\"); conn.Exec(\"PRAGMA synchronous=NORMAL\"). Use a connection pool with sql.Open(\"sqlite3\", path) and set db.SetMaxOpenConns(1) for SQLite (SQLite only supports one writer at a time).",
+      "effort": "S"
+    },
+    {
+      "id": "G-020",
+      "title": "No alerting or anomaly detection on security events",
+      "severity": "Medium",
+      "location": "pkg/telemetry/events.go, pkg/telemetry/logging.go",
+      "whats_missing": "The system logs auth failures, rate limit hits, and tool errors, but there is no alerting mechanism. An attacker fuzzing auth tokens or running a DoS would generate logs that no one is watching. There are no threshold-based alerts, no integration with alerting systems (PagerDuty, Slack alerts, Prometheus alert rules), and no anomaly detection on tool call patterns.",
+      "recommended_fix": "Add a structured alert emission path. Emit alerts when auth failures exceed a threshold per minute, rate limit hits spike, or tool errors cluster. Integrate with the logging system to write alert events to a dedicated channel. Example: AlertManager that accepts events and fires webhooks when thresholds are crossed. Add Prometheus alert rules: - alert: HighAuthFailureRate increase rate of auth failures > 10/min for 5m.",
+      "effort": "L"
+    }
+  ],
+  "clean_areas": [
+    "Docker sandbox in pkg/sandbox/docker.go — properly hardened with --network none, --read-only, --tmpfs /tmp, --cap-drop ALL, --user 1000:1000, memory/CPU/pids limits",
+    "Path traversal prevention in pkg/utils/security.go — ValidatePath implements chroot validation with double-prefix check and depth limit; FileWriteSanitize re-validates after Clean",
+    "Shell command allowlist in pkg/tools/shell.go — empty AllowedCommands denies all (secure default); blacklist is defense-in-depth; timeout enforced via context",
+    "HTTPTool SSRF protection in pkg/tools/http_client.go — blocks cloud metadata endpoints, private/loopback IPs, limits redirects to 10, limits response body size",
+    "CodeInterpreterTool host execution prevention in pkg/tools/code_interpreter.go — refuses to execute on host when no sandbox configured; clear error message",
+    "FileReadTool and FileWriteTool path validation — both call ValidatePath; FileWriteTool additionally re-validates after filepath.Clean",
+    "Guardrails framework in pkg/guardrails/guardrails.go — structured input/output validation with multiple guardrail types (token limit, content filter, JSON schema, PII detection)",
+    "Metrics and Prometheus endpoint in pkg/telemetry/metrics.go — comprehensive LLM, token, task, tool, and system metrics exposed at /metrics; structured Prometheus text format",
+    "Event bus with non-blocking publish in pkg/telemetry/events.go — Publish uses select/default to avoid blocking; subscribers have bounded buffer (100)",
+    "Retry with exponential backoff in pkg/llm/openai.go retryRoundTripper — retries 429/5xx with backoff, respects Retry-After header, detects hard quota limits, fails fast on total limit exceeded",
+    "Rate limiting in pkg/server/server.go — token bucket per-IP rate limiting with configurable rate/window; applied before auth in middleware chain; health endpoints excluded",
+    "API key authentication in pkg/server/server.go — API key validation on all non-health endpoints; pprof endpoints protected when API keys are configured",
+    "Structured logging middleware in pkg/server/server.go — logs method, path, remote IP, status, duration, user agent for every request",
+    "Tool review requirements in pkg/tools/ — 17 tools correctly return RequiresReview() = true (SendGrid, Email, Slack, Twilio, GitHub, SQL tools, MongoDB, Postgres, MySQL, Google Sheets, Linear, Notion, HubSpot, Jira, browser, WASM sandbox)",
+    "SendGrid API key masking in pkg/tools/sendgrid.go — apiKey field is masked in constructor"
+  ],
+  "priority_matrix": {
+    "immediate": [
+      "G-005: Replace http.DefaultClient in 4 locations (serper, exa, brave, llm/usage)",
+      "G-006: Replace panic() in config.go with error return + graceful handling",
+      "G-008: Add SSRF protection to ScraperTool and ScrapeWebsiteTool",
+      "G-001: Add rate limiting to API server routes in pkg/api/server.go"
+    ],
+    "this_sprint": [
+      "G-007: Harden Docker sandbox in code_interpreter.go runDocker() with --network none, --cap-drop ALL, --user, --read-only, --tmpfs, --pids-limit",
+      "G-002: Add circuit breaker to LLM client calls",
+      "G-009: Set RequiresReview()=true on DiscordTool, ScraperTool",
+      "G-014: Add tenant isolation to session queries and checkpoint store",
+      "G-017: Set HTTP server timeouts on API server (ReadTimeout, WriteTimeout, IdleTimeout)",
+      "G-003: Add request body size limit on API handlers",
+      "G-004: Bound goroutine spawn in handleKickoff with semaphore + context propagation",
+      "G-010: Fix silent duration parse errors in config.go with warnings + safe defaults"
+    ],
+    "backlog": [
+      "G-012: Add TLS/mTLS to gRPC mesh server and client",
+      "G-013: Add secret rotation / hot-reload support for API keys",
+      "G-018: Add webhook signature verification framework for MCP bridge and web MCP",
+      "G-020: Add alerting and anomaly detection on security events",
+      "G-011: Use constant-time comparison for auth token check",
+      "G-015: Add session-scoped filtering to GlobalBus event subscription",
+      "G-016: Implement real CPU usage metric instead of hardcoded 0.0",
+      "G-019: Enable SQLite WAL mode and busy timeout in checkpoint store"
+    ]
+  }
+}

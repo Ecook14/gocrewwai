@@ -17,18 +17,18 @@ import (
 type TestResult struct {
 	Iteration    int           `json:"iteration"`
 	Duration     time.Duration `json:"duration"`
-	Score        int           `json:"score"`         // 1-10
+	Score        int           `json:"score"` // 1-10
 	Feedback     string        `json:"feedback"`
 	OutputSample string        `json:"output_sample"`
 }
 
 // PerformanceSuite aggregates metrics across multiple test runs.
 type PerformanceSuite struct {
-	Results      []TestResult `json:"results"`
-	AverageScore float64      `json:"average_score"`
+	Results      []TestResult  `json:"results"`
+	AverageScore float64       `json:"average_score"`
 	AverageTime  time.Duration `json:"average_time"`
-	TotalTokens  int          `json:"total_tokens"`
-	PassRate     float64      `json:"pass_rate"`
+	TotalTokens  int           `json:"total_tokens"`
+	PassRate     float64       `json:"pass_rate"`
 }
 
 // ============================================================
@@ -79,7 +79,7 @@ func (e *Evaluator) EvaluateCrew(ctx context.Context, app Orchestrator) (*Perfor
 
 	for i := 0; i < e.Config.Runs; i++ {
 		start := time.Now()
-		
+
 		// Run the crew
 		output, err := app.Kickoff(ctx)
 		duration := time.Since(start)
@@ -89,7 +89,7 @@ func (e *Evaluator) EvaluateCrew(ctx context.Context, app Orchestrator) (*Perfor
 		}
 
 		outStr := fmt.Sprintf("%v", output)
-		
+
 		// Score the run
 		score, feedback, err := e.ScoreResult(ctx, e.Config.Rubric, e.Config.ExpectedSchema, outStr)
 		if err != nil {
@@ -121,7 +121,7 @@ func (e *Evaluator) EvaluateCrew(ctx context.Context, app Orchestrator) (*Perfor
 			passes++
 		}
 	}
-	
+
 	// Dynamically attach pass rate to the suite
 	suite.PassRate = float64(passes) / float64(e.Config.Runs)
 
@@ -155,10 +155,10 @@ FEEDBACK: [1-2 sentences explaining the score]`, taskDesc, expected, output)
 	score := 0
 	feedback := ""
 	fmt.Sscanf(response, "SCORE: %d", &score)
-	
+
 	feedbackIdx := fmt.Sprintln("FEEDBACK:")
 	_ = feedbackIdx // Placeholder for parsing logic
-	
+
 	// Basic parsing
 	lines := splitLines(response)
 	for _, line := range lines {

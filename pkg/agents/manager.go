@@ -6,20 +6,19 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/Ecook14/gocrewwai/pkg/llm"
-	"github.com/Ecook14/gocrewwai/pkg/protocols"
 	"github.com/Ecook14/gocrewwai/pkg/core"
 	"github.com/Ecook14/gocrewwai/pkg/flows"
+	"github.com/Ecook14/gocrewwai/pkg/llm"
+	"github.com/Ecook14/gocrewwai/pkg/protocols"
 )
-
 
 // ManagerAgent is a specialized agent that orchestrates other agents.
 // It handles task delegation, validation, and result aggregation.
 type ManagerAgent struct {
 	Agent
 	ManagedAgents []core.Agent
-	A2AClient    *protocols.A2AClient
-	Discovery    *protocols.AgentDiscovery
+	A2AClient     *protocols.A2AClient
+	Discovery     *protocols.AgentDiscovery
 }
 
 // NewManagerAgent creates a new manager agent with default delegation capabilities.
@@ -48,7 +47,9 @@ func (m *ManagerAgent) DelegateTask(ctx context.Context, taskDescription string)
 	if len(remoteCards) > 0 {
 		agentRoles += "\nREMOTE AGENTS (AVAILABLE VIA NETWORK):\n"
 		for _, card := range remoteCards {
-			if card.ID == m.A2AID { continue } // Skip self
+			if card.ID == m.A2AID {
+				continue
+			} // Skip self
 			agentRoles += fmt.Sprintf("- %s: %s (Remote ID: %s)\n", card.Role, card.Description, card.ID)
 		}
 	}
@@ -77,7 +78,7 @@ Respond ONLY with the name of the 'Role' of the agent. If it is a remote agent, 
 	}
 
 	chosenRole := strings.TrimSpace(response)
-	
+
 	// 1. Check local agents first
 	for _, a := range m.ManagedAgents {
 		if strings.Contains(strings.ToLower(chosenRole), strings.ToLower(a.GetRole())) {
@@ -112,17 +113,17 @@ func (m *ManagerAgent) DelegateParallelTasks(ctx context.Context, taskDescriptio
 
 	// 1. Create a dynamic flow
 	flow := flows.NewFlow("manager-parallel", "parallel-root", &flows.BaseState{Data: make(map[string]interface{})})
-	
+
 	parallelNode := &flows.FlowNode{
 		ID:   "parallel-root",
 		Type: flows.NodeParallel,
 		Next: []string{"reduce-node"},
 	}
-	
+
 	for i, task := range taskDescriptions {
 		branchID := fmt.Sprintf("task-%d", i)
 		parallelNode.ParallelBranches = append(parallelNode.ParallelBranches, branchID)
-		
+
 		taskCopy := task
 		flow.AddNode(&flows.FlowNode{
 			ID:   branchID,
@@ -140,9 +141,9 @@ func (m *ManagerAgent) DelegateParallelTasks(ctx context.Context, taskDescriptio
 			},
 		})
 	}
-	
+
 	flow.AddNode(parallelNode)
-	
+
 	// Reduce node to aggregate results
 	flow.AddNode(&flows.FlowNode{
 		ID:   "reduce-node",
@@ -159,18 +160,18 @@ func (m *ManagerAgent) DelegateParallelTasks(ctx context.Context, taskDescriptio
 			return masterState
 		},
 	})
-	
+
 	// 2. Execute flow
 	engine := &flows.Engine{}
 	err := engine.Run(ctx, flow)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if bState, ok := flow.State.(*flows.BaseState); ok {
 		return bState.Data, nil
 	}
-	
+
 	return nil, fmt.Errorf("failed to retrieve state from flow")
 }
 

@@ -20,27 +20,27 @@ type Client struct {
 
 // AgentInfo represents a registered AAMARVA agent.
 type AgentInfo struct {
-	ID               string `json:"id"`
-	AgentID          string `json:"agentId"`
+	ID                 string `json:"id"`
+	AgentID            string `json:"agentId"`
 	VerificationStatus string `json:"verificationStatus"`
-	Name             string `json:"name"`
-	Avatar           string `json:"avatar"`
-	Bio              string `json:"bio"`
-	CreatedAt        string `json:"createdAt"`
+	Name               string `json:"name"`
+	Avatar             string `json:"avatar"`
+	Bio                string `json:"bio"`
+	CreatedAt          string `json:"createdAt"`
 }
 
 // Post represents a post on the AAMARVA Floor.
 type Post struct {
-	ID                string `json:"id"`
-	UserID            string `json:"userId"`
-	AgentID           string `json:"agentId"`
-	AgentName         string `json:"agentName"`
-	Category          string `json:"category"`
-	Content           string `json:"content"`
-	Type              string `json:"type"`
-	CreatedAt         string `json:"createdAt"`
-	RepliesCount      int    `json:"repliesCount"`
-	ConnectionsCount  int    `json:"connectionsCount"`
+	ID               string `json:"id"`
+	UserID           string `json:"userId"`
+	AgentID          string `json:"agentId"`
+	AgentName        string `json:"agentName"`
+	Category         string `json:"category"`
+	Content          string `json:"content"`
+	Type             string `json:"type"`
+	CreatedAt        string `json:"createdAt"`
+	RepliesCount     int    `json:"repliesCount"`
+	ConnectionsCount int    `json:"connectionsCount"`
 }
 
 // SearchResult represents a search response from AAMARVA.
@@ -64,7 +64,9 @@ func NewClient() *Client {
 func (c *Client) Register(ctx context.Context, name, bio string) (*AgentInfo, error) {
 	reqBody, _ := json.Marshal(map[string]string{"name": name, "bio": bio})
 	resp, err := c.post(ctx, "/auth/register", reqBody)
-	if err != nil { return nil, fmt.Errorf("registration failed: %w", err) }
+	if err != nil {
+		return nil, fmt.Errorf("registration failed: %w", err)
+	}
 	defer resp.Body.Close()
 	var result struct {
 		Success bool `json:"success"`
@@ -88,7 +90,9 @@ func (c *Client) Login(ctx context.Context) error {
 	}
 	reqBody, _ := json.Marshal(map[string]string{"agentId": c.AgentID, "apiKey": c.APIKey})
 	resp, err := c.post(ctx, "/auth/login", reqBody)
-	if err != nil { return fmt.Errorf("login failed: %w", err) }
+	if err != nil {
+		return fmt.Errorf("login failed: %w", err)
+	}
 	defer resp.Body.Close()
 	var result struct {
 		Success bool `json:"success"`
@@ -107,7 +111,9 @@ func (c *Client) Login(ctx context.Context) error {
 func (c *Client) SearchAgents(ctx context.Context, query string, limit int) (*SearchResult, error) {
 	url := fmt.Sprintf("%s/agents?q=%s&limit=%d", c.BaseURL, query, limit)
 	resp, err := c.get(ctx, url)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer resp.Body.Close()
 	var result SearchResult
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
@@ -120,7 +126,9 @@ func (c *Client) SearchAgents(ctx context.Context, query string, limit int) (*Se
 func (c *Client) SearchPosts(ctx context.Context, query string, limit int) (*SearchResult, error) {
 	url := fmt.Sprintf("%s/posts?q=%s&limit=%d", c.BaseURL, query, limit)
 	resp, err := c.get(ctx, url)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer resp.Body.Close()
 	var result SearchResult
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
@@ -133,7 +141,9 @@ func (c *Client) SearchPosts(ctx context.Context, query string, limit int) (*Sea
 func (c *Client) CreatePost(ctx context.Context, category, content, postType string) (*Post, error) {
 	reqBody, _ := json.Marshal(map[string]string{"category": category, "content": content, "type": postType})
 	resp, err := c.post(ctx, "/posts", reqBody)
-	if err != nil { return nil, fmt.Errorf("create post failed: %w", err) }
+	if err != nil {
+		return nil, fmt.Errorf("create post failed: %w", err)
+	}
 	defer resp.Body.Close()
 	var result struct {
 		Success bool `json:"success"`
@@ -149,7 +159,9 @@ func (c *Client) CreatePost(ctx context.Context, category, content, postType str
 func (c *Client) ReplyToPost(ctx context.Context, postID, content string) error {
 	reqBody, _ := json.Marshal(map[string]string{"postId": postID, "content": content})
 	_, err := c.post(ctx, "/replies", reqBody)
-	if err != nil { return fmt.Errorf("reply failed: %w", err) }
+	if err != nil {
+		return fmt.Errorf("reply failed: %w", err)
+	}
 	return nil
 }
 
@@ -157,14 +169,18 @@ func (c *Client) ReplyToPost(ctx context.Context, postID, content string) error 
 func (c *Client) EstablishConnection(ctx context.Context, targetAgentID string) error {
 	reqBody, _ := json.Marshal(map[string]string{"targetAgentId": targetAgentID})
 	_, err := c.post(ctx, "/connections", reqBody)
-	if err != nil { return fmt.Errorf("connection failed: %w", err) }
+	if err != nil {
+		return fmt.Errorf("connection failed: %w", err)
+	}
 	return nil
 }
 
 // GetStats retrieves AAMARVA network statistics.
 func (c *Client) GetStats(ctx context.Context) (*SearchResult, error) {
 	resp, err := c.get(ctx, fmt.Sprintf("%s/stats", c.BaseURL))
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer resp.Body.Close()
 	var result SearchResult
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
@@ -176,7 +192,9 @@ func (c *Client) GetStats(ctx context.Context) (*SearchResult, error) {
 // GetADK retrieves the AAMARVA Platform Specification.
 func (c *Client) GetADK(ctx context.Context) (*SearchResult, error) {
 	resp, err := c.get(ctx, fmt.Sprintf("%s/adk", c.BaseURL))
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer resp.Body.Close()
 	var result SearchResult
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {

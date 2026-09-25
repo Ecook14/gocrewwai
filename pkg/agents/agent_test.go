@@ -20,17 +20,25 @@ func (m *mockLLM) Generate(ctx context.Context, messages []llm.Message, options 
 	}
 	return "Success", nil
 }
-func (m *mockLLM) GenerateWithUsage(ctx context.Context, messages []llm.Message, options llm.GenerateOptions) (string, *llm.Usage, error) { return "", nil, nil }
-func (m *mockLLM) GenerateStructured(ctx context.Context, messages []llm.Message, schema interface{}, options llm.GenerateOptions) (interface{}, error) { return nil, nil }
-func (m *mockLLM) StreamGenerate(ctx context.Context, messages []llm.Message, options llm.GenerateOptions) (<-chan string, error) { return nil, nil }
-func (m *mockLLM) GenerateEmbedding(ctx context.Context, text string, options llm.GenerateOptions) ([]float32, error) { return nil, nil }
+func (m *mockLLM) GenerateWithUsage(ctx context.Context, messages []llm.Message, options llm.GenerateOptions) (string, *llm.Usage, error) {
+	return "", nil, nil
+}
+func (m *mockLLM) GenerateStructured(ctx context.Context, messages []llm.Message, schema interface{}, options llm.GenerateOptions) (interface{}, error) {
+	return nil, nil
+}
+func (m *mockLLM) StreamGenerate(ctx context.Context, messages []llm.Message, options llm.GenerateOptions) (<-chan string, error) {
+	return nil, nil
+}
+func (m *mockLLM) GenerateEmbedding(ctx context.Context, text string, options llm.GenerateOptions) ([]float32, error) {
+	return nil, nil
+}
 
 type mockTool struct {
-	name string
+	name        string
 	executeFunc func(ctx context.Context, input map[string]interface{}) (string, error)
 }
 
-func (m *mockTool) Name() string { return m.name }
+func (m *mockTool) Name() string        { return m.name }
 func (m *mockTool) Description() string { return m.name }
 func (m *mockTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	if m.executeFunc != nil {
@@ -38,8 +46,8 @@ func (m *mockTool) Execute(ctx context.Context, input map[string]interface{}) (s
 	}
 	return "", nil
 }
-func (m *mockTool) RequiresReview() bool { return false }
-func (m *mockTool) ArgsSchema() []tools.ArgSchema { return nil }
+func (m *mockTool) RequiresReview() bool                              { return false }
+func (m *mockTool) ArgsSchema() []tools.ArgSchema                     { return nil }
 func (m *mockTool) CacheFunction(input map[string]interface{}) string { return "" }
 
 func TestAgentExecute_Basic(t *testing.T) {
@@ -69,11 +77,11 @@ func TestAgentExecute_SelfHealing(t *testing.T) {
 		},
 	}
 	agent := &Agent{
-		Role:        "Healer",
-		Goal:        "Test self-healing",
-		LLM:         mock,
-		Tools:       []tools.Tool{failingTool},
-		SelfHealing: true,
+		Role:          "Healer",
+		Goal:          "Test self-healing",
+		LLM:           mock,
+		Tools:         []tools.Tool{failingTool},
+		SelfHealing:   true,
 		MaxIterations: 3,
 	}
 	i18nInst, _ := i18n.NewI18N("en")
@@ -84,9 +92,9 @@ func TestAgentExecute_SelfHealing(t *testing.T) {
 func TestAgentExecute_WithReview(t *testing.T) {
 	tool := &mockTool{name: "ReviewTool"}
 	agent := &Agent{
-		Role: "HITLTester",
-		LLM:  &mockLLM{},
-		Tools: []tools.Tool{tool},
+		Role:         "HITLTester",
+		LLM:          &mockLLM{},
+		Tools:        []tools.Tool{tool},
 		UsageMetrics: make(map[string]int),
 		StepReview: func(toolName string, input interface{}) bool {
 			return true

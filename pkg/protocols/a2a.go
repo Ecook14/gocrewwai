@@ -24,8 +24,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gorilla/websocket"
 	"github.com/Ecook14/gocrewwai/pkg/telemetry"
+	"github.com/gorilla/websocket"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -72,7 +72,7 @@ var upgrader = websocket.Upgrader{
 type A2AClient struct {
 	httpClient *http.Client
 	AuthToken  string
-	
+
 	// Simple Circuit Breaker per endpoint
 	mu       sync.Mutex
 	failures map[string]int
@@ -130,7 +130,7 @@ func (c *A2AClient) SendWithRetry(ctx context.Context, endpoint string, msg A2AM
 			return resp, nil
 		}
 		lastErr = err
-		
+
 		// Don't retry on certain errors (e.g., Auth failure)
 		if strings.Contains(err.Error(), "status 401") || strings.Contains(err.Error(), "status 403") {
 			return nil, err
@@ -241,13 +241,13 @@ func (c *A2AClient) doSend(ctx context.Context, endpoint string, msg A2AMessage)
 func (c *A2AClient) checkCircuit(endpoint string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	if c.failures[endpoint] >= 5 {
 		if time.Since(c.lastFail[endpoint]) < 30*time.Second {
 			return fmt.Errorf("a2a: circuit breaker open for %s", endpoint)
 		}
 		// Half-open: allow one request
-		c.failures[endpoint] = 4 
+		c.failures[endpoint] = 4
 	}
 	return nil
 }
@@ -324,7 +324,7 @@ func (s *A2AServer) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	if s.AuthToken != "" {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
-			// Subprotocols or query params could also be used for WS auth, 
+			// Subprotocols or query params could also be used for WS auth,
 			// but here we check the initial header.
 			authHeader = r.URL.Query().Get("token")
 		}
@@ -337,7 +337,7 @@ func (s *A2AServer) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// We need a way to pass the "stream back" capability to the handler.
 	// We'll use the context for this.
 	ctx := context.WithValue(r.Context(), "a2a_ws_conn", conn)
-	
+
 	response, err := s.Router.Route(ctx, msg)
 	if err != nil {
 		_ = conn.WriteJSON(A2AMessage{Type: A2AError, Payload: map[string]interface{}{"error": err.Error()}})
@@ -374,7 +374,7 @@ func (s *A2AServer) handleMessage(w http.ResponseWriter, r *http.Request) {
 	// Route the message
 	ctx := r.Context()
 	if msg.TraceID != "" {
-		// In a real Otel setup, we'd use a propagator, but here we simulate 
+		// In a real Otel setup, we'd use a propagator, but here we simulate
 		// by starting a new span with the context and logging the trace ID.
 		var span trace.Span
 		ctx, span = telemetry.StartSpan(ctx, "A2A."+msg.Action)
@@ -431,14 +431,14 @@ type AgentCard struct {
 
 // A2AMessage is the standard envelope for inter-agent communication.
 type A2AMessage struct {
-	ID          string                 `json:"id"`
-	From        string                 `json:"from"`         // Sender agent ID
-	To          string                 `json:"to"`           // Recipient agent ID
-	Type        A2AMessageType         `json:"type"`         // request, response, event, error
-	Action      string                 `json:"action"`       // What the sender wants (e.g., "delegate_task", "ask_question")
-	Payload     map[string]interface{} `json:"payload"`
-	CorrelationID string              `json:"correlation_id,omitempty"` // Links request ↔ response
-	TraceID       string              `json:"trace_id,omitempty"`       // OpenTelemetry Trace Context
+	ID            string                 `json:"id"`
+	From          string                 `json:"from"`   // Sender agent ID
+	To            string                 `json:"to"`     // Recipient agent ID
+	Type          A2AMessageType         `json:"type"`   // request, response, event, error
+	Action        string                 `json:"action"` // What the sender wants (e.g., "delegate_task", "ask_question")
+	Payload       map[string]interface{} `json:"payload"`
+	CorrelationID string                 `json:"correlation_id,omitempty"` // Links request ↔ response
+	TraceID       string                 `json:"trace_id,omitempty"`       // OpenTelemetry Trace Context
 	Timestamp     time.Time              `json:"timestamp"`
 }
 

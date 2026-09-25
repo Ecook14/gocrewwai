@@ -5,19 +5,19 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"sync"
 	"strings"
+	"sync"
 
 	"github.com/Ecook14/gocrewwai/pkg/agents"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/memory"
 	"github.com/Ecook14/gocrewwai/pkg/protocols"
+	"github.com/Ecook14/gocrewwai/pkg/sandbox"
 	"github.com/Ecook14/gocrewwai/pkg/tasks"
 	"github.com/Ecook14/gocrewwai/pkg/telemetry"
 	"github.com/Ecook14/gocrewwai/pkg/tools"
-	"github.com/Ecook14/gocrewwai/pkg/sandbox"
-	"github.com/gorilla/websocket"
 	"github.com/Ecook14/gocrewwai/web-ui"
+	"github.com/gorilla/websocket"
 	"runtime"
 	"time"
 )
@@ -137,7 +137,7 @@ func (s *WSServer) handleReview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	telemetry.GlobalReviewManager.SubmitReview(req.ReviewID, req.Approved)
-	
+
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"ok"}`))
 }
@@ -194,7 +194,7 @@ func (s *WSServer) handleCreateAgent(w http.ResponseWriter, r *http.Request) {
 	// Dynamic Creation Logic
 	var client llm.Client
 	apiKey := req.APIKey
-	
+
 	switch strings.ToLower(req.Provider) {
 	case "openai":
 		if apiKey == "" {
@@ -230,16 +230,16 @@ func (s *WSServer) handleCreateAgent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	agent := &agents.Agent{
-		Role:      req.Role,
-		Goal:      req.Goal,
-		Backstory: req.Backstory,
-		Provider:  req.Provider,
-		LLMModel:  req.LLMModel,
-		LLM:       client,
-		MaxRPM:    req.MaxRPM,
+		Role:            req.Role,
+		Goal:            req.Goal,
+		Backstory:       req.Backstory,
+		Provider:        req.Provider,
+		LLMModel:        req.LLMModel,
+		LLM:             client,
+		MaxRPM:          req.MaxRPM,
 		AllowDelegation: req.AllowDelegation,
 		SelfHealing:     req.SelfHealing,
-		Verbose:   true,
+		Verbose:         true,
 	}
 
 	// Dynamic Memory Initialization
@@ -302,7 +302,7 @@ func (s *WSServer) handleCreateAgent(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"status": "created",
-		"agent": req,
+		"agent":  req,
 	})
 }
 
@@ -336,7 +336,7 @@ func (s *WSServer) handleCreateMCP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"status": "created",
-		"mcp": req,
+		"mcp":    req,
 	})
 }
 
@@ -375,7 +375,7 @@ func (s *WSServer) handleCreateA2A(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"status": "created",
-		"a2a": req,
+		"a2a":    req,
 	})
 }
 
@@ -413,7 +413,7 @@ func (s *WSServer) handleListProviders(w http.ResponseWriter, r *http.Request) {
 
 func (s *WSServer) handleListAll(w http.ResponseWriter, r *http.Request) {
 	data := telemetry.GlobalDynamicRegistry.ListAll()
-	
+
 	agentsCount := 0
 	if agents, ok := data["agents"].([]interface{}); ok {
 		agentsCount = len(agents)
@@ -424,7 +424,7 @@ func (s *WSServer) handleListAll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slog.Info("Syncing Dashboard Entities", slog.Int("agents", agentsCount), slog.Int("tasks", tasksCount))
-	
+
 	// Marshal first to ensure we don't send a partial 200 OK response
 	jsonData, err := json.Marshal(data)
 	if err != nil {
@@ -511,7 +511,7 @@ func (s *WSServer) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"status": "created",
-		"task": req,
+		"task":   req,
 	})
 }
 
@@ -546,9 +546,9 @@ func (s *WSServer) publishMetrics() {
 			Type:      telemetry.EventSystemMetrics,
 			Timestamp: time.Now(),
 			Payload: map[string]interface{}{
-				"memory_mb":     m.Alloc / 1024 / 1024,
-				"goroutines":    runtime.NumGoroutine(),
-				"uptime_secs":   time.Since(startTime).Seconds(),
+				"memory_mb":   m.Alloc / 1024 / 1024,
+				"goroutines":  runtime.NumGoroutine(),
+				"uptime_secs": time.Since(startTime).Seconds(),
 			},
 		}
 

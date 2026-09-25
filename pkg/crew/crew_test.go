@@ -21,10 +21,18 @@ func (m *mockLLM) Generate(ctx context.Context, messages []llm.Message, options 
 	}
 	return "Success", nil
 }
-func (m *mockLLM) GenerateWithUsage(ctx context.Context, messages []llm.Message, options llm.GenerateOptions) (string, *llm.Usage, error) { return "", nil, nil }
-func (m *mockLLM) GenerateStructured(ctx context.Context, messages []llm.Message, schema interface{}, options llm.GenerateOptions) (interface{}, error) { return nil, nil }
-func (m *mockLLM) StreamGenerate(ctx context.Context, messages []llm.Message, options llm.GenerateOptions) (<-chan string, error) { return nil, nil }
-func (m *mockLLM) GenerateEmbedding(ctx context.Context, text string, options llm.GenerateOptions) ([]float32, error) { return nil, nil }
+func (m *mockLLM) GenerateWithUsage(ctx context.Context, messages []llm.Message, options llm.GenerateOptions) (string, *llm.Usage, error) {
+	return "", nil, nil
+}
+func (m *mockLLM) GenerateStructured(ctx context.Context, messages []llm.Message, schema interface{}, options llm.GenerateOptions) (interface{}, error) {
+	return nil, nil
+}
+func (m *mockLLM) StreamGenerate(ctx context.Context, messages []llm.Message, options llm.GenerateOptions) (<-chan string, error) {
+	return nil, nil
+}
+func (m *mockLLM) GenerateEmbedding(ctx context.Context, text string, options llm.GenerateOptions) ([]float32, error) {
+	return nil, nil
+}
 
 func TestCrewKickoff_Sequential(t *testing.T) {
 	mock := &mockLLM{}

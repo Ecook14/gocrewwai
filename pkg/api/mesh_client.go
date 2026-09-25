@@ -12,10 +12,10 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/Ecook14/gocrewwai/pkg/api/mesh"
 	"github.com/Ecook14/gocrewwai/pkg/core"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/memory"
-	"github.com/Ecook14/gocrewwai/pkg/api/mesh"
 )
 
 // MeshServerCredentialConfig holds TLS configuration for the mesh server.
@@ -58,9 +58,9 @@ func DefaultMeshServerCredentials() MeshServerCredentialConfig {
 // environment variables. This is the production entry point for mesh client TLS.
 func DefaultMeshClientCredentials() MeshClientCredentialConfig {
 	return MeshClientCredentialConfig{
-		EnableTLS:    os.Getenv("MESH_TLS_ENABLED") == "true",
-		CAFile:       os.Getenv("MESH_TLS_CA"),
-		ServerName:   os.Getenv("MESH_TLS_SERVER_NAME"),
+		EnableTLS:  os.Getenv("MESH_TLS_ENABLED") == "true",
+		CAFile:     os.Getenv("MESH_TLS_CA"),
+		ServerName: os.Getenv("MESH_TLS_SERVER_NAME"),
 	}
 }
 
@@ -273,15 +273,15 @@ func (s *MeshServer) SearchKnowledge(ctx context.Context, req *mesh.SearchReques
 	formattedResults := make([]*mesh.KnowledgeSnippet, len(results))
 	for i, r := range results {
 		formattedResults[i] = &mesh.KnowledgeSnippet{
-			Source:     r.ID,
-			Score:      0.0,
-			Content:    r.Text,
-			Metadata:   nil,
+			Source:   r.ID,
+			Score:    0.0,
+			Content:  r.Text,
+			Metadata: nil,
 		}
 	}
 
 	return &mesh.SearchResponse{
-		Success: true,
+		Success:  true,
 		Snippets: formattedResults,
 	}, nil
 }

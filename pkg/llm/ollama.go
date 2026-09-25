@@ -47,12 +47,12 @@ type ollamaMessage struct {
 
 // ollamaRequest represents the full chat request payload.
 type ollamaRequest struct {
-	Model      string              `json:"model"`
-	Messages   []ollamaMessage     `json:"messages"`
-	Stream     bool                `json:"stream"`
-	Options    *ollamaOptions      `json:"options,omitempty"`
-	Format     string              `json:"format,omitempty"`
-	KeepAlive  string              `json:"keep_alive,omitempty"`
+	Model     string          `json:"model"`
+	Messages  []ollamaMessage `json:"messages"`
+	Stream    bool            `json:"stream"`
+	Options   *ollamaOptions  `json:"options,omitempty"`
+	Format    string          `json:"format,omitempty"`
+	KeepAlive string          `json:"keep_alive,omitempty"`
 }
 
 type ollamaOptions struct {
@@ -68,11 +68,11 @@ type ollamaResponse struct {
 		Role    string `json:"role"`
 		Content string `json:"content"`
 	} `json:"message"`
-	Done      bool   `json:"done"`
-	Total     int    `json:"total_duration"`
-	Load      int    `json:"load_duration"`
-	Evaluate  int    `json:"eval_duration"`
-	TokenCount int   `json:"token_count"`
+	Done       bool `json:"done"`
+	Total      int  `json:"total_duration"`
+	Load       int  `json:"load_duration"`
+	Evaluate   int  `json:"eval_duration"`
+	TokenCount int  `json:"token_count"`
 }
 
 // ollamaEmbeddingRequest represents an embedding request.
@@ -83,10 +83,10 @@ type ollamaEmbeddingRequest struct {
 
 // ollamaEmbeddingResponse represents an embedding response.
 type ollamaEmbeddingResponse struct {
-	Model     string      `json:"model"`
-	CreatedAt string      `json:"created_at"`
+	Model      string      `json:"model"`
+	CreatedAt  string      `json:"created_at"`
 	Embeddings [][]float32 `json:"embeddings"`
-	Total     int         `json:"total_duration"`
+	Total      int         `json:"total_duration"`
 }
 
 // Generate implements the Client interface for Ollama.

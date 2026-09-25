@@ -35,7 +35,7 @@
 
 #### 3. Documentation
 - Added `docs/PROGRESS.md` tracking competitive progress
-- Updated Gap.md with accurate counts (57 tools, 7 LLM clients, 6 vector stores)
+- Updated Gap.md with accurate counts (57 tools, 7 LLM clients, 12 memory stores)
 - Added CI/CD pipeline documentation
 
 ### 🟡 Notable Gaps (In Progress)
@@ -87,7 +87,7 @@ gocrewwai/
 │   ├── tools/        # 57 built-in tools including SaaS integrations
 │   ├── agents/       # Agent builder, cloning, reasoning, delegation
 │   ├── crew/         # 6 process types, async execution, training
-│   ├── memory/       # SQLite, Redis, Chroma, Qdrant, Pinecone, Weaviate
+│   ├── memory/       # 12 store types: SQLite, Redis, Chroma, Pinecone, Qdrant, Weaviate, InMemCosine, Conversation, Entity, ShortTerm, LongTerm, Unified
 │   ├── flows/        # TypedFlow, persistence, checkpoints
 │   ├── guardrails/   # 8 guardrail types
 │   ├── protocols/    # A2A, MCP, WebMCP

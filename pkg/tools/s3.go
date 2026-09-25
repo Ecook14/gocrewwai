@@ -25,10 +25,10 @@ import (
 //	{"action": "delete", "bucket": "my-bucket", "key": "docs/old.txt"}
 type S3Tool struct {
 	BaseTool
-	Endpoint  string // S3 endpoint (e.g., "https://s3.amazonaws.com" or MinIO URL)
-	AccessKey string
-	SecretKey string
-	Region    string
+	Endpoint   string // S3 endpoint (e.g., "https://s3.amazonaws.com" or MinIO URL)
+	AccessKey  string
+	SecretKey  string
+	Region     string
 	httpClient *http.Client
 }
 
@@ -201,5 +201,5 @@ func (t *S3Tool) headObject(ctx context.Context, bucket, key string) (string, er
 	return string(result), nil
 }
 
-func (t *S3Tool) Name() string { return t.BaseTool.NameValue }
+func (t *S3Tool) Name() string        { return t.BaseTool.NameValue }
 func (t *S3Tool) Description() string { return t.BaseTool.DescriptionValue }

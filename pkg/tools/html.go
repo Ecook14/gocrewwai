@@ -48,8 +48,8 @@ func (t *HTMLReadTool) Execute(ctx context.Context, input map[string]interface{}
 	return stripHTMLTagsOnly(string(content)), nil
 }
 
-func (t *HTMLReadTool) Name() string { return t.BaseTool.NameValue }
-func (t *HTMLReadTool) Description() string { return t.BaseTool.DescriptionValue }
+func (t *HTMLReadTool) Name() string                                      { return t.BaseTool.NameValue }
+func (t *HTMLReadTool) Description() string                               { return t.BaseTool.DescriptionValue }
 func (t *HTMLReadTool) CacheFunction(input map[string]interface{}) string { return "" }
 
 // stripHTML removes HTML tags and decodes basic entities from content.

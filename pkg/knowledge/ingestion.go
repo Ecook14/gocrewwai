@@ -10,9 +10,9 @@ import (
 	"fmt"
 	"hash/fnv"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
-	"log/slog"
 	"path/filepath"
 	"strings"
 	"time"
@@ -24,9 +24,9 @@ import (
 
 // IngestionEngine takes physical files, chunks them, and saves them into the Agent's Vector Memory.
 type IngestionEngine struct {
-	Store          memory.Store
-	LLM            llm.Client // Used purely for the vector Translation
-	Splitter       *TokenSplitter
+	Store           memory.Store
+	LLM             llm.Client // Used purely for the vector Translation
+	Splitter        *TokenSplitter
 	ThroughputDelay time.Duration // Mandatory delay between chunks
 }
 
@@ -189,7 +189,7 @@ func (ie *IngestionEngine) IngestPDF(ctx context.Context, filePath string) error
 	if err != nil {
 		return fmt.Errorf("failed to extract pdf text: %w", err)
 	}
-	
+
 	buf.ReadFrom(b)
 	content := buf.String()
 
@@ -328,9 +328,9 @@ func (ie *IngestionEngine) storeChunks(ctx context.Context, source string, chunk
 			Text:   chunk,
 			Vector: vector,
 			Metadata: map[string]interface{}{
-				"source":     source,
-				"chunk":      i,
-				"total":      len(chunks),
+				"source":      source,
+				"chunk":       i,
+				"total":       len(chunks),
 				"ingested_at": time.Now().Format(time.RFC3339),
 			},
 			CreatedAt: time.Now(),

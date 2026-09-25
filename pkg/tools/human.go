@@ -29,8 +29,6 @@ func NewAskHumanTool(enabled bool) *AskHumanTool {
 	return t
 }
 
-
-
 func (t *AskHumanTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	if !t.Enabled {
 		return "", fmt.Errorf("Human-in-the-loop (HITL) is currently disabled")

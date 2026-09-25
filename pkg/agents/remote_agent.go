@@ -7,8 +7,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/Ecook14/gocrewwai/pkg/tools"
 	"github.com/Ecook14/gocrewwai/pkg/api/mesh" // This will be generated from proto, placeholders for now
+	"github.com/Ecook14/gocrewwai/pkg/tools"
 )
 
 // RemoteAgent represents an agent running on a different engine instance via gRPC.
@@ -30,14 +30,14 @@ func NewRemoteAgent(role, goal, backstory, address, token string) *RemoteAgent {
 	}
 }
 
-func (r *RemoteAgent) GetRole() string      { return r.Role }
-func (r *RemoteAgent) GetGoal() string      { return r.Goal }
-func (r *RemoteAgent) GetBackstory() string { return r.Backstory }
-func (r *RemoteAgent) GetMaxRPM() int { return 0 }
-func (r *RemoteAgent) SetMaxRPM(int) {}
+func (r *RemoteAgent) GetRole() string                 { return r.Role }
+func (r *RemoteAgent) GetGoal() string                 { return r.Goal }
+func (r *RemoteAgent) GetBackstory() string            { return r.Backstory }
+func (r *RemoteAgent) GetMaxRPM() int                  { return 0 }
+func (r *RemoteAgent) SetMaxRPM(int)                   {}
 func (r *RemoteAgent) GetUsageMetrics() map[string]int { return nil }
-func (r *RemoteAgent) GetToolCount() int { return 0 }
-func (r *RemoteAgent) Equip(tools ...tools.Tool) {}
+func (r *RemoteAgent) GetToolCount() int               { return 0 }
+func (r *RemoteAgent) Equip(tools ...tools.Tool)       {}
 
 func (r *RemoteAgent) Execute(ctx context.Context, input string, options map[string]interface{}) (interface{}, error) {
 	// 1. Dial remote instance

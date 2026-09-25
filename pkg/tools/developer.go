@@ -76,8 +76,8 @@ func (t *JSONTool) parse(input map[string]interface{}) (string, error) {
 }
 
 func (t *JSONTool) RequiresReview() bool { return false }
-func (t *JSONTool) Name() string { return t.BaseTool.NameValue }
-func (t *JSONTool) Description() string { return t.BaseTool.DescriptionValue }
+func (t *JSONTool) Name() string         { return t.BaseTool.NameValue }
+func (t *JSONTool) Description() string  { return t.BaseTool.DescriptionValue }
 
 func (t *JSONTool) query(input map[string]interface{}) (string, error) {
 	data, _ := input["data"].(string)
@@ -253,5 +253,5 @@ func (t *RegexTool) Execute(ctx context.Context, input map[string]interface{}) (
 }
 
 func (t *RegexTool) RequiresReview() bool { return false }
-func (t *RegexTool) Name() string { return t.BaseTool.NameValue }
-func (t *RegexTool) Description() string { return t.BaseTool.DescriptionValue }
+func (t *RegexTool) Name() string         { return t.BaseTool.NameValue }
+func (t *RegexTool) Description() string  { return t.BaseTool.DescriptionValue }

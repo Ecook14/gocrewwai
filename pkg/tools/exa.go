@@ -29,7 +29,6 @@ func NewExaTool(apiKey string) *ExaTool {
 	}
 }
 
-
 func (t *ExaTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	query, ok := input["query"].(string)
 	if !ok {
@@ -41,17 +40,17 @@ func (t *ExaTool) Execute(ctx context.Context, input map[string]interface{}) (st
 	}
 
 	url := "https://api.exa.ai/search"
-	
+
 	// Exa supports various parameters like useAutoprompt, type, etc.
 	payload := map[string]interface{}{
-		"query":          query,
-		"useAutoprompt":  true,
-		"numResults":     5,
+		"query":         query,
+		"useAutoprompt": true,
+		"numResults":    5,
 		"contents": map[string]interface{}{
 			"text": true, // Request text content
 		},
 	}
-	
+
 	payloadBytes, _ := json.Marshal(payload)
 
 	req, _ := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(payloadBytes))
@@ -71,10 +70,10 @@ func (t *ExaTool) Execute(ctx context.Context, input map[string]interface{}) (st
 
 	var response struct {
 		Results []struct {
-			Title   string `json:"title"`
-			URL     string `json:"url"`
-			Score   float64 `json:"score"`
-			Text    string `json:"text"`
+			Title string  `json:"title"`
+			URL   string  `json:"url"`
+			Score float64 `json:"score"`
+			Text  string  `json:"text"`
 		} `json:"results"`
 	}
 
@@ -99,5 +98,5 @@ func (t *ExaTool) Execute(ctx context.Context, input map[string]interface{}) (st
 	return output.String(), nil
 }
 
-func (t *ExaTool) Name() string { return t.BaseTool.NameValue }
+func (t *ExaTool) Name() string        { return t.BaseTool.NameValue }
 func (t *ExaTool) Description() string { return t.BaseTool.DescriptionValue }

@@ -45,9 +45,9 @@ func DefaultSanitizer() *Sanitizer {
 
 // SanitizeResult holds the outcome of a sanitization check.
 type SanitizeResult struct {
-	Clean   bool   // Whether the input passed all checks
-	Output  string // The sanitized input (or original if rejected)
-	Reason  string // Why it was rejected (empty if clean)
+	Clean  bool   // Whether the input passed all checks
+	Output string // The sanitized input (or original if rejected)
+	Reason string // Why it was rejected (empty if clean)
 }
 
 // Sanitize processes input through all configured checks.

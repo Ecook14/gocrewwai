@@ -38,8 +38,8 @@ func NewAnthropicClient(apiKey, model string) *AnthropicClient {
 	}
 
 	return &AnthropicClient{
-		APIKey: apiKey,
-		Model:  model,
+		APIKey:  apiKey,
+		Model:   model,
 		BaseURL: "https://api.anthropic.com/v1",
 		HTTPClient: &http.Client{
 			Timeout: 300 * time.Second,

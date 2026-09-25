@@ -132,7 +132,9 @@ func ExecuteTasksAsync(ctx context.Context, tasks []*TaskFuture) []TaskResult {
 // dispatchAsyncTask wraps a single task in a TaskFuture for fire-and-collect
 // async execution within sequential flows. Unlike fire-and-forget, the
 // future can be collected later.
-func (c *Crew) dispatchAsyncTask(ctx context.Context, taskIndex int, task interface{ Execute(context.Context) (interface{}, error) }) *TaskFuture {
+func (c *Crew) dispatchAsyncTask(ctx context.Context, taskIndex int, task interface {
+	Execute(context.Context) (interface{}, error)
+}) *TaskFuture {
 	return newTaskFuture(func() (interface{}, error) {
 		result, err := task.Execute(ctx)
 		if err != nil {

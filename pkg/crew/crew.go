@@ -6,15 +6,15 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
-	
+
 	"github.com/Ecook14/gocrewwai/pkg/agents"
 	"github.com/Ecook14/gocrewwai/pkg/core"
 	//"github.com/Ecook14/gocrewwai/pkg/dashboard"
-	"github.com/Ecook14/gocrewwai/pkg/delegation"
 	"github.com/Ecook14/gocrewwai/pkg/config"
+	"github.com/Ecook14/gocrewwai/pkg/delegation"
 	crewErrors "github.com/Ecook14/gocrewwai/pkg/errors"
-	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/events"
+	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/memory"
 	"github.com/Ecook14/gocrewwai/pkg/tasks"
 	"github.com/Ecook14/gocrewwai/pkg/telemetry"
@@ -43,26 +43,26 @@ type CrewOption func(*Crew)
 
 // CrewConfig defines the parameters for creating a new Crew in a declarative style.
 type CrewConfig struct {
-	Agents         []core.Agent
-	Tasks          []*tasks.Task
-	Process        ProcessType
-	Verbose        bool
-	ManagerLLM     llm.Client
-	ManagerAgent   core.Agent
-	OnTaskComplete func(taskIndex int, result interface{})
-	OnTaskError    func(taskIndex int, err error)
-	StateFile      string
-	OutputLogFile  string
-	MaxCycles      int
-	MaxConcurrency int
-	MaxRPM         int
-	Planning       bool
-	PlanningLLM    llm.Client
+	Agents           []core.Agent
+	Tasks            []*tasks.Task
+	Process          ProcessType
+	Verbose          bool
+	ManagerLLM       llm.Client
+	ManagerAgent     core.Agent
+	OnTaskComplete   func(taskIndex int, result interface{})
+	OnTaskError      func(taskIndex int, err error)
+	StateFile        string
+	OutputLogFile    string
+	MaxCycles        int
+	MaxConcurrency   int
+	MaxRPM           int
+	Planning         bool
+	PlanningLLM      llm.Client
 	KnowledgeSources []memory.KnowledgeSource
-	Stream         bool
-	TrainingDir    string // Directory for training iteration data
-	TestLLM        llm.Client // Internal evaluation LLM for elite tier verification
-	TaskCooldown   time.Duration 
+	Stream           bool
+	TrainingDir      string     // Directory for training iteration data
+	TestLLM          llm.Client // Internal evaluation LLM for elite tier verification
+	TaskCooldown     time.Duration
 }
 
 func WithProcess(p ProcessType) CrewOption {
@@ -102,31 +102,30 @@ func NewCrew(agents []core.Agent, tasks []*tasks.Task, opts ...CrewOption) *Crew
 	return c
 }
 
-
 // New creates a new Crew using a declarative configuration struct (Elite Style).
 func New(cfg CrewConfig) *Crew {
 	return &Crew{
-		Agents:         cfg.Agents,
-		Tasks:          cfg.Tasks,
-		Process:        cfg.Process,
-		Verbose:        cfg.Verbose,
-		ManagerLLM:     cfg.ManagerLLM,
-		ManagerAgent:   cfg.ManagerAgent,
-		OnTaskComplete: cfg.OnTaskComplete,
-		OnTaskError:    cfg.OnTaskError,
-		StateFile:      cfg.StateFile,
-		OutputLogFile:  cfg.OutputLogFile,
-		MaxCycles:      cfg.MaxCycles,
-		MaxConcurrency: cfg.MaxConcurrency,
-		MaxRPM:         cfg.MaxRPM,
-		Planning:       cfg.Planning,
-		PlanningLLM:    cfg.PlanningLLM,
+		Agents:           cfg.Agents,
+		Tasks:            cfg.Tasks,
+		Process:          cfg.Process,
+		Verbose:          cfg.Verbose,
+		ManagerLLM:       cfg.ManagerLLM,
+		ManagerAgent:     cfg.ManagerAgent,
+		OnTaskComplete:   cfg.OnTaskComplete,
+		OnTaskError:      cfg.OnTaskError,
+		StateFile:        cfg.StateFile,
+		OutputLogFile:    cfg.OutputLogFile,
+		MaxCycles:        cfg.MaxCycles,
+		MaxConcurrency:   cfg.MaxConcurrency,
+		MaxRPM:           cfg.MaxRPM,
+		Planning:         cfg.Planning,
+		PlanningLLM:      cfg.PlanningLLM,
 		KnowledgeSources: cfg.KnowledgeSources,
-		Stream:         cfg.Stream,
-		TrainingDir:    cfg.TrainingDir,
-		TaskCooldown:   cfg.TaskCooldown,
-		TestLLM:        cfg.TestLLM,
-		UsageMetrics:   make(map[string]int),
+		Stream:           cfg.Stream,
+		TrainingDir:      cfg.TrainingDir,
+		TaskCooldown:     cfg.TaskCooldown,
+		TestLLM:          cfg.TestLLM,
+		UsageMetrics:     make(map[string]int),
 	}
 }
 
@@ -153,7 +152,7 @@ type Crew struct {
 	OnTaskComplete func(taskIndex int, result interface{}) `json:"-"`
 	OnTaskError    func(taskIndex int, err error)          `json:"-"`
 	StepCallback   func(step map[string]interface{})       `json:"-"` // Called per agent step for collaboration tracking
-	TaskCallback   func(taskIndex int, output interface{})  `json:"-"` // Called when any task produces output
+	TaskCallback   func(taskIndex int, output interface{}) `json:"-"` // Called when any task produces output
 
 	// Persistence & Logging (Elite)
 	SessionID     string
@@ -161,13 +160,13 @@ type Crew struct {
 	OutputLogFile string
 
 	// Elite Features
-	Planning      bool
-	PlanningLLM   llm.Client
-	TrainingDir   string
-	TaskCooldown  time.Duration
-	TestLLM       llm.Client
+	Planning         bool
+	PlanningLLM      llm.Client
+	TrainingDir      string
+	TaskCooldown     time.Duration
+	TestLLM          llm.Client
 	KnowledgeSources []memory.KnowledgeSource
-	Stream        bool
+	Stream           bool
 
 	// Execution Tracking
 	UsageMetrics map[string]int
@@ -195,8 +194,8 @@ func (c *Crew) ProvideTrainingFeedback(taskID string, feedback TrainingFeedback)
 			// Agent capturing logic would be piped internally via entity memory here.
 			if feedback.Rating < 0 {
 				events.GlobalBus.Publish(events.Event{
-					Type:    events.AgentFeedbackReceived,
-					Source:  "Crew",
+					Type:   events.AgentFeedbackReceived,
+					Source: "Crew",
 					Payload: map[string]interface{}{
 						"rating":  feedback.Rating,
 						"comment": feedback.Comment,
@@ -228,7 +227,7 @@ func (c *Crew) Train(ctx context.Context, iterations int, inputs map[string]inte
 
 	for i := 0; i < iterations; i++ {
 		slog.Info(fmt.Sprintf("🏋️ Training Iteration %d/%d", i+1, iterations))
-		
+
 		// Run a normal kickoff but with training flags enabled internally
 		_, err := c.Kickoff(ctx)
 		if err != nil {
@@ -262,7 +261,7 @@ func (c *Crew) Train(ctx context.Context, iterations int, inputs map[string]inte
 }
 
 // Kickoff starts the execution process based on the process type.
-func (c *Crew) Kickoff(ctx context.Context) (interface{}, error) { 
+func (c *Crew) Kickoff(ctx context.Context) (interface{}, error) {
 	// 🛠️ Phase 15: Automatic MCP Injection from Config
 	c.injectMCPFromConfig(ctx)
 
@@ -413,7 +412,7 @@ func (c *Crew) Kickoff(ctx context.Context) (interface{}, error) {
 // It resets the 'Processed' status of the target task and all downstream tasks.
 func (c *Crew) Replay(ctx context.Context, taskID string) (interface{}, error) {
 	slog.Info("🔄 Replaying Crew Execution", slog.String("start_task", taskID))
-	
+
 	found := false
 	for _, t := range c.Tasks {
 		if t.Name == taskID || t.Description == taskID {
@@ -425,16 +424,13 @@ func (c *Crew) Replay(ctx context.Context, taskID string) (interface{}, error) {
 			t.Error = nil
 		}
 	}
-	
+
 	if !found {
 		return nil, fmt.Errorf("task not found for replay: %s", taskID)
 	}
-	
+
 	return c.Kickoff(ctx)
 }
-
-
-
 
 // executeSequential executes tasks one by one in order, piping context between them.
 // Tasks marked with AsyncExecution=true are dispatched in the background via TaskFuture
@@ -506,7 +502,7 @@ func (c *Crew) executeSequential(ctx context.Context) (interface{}, error) {
 			result, err := task.Execute(ctx)
 			taskSpan.SetAttributes(attribute.String("crew.task_index", fmt.Sprintf("%d", i+1)))
 			taskSpan.End()
-			
+
 			if err != nil {
 				task.Failed = true
 				task.Error = err
@@ -587,7 +583,7 @@ func (c *Crew) executeHierarchical(ctx context.Context) (interface{}, error) {
 			orchestrator = &agents.ManagerAgent{Agent: *local, ManagedAgents: c.Agents}
 		}
 	}
-	
+
 	if orchestrator == nil {
 		model := c.ManagerLLM
 		if model == nil && len(c.Agents) > 0 {
@@ -640,7 +636,7 @@ func (c *Crew) executeHierarchical(ctx context.Context) (interface{}, error) {
 				defer wg.Done()
 				sem <- struct{}{}
 				defer func() { <-sem }()
-				
+
 				select {
 				case <-ctx.Done():
 					errCh <- ctx.Err()
@@ -710,7 +706,7 @@ func (c *Crew) executeHierarchical(ctx context.Context) (interface{}, error) {
 		if c.Verbose {
 			defaultLogger.Info("🔍 Manager evaluating plan for potential re-routing")
 		}
-		
+
 		planContext := "CURRENT STATUS:\n"
 		for i, t := range c.Tasks {
 			status := "Pending"
@@ -722,7 +718,7 @@ func (c *Crew) executeHierarchical(ctx context.Context) (interface{}, error) {
 
 		replanPrompt := planContext + "\n\nAs the Manager, review the completed tasks. Should we add any new follow-up tasks or modify the existing plan based on current results? " +
 			"If yes, describe the new tasks cleanly. If no and the goals are met, respond with exactly 'PLAN_STABLE'."
-		
+
 		decision, err := orchestrator.Execute(ctx, replanPrompt, nil)
 		if err == nil {
 			decisionStr := fmt.Sprintf("%v", decision)
@@ -730,19 +726,19 @@ func (c *Crew) executeHierarchical(ctx context.Context) (interface{}, error) {
 				if c.Verbose {
 					defaultLogger.Info("🔄 Manager INITIATED RE-PLANNING", slog.String("decision", decisionStr))
 				}
-				
+
 				// Elite Pattern: Dynamic Re-Planning native injection.
 				newTask := &tasks.Task{
 					Description: "Follow-up execution based on manager refinement: " + decisionStr,
 					Agent:       &orchestrator.Agent,
 				}
-				
+
 				c.Tasks = append(c.Tasks, newTask)
 				replanCount++
 				continue // Trigger outer loop to process the newly appended task natively
 			}
 		}
-		
+
 		break // The plan is stable or we hit the replan limit
 	}
 
@@ -829,7 +825,7 @@ func (c *Crew) executeConsensual(ctx context.Context) (string, error) {
 
 	concurrency := c.MaxConcurrency
 	if concurrency <= 0 {
-		concurrency = 5 
+		concurrency = 5
 	}
 	sem := make(chan struct{}, concurrency)
 
@@ -839,7 +835,7 @@ func (c *Crew) executeConsensual(ctx context.Context) (string, error) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			
+
 			// Execute task with this specific agent
 			res, err := a.Execute(ctx, mainTask.Description, nil)
 			if err != nil {
@@ -869,7 +865,7 @@ func (c *Crew) executeConsensual(ctx context.Context) (string, error) {
 			orchestrator = &agents.ManagerAgent{Agent: *local, ManagedAgents: c.Agents}
 		}
 	}
-	
+
 	if orchestrator == nil {
 		model := c.ManagerLLM
 		if model == nil && len(c.Agents) > 0 {
@@ -887,7 +883,7 @@ func (c *Crew) executeConsensual(ctx context.Context) (string, error) {
 	}
 
 	finalAnswer, err := orchestrator.Execute(ctx, synthesisPrompt, nil)
-	
+
 	// Update Metrics (Aggressively sync even if synthesis failed partially)
 	if c.UsageMetrics == nil {
 		c.UsageMetrics = make(map[string]int)
@@ -928,7 +924,7 @@ func (c *Crew) executeGraph(ctx context.Context) (string, error) {
 
 	concurrency := c.MaxConcurrency
 	if concurrency <= 0 {
-		concurrency = 5 
+		concurrency = 5
 	}
 	sem := make(chan struct{}, concurrency)
 
@@ -1013,11 +1009,11 @@ func (c *Crew) executeGraph(ctx context.Context) (string, error) {
 	return fmt.Sprintf("%v", lastTask.Output), nil
 }
 
-// executeReflective runs tasks sequentially but with a mandatory "Manager Review" 
+// executeReflective runs tasks sequentially but with a mandatory "Manager Review"
 // stage for each task output. If the manager rejects, the agent must retry.
 func (c *Crew) executeReflective(ctx context.Context) (string, error) {
 	var finalResult string
-	
+
 	var orchestrator *agents.ManagerAgent
 	if c.ManagerAgent != nil {
 		if m, ok := c.ManagerAgent.(*agents.ManagerAgent); ok {
@@ -1027,7 +1023,7 @@ func (c *Crew) executeReflective(ctx context.Context) (string, error) {
 			orchestrator = &agents.ManagerAgent{Agent: *local, ManagedAgents: c.Agents}
 		}
 	}
-	
+
 	if orchestrator == nil {
 		model := c.ManagerLLM
 		if model == nil && len(c.Agents) > 0 {
@@ -1050,7 +1046,7 @@ func (c *Crew) executeReflective(ctx context.Context) (string, error) {
 
 		// Manager Review Stage
 		reviewPrompt := fmt.Sprintf("Please review the following task output for accuracy and quality.\nTask: %s\nOutput: %v\n\nRespond with 'APPROVED' if it is satisfactory, or provide constructive feedback for improvement.", task.Description, result)
-		
+
 		maxReviewRetries := 2
 		for j := 0; j < maxReviewRetries; j++ {
 			review, err := orchestrator.Execute(ctx, reviewPrompt, nil) // Corrected to use orchestrator and reviewPrompt, and capture err
@@ -1084,7 +1080,7 @@ func (c *Crew) executeReflective(ctx context.Context) (string, error) {
 				return "", err
 			}
 		}
-		
+
 		finalResult = fmt.Sprintf("%v", result)
 	}
 
@@ -1187,7 +1183,7 @@ func (c *Crew) runPlanningPhase(ctx context.Context) error {
 			orchestrator = &agents.ManagerAgent{Agent: *local, ManagedAgents: c.Agents}
 		}
 	}
-	
+
 	if orchestrator == nil {
 		model := c.PlanningLLM
 		if model == nil {
@@ -1257,7 +1253,7 @@ func (c *Crew) RunCreatorMode(ctx context.Context) error {
 
 			if len(newTasks) > 0 || len(newAgents) > 0 {
 				slog.Info("📥 Dynamic changes detected! Injecting into live engine loop...")
-				
+
 				// Inject Agents first so tasks can bind to them
 				for _, a := range newAgents {
 					if agent, ok := a.(core.Agent); ok {
@@ -1306,11 +1302,11 @@ func (c *Crew) RunCreatorMode(ctx context.Context) error {
 									}
 								}
 							}
-							
+
 							// Fallback: If still nil, assign to the first available agent
 							if task.Agent == nil && len(c.Agents) > 0 {
-								slog.Warn("⚠️ No agent match found for task. Falling back to first available agent.", 
-									slog.String("task", task.Description), 
+								slog.Warn("⚠️ No agent match found for task. Falling back to first available agent.",
+									slog.String("task", task.Description),
 									slog.String("requested_role", task.AgentRole),
 									slog.String("assigned_role", c.Agents[0].GetRole()))
 								task.Agent = c.Agents[0]
@@ -1335,13 +1331,13 @@ func (c *Crew) RunCreatorMode(ctx context.Context) error {
 							continue
 						}
 
-						slog.Info("📥 Dynamic Task injected", 
+						slog.Info("📥 Dynamic Task injected",
 							slog.String("description", task.Description),
 							slog.String("assigned_agent", task.Agent.GetRole()))
 						c.Tasks = append(c.Tasks, task)
 					}
 				}
-				
+
 				// Full Sync: Add existing tasks to registry if missing (e.g. Task 1 from kickoff)
 				for _, t := range c.Tasks {
 					telemetry.GlobalDynamicRegistry.AddTask(t, false)
@@ -1383,47 +1379,52 @@ func (c *Crew) InjectDelegationTools() {
 			}
 		}
 
-			if len(coworkers) > 0 {
-				// Remove existing delegation tools to avoid duplicates and update coworkers
-				newTools := make([]agents.Tool, 0)
-				for _, t := range localAgent.Tools {
-					if t.Name() != "DelegateWork" && t.Name() != "AskQuestion" {
-						newTools = append(newTools, t)
-					}
-				}
-				localAgent.Tools = newTools
- 
-				// Inject fresh tools with current coworker list
-				localAgent.Tools = append(localAgent.Tools, delegation.NewDelegateWorkTool(coworkers))
-				localAgent.Tools = append(localAgent.Tools, delegation.NewAskQuestionTool(coworkers))
-
-				if c.Verbose {
-					defaultLogger.Info("🔁 Delegation tools refreshed",
-						slog.String("agent", agent.GetRole()),
-						slog.Int("coworkers", len(coworkers)))
+		if len(coworkers) > 0 {
+			// Remove existing delegation tools to avoid duplicates and update coworkers
+			newTools := make([]agents.Tool, 0)
+			for _, t := range localAgent.Tools {
+				if t.Name() != "DelegateWork" && t.Name() != "AskQuestion" {
+					newTools = append(newTools, t)
 				}
 			}
+			localAgent.Tools = newTools
+
+			// Inject fresh tools with current coworker list
+			localAgent.Tools = append(localAgent.Tools, delegation.NewDelegateWorkTool(coworkers))
+			localAgent.Tools = append(localAgent.Tools, delegation.NewAskQuestionTool(coworkers))
+
+			if c.Verbose {
+				defaultLogger.Info("🔁 Delegation tools refreshed",
+					slog.String("agent", agent.GetRole()),
+					slog.Int("coworkers", len(coworkers)))
+			}
+		}
 	}
 }
 
 func (c *Crew) injectMCPFromConfig(ctx context.Context) {
-	cfg := config.Get()
+	cfg, err := config.LoadConfigFile("")
+	if err != nil {
+		if c.Verbose {
+			fmt.Printf("📦 Crew: skipping MCP injection — config unavailable: %v\n", err)
+		}
+		return
+	}
 	if len(cfg.MCPServers) == 0 {
 		return
 	}
 
 	for name, serverCfg := range cfg.MCPServers {
 		source := fmt.Sprintf("stdio:%s %s", serverCfg.Command, strings.Join(serverCfg.Args, " "))
-		
+
 		for _, agent := range c.Agents {
 			if agentPtr, ok := agent.(*agents.Agent); ok {
 				agentPtr.EquipMCP(ctx, source)
 			}
 		}
-		
+
 		if c.Verbose {
 			fmt.Printf("📦 Crew: Automatically injected MCP server '%s' into all agents\n", name)
 		}
 	}
 }
-

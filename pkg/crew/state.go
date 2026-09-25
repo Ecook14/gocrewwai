@@ -4,12 +4,13 @@ import (
 	"encoding/json"
 	"os"
 )
+
 // CrewState represents the serialized state of a crew for checkpointing.
 type CrewState struct {
-	CurrentTaskIndex int                      `json:"current_task_index"`
-	TaskOutputs      map[int]interface{}      `json:"task_outputs"`
-	UsageMetrics     map[string]int           `json:"usage_metrics"`
-	TaskCycles       map[int]int              `json:"task_cycles"`
+	CurrentTaskIndex int                 `json:"current_task_index"`
+	TaskOutputs      map[int]interface{} `json:"task_outputs"`
+	UsageMetrics     map[string]int      `json:"usage_metrics"`
+	TaskCycles       map[int]int         `json:"task_cycles"`
 }
 
 func (c *Crew) SaveState(path string, taskIndex int) error {

@@ -76,7 +76,9 @@ func (j *JiraTool) searchIssues(ctx context.Context, query string) (string, erro
 	req, _ := http.NewRequest("GET", url, nil)
 	req.SetBasicAuth(j.email, j.token)
 	resp, err := j.client.Do(req.WithContext(ctx))
-	if err != nil { return "", err }
+	if err != nil {
+		return "", err
+	}
 	defer resp.Body.Close()
 	var result map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&result)
@@ -85,11 +87,13 @@ func (j *JiraTool) searchIssues(ctx context.Context, query string) (string, erro
 }
 
 func (j *JiraTool) createIssue(ctx context.Context, project, summary, issueType string) (string, error) {
-	if issueType == "" { issueType = "Task" }
+	if issueType == "" {
+		issueType = "Task"
+	}
 	data, _ := json.Marshal(map[string]interface{}{
 		"fields": map[string]interface{}{
-			"project": map[string]string{"key": project},
-			"summary": summary,
+			"project":   map[string]string{"key": project},
+			"summary":   summary,
 			"issuetype": map[string]string{"name": issueType},
 		},
 	})
@@ -98,7 +102,9 @@ func (j *JiraTool) createIssue(ctx context.Context, project, summary, issueType 
 	req.SetBasicAuth(j.email, j.token)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := j.client.Do(req.WithContext(ctx))
-	if err != nil { return "", err }
+	if err != nil {
+		return "", err
+	}
 	defer resp.Body.Close()
 	var result map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&result)
@@ -113,7 +119,9 @@ func (j *JiraTool) updateIssue(ctx context.Context, key string, updates map[stri
 	req.SetBasicAuth(j.email, j.token)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := j.client.Do(req.WithContext(ctx))
-	if err != nil { return "", err }
+	if err != nil {
+		return "", err
+	}
 	defer resp.Body.Close()
 	return fmt.Sprintf("Updated issue %s", key), nil
 }
@@ -123,7 +131,9 @@ func (j *JiraTool) getIssue(ctx context.Context, key string) (string, error) {
 	req, _ := http.NewRequest("GET", url, nil)
 	req.SetBasicAuth(j.email, j.token)
 	resp, err := j.client.Do(req.WithContext(ctx))
-	if err != nil { return "", err }
+	if err != nil {
+		return "", err
+	}
 	defer resp.Body.Close()
 	var result map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&result)
@@ -136,7 +146,9 @@ func (j *JiraTool) listProjects(ctx context.Context) (string, error) {
 	req, _ := http.NewRequest("GET", url, nil)
 	req.SetBasicAuth(j.email, j.token)
 	resp, err := j.client.Do(req.WithContext(ctx))
-	if err != nil { return "", err }
+	if err != nil {
+		return "", err
+	}
 	defer resp.Body.Close()
 	var result map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&result)
@@ -145,5 +157,5 @@ func (j *JiraTool) listProjects(ctx context.Context) (string, error) {
 }
 
 func (j *JiraTool) RequiresReview() bool { return true }
-func (j *JiraTool) Name() string { return j.BaseTool.NameValue }
-func (j *JiraTool) Description() string { return j.BaseTool.DescriptionValue }
+func (j *JiraTool) Name() string         { return j.BaseTool.NameValue }
+func (j *JiraTool) Description() string  { return j.BaseTool.DescriptionValue }

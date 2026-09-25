@@ -29,8 +29,8 @@ func main() {
 	}
 
 	myCrew := gocrew.NewCrew(gocrew.CrewConfig{
-		Agents:  []gocrew.CoreAgent{developer},
-		Tasks:   []*gocrew.Task{task},
+		Agents: []gocrew.CoreAgent{developer},
+		Tasks:  []*gocrew.Task{task},
 	})
 
 	fmt.Println("🚀 Starting Sandboxing Demo (E2B Cloud Integration)...")

@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -28,8 +28,8 @@ func NewDiscordTool(botToken, channelID string) *DiscordTool {
 			NameValue:        "DiscordTool",
 			DescriptionValue: "Sends messages and interacts with Discord channels. Actions: send_message, delete_message, edit_message.",
 		},
-		client: &http.Client{Timeout: 15 * time.Second},
-		botToken: botToken,
+		client:    &http.Client{Timeout: 15 * time.Second},
+		botToken:  botToken,
 		channelID: channelID,
 	}
 }
@@ -50,7 +50,9 @@ func (d *DiscordTool) Execute(ctx context.Context, input map[string]interface{})
 	switch action {
 	case "send_message":
 		msg, _ := input["message"].(string)
-		if msg == "" { return "", fmt.Errorf("missing 'message' parameter") }
+		if msg == "" {
+			return "", fmt.Errorf("missing 'message' parameter")
+		}
 		return d.sendMessage(ctx, msg)
 	case "delete_message":
 		msgID, _ := input["message_id"].(string)
@@ -71,7 +73,9 @@ func (d *DiscordTool) sendMessage(ctx context.Context, message string) (string, 
 	req.Header.Set("Authorization", "Bot "+d.botToken)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := d.client.Do(req.WithContext(ctx))
-	if err != nil { return "", fmt.Errorf("Discord send failed: %w", err) }
+	if err != nil {
+		return "", fmt.Errorf("Discord send failed: %w", err)
+	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 && resp.StatusCode != 201 {
 		return "", fmt.Errorf("Discord returned status %d", resp.StatusCode)
@@ -84,7 +88,9 @@ func (d *DiscordTool) deleteMessage(ctx context.Context, msgID string) (string, 
 	req, _ := http.NewRequest("DELETE", url, nil)
 	req.Header.Set("Authorization", "Bot "+d.botToken)
 	resp, err := d.client.Do(req.WithContext(ctx))
-	if err != nil { return "", fmt.Errorf("Discord delete failed: %w", err) }
+	if err != nil {
+		return "", fmt.Errorf("Discord delete failed: %w", err)
+	}
 	defer resp.Body.Close()
 	return fmt.Sprintf("Message %s deleted", msgID), nil
 }
@@ -96,7 +102,9 @@ func (d *DiscordTool) editMessage(ctx context.Context, msgID, newMessage string)
 	req.Header.Set("Authorization", "Bot "+d.botToken)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := d.client.Do(req.WithContext(ctx))
-	if err != nil { return "", fmt.Errorf("Discord edit failed: %w", err) }
+	if err != nil {
+		return "", fmt.Errorf("Discord edit failed: %w", err)
+	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		return "", fmt.Errorf("Discord returned status %d", resp.StatusCode)
@@ -105,5 +113,5 @@ func (d *DiscordTool) editMessage(ctx context.Context, msgID, newMessage string)
 }
 
 func (d *DiscordTool) RequiresReview() bool { return true }
-func (d *DiscordTool) Name() string { return d.BaseTool.NameValue }
-func (d *DiscordTool) Description() string { return d.BaseTool.DescriptionValue }
+func (d *DiscordTool) Name() string         { return d.BaseTool.NameValue }
+func (d *DiscordTool) Description() string  { return d.BaseTool.DescriptionValue }

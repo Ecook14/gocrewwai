@@ -14,8 +14,8 @@ import (
 
 // IterationData captures a single training pass.
 type IterationData struct {
-	InitialOutput string `json:"initial_output"`
-	HumanFeedback string `json:"human_feedback"`
+	InitialOutput  string `json:"initial_output"`
+	HumanFeedback  string `json:"human_feedback"`
 	ImprovedOutput string `json:"improved_output"`
 }
 

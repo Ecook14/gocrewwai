@@ -5,25 +5,25 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"os"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
-	"github.com/Ecook14/gocrewwai/pkg/events"
-	"github.com/Ecook14/gocrewwai/pkg/training"
+	"github.com/Ecook14/gocrewwai/pkg/core"
 	crewErrors "github.com/Ecook14/gocrewwai/pkg/errors"
+	"github.com/Ecook14/gocrewwai/pkg/events"
 	"github.com/Ecook14/gocrewwai/pkg/guardrails"
+	"github.com/Ecook14/gocrewwai/pkg/i18n"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/memory"
-	"github.com/Ecook14/gocrewwai/pkg/telemetry"
-	"github.com/Ecook14/gocrewwai/pkg/tools"
 	"github.com/Ecook14/gocrewwai/pkg/protocols"
 	"github.com/Ecook14/gocrewwai/pkg/sandbox"
+	"github.com/Ecook14/gocrewwai/pkg/telemetry"
+	"github.com/Ecook14/gocrewwai/pkg/tools"
+	"github.com/Ecook14/gocrewwai/pkg/training"
 	"github.com/gorilla/websocket"
 	"go.opentelemetry.io/otel/attribute"
-	"github.com/Ecook14/gocrewwai/pkg/core"
-	"github.com/Ecook14/gocrewwai/pkg/i18n"
 )
 
 var _ core.Agent = (*Agent)(nil)
@@ -75,14 +75,14 @@ type AgentConfig struct {
 	Sandbox              string
 	SandboxProvider      sandbox.Provider // NEW: Explicitly providing a sandbox runner
 	SandboxType          string           // NEW: "none", "wasm", "docker"
-	MCPS                 []string // MCP server URLs or command strings
-	MCPAllowList         []string // Optional: Specific tools to allow (empty means all)
-	MCPBlockList         []string // Optional: Specific tools to block
-	MCPSamplingPolicy    string   // "Never", "Always", "AskHuman" (default: "AskHuman")
-	A2APort              int      // If > 0, starts an A2A server on this port
-	A2ACapabilities      []string // Capabilities to declare in A2A
-	A2AAuthToken         string   // Bearer token for inter-agent auth
-	Language             string   // NEW: Preferred language for prompts (e.g., "en", "es", "fr")
+	MCPS                 []string         // MCP server URLs or command strings
+	MCPAllowList         []string         // Optional: Specific tools to allow (empty means all)
+	MCPBlockList         []string         // Optional: Specific tools to block
+	MCPSamplingPolicy    string           // "Never", "Always", "AskHuman" (default: "AskHuman")
+	A2APort              int              // If > 0, starts an A2A server on this port
+	A2ACapabilities      []string         // Capabilities to declare in A2A
+	A2AAuthToken         string           // Bearer token for inter-agent auth
+	Language             string           // NEW: Preferred language for prompts (e.g., "en", "es", "fr")
 }
 
 // Agent translates the `class Agent` python abstraction into idiomatic Go.
@@ -95,16 +95,16 @@ type Agent struct {
 	Verbose   bool   `json:"verbose"`
 
 	// LLM config
-	LLM                llm.Client `json:"-"`
-	FunctionCallingLLM llm.Client `json:"-"` // Separate LLM for tool calling
+	LLM                llm.Client   `json:"-"`
+	FunctionCallingLLM llm.Client   `json:"-"` // Separate LLM for tool calling
 	Tools              []tools.Tool `json:"-"`
 
 	// A2A Support
-	A2AServer    *protocols.A2AServer    `json:"-"`
-	A2AClient    *protocols.A2AClient    `json:"-"`
+	A2AServer    *protocols.A2AServer      `json:"-"`
+	A2AClient    *protocols.A2AClient      `json:"-"`
 	A2ADiscovery *protocols.AgentDiscovery `json:"-"`
-	A2AAuthToken string                  `json:"-"`
-	A2AID        string                  `json:"a2a_id"`
+	A2AAuthToken string                    `json:"-"`
+	A2AID        string                    `json:"a2a_id"`
 
 	// MCP Bridge
 	MCPServer *protocols.MCPServer `json:"-"`
@@ -113,9 +113,9 @@ type Agent struct {
 	SandboxProvider sandbox.Provider `json:"-"`
 
 	// Execution context limits
-	MaxIterations        int `json:"-"`
-	MaxRetryLimit        int `json:"-"`
-	MaxRPM               int `json:"max_rpm"`
+	MaxIterations        int  `json:"-"`
+	MaxRetryLimit        int  `json:"-"`
+	MaxRPM               int  `json:"max_rpm"`
 	RespectContextWindow bool `json:"-"`
 
 	// Memory enables agents to recall and store context across executions.
@@ -154,7 +154,7 @@ type Agent struct {
 
 	// KnowledgeBases provide additional context for the agent's tasks.
 	KnowledgeBases []string `json:"-"`
-	
+
 	// FewShotExamples are used to train the agent's prompt for better accuracy.
 	FewShotExamples []string `json:"-"`
 
@@ -164,16 +164,16 @@ type Agent struct {
 	ResponseTemplate string `json:"-"`
 
 	// Core 1 Perfection Fields
-	AllowCodeExecution   bool                   `json:"-"`
-	CodeExecutionMode    string                 `json:"-"` // "safe", "unsafe"
-	Multimodal           bool                   `json:"-"`
-	InjectDate           bool                   `json:"-"`
-	DateFormat           string                 `json:"-"`
-	Reasoning            bool                   `json:"-"`
-	MaxReasoningAttempts int                    `json:"-"`
-	EmbedderConfig       map[string]interface{} `json:"-"`
-	KnowledgeSources     []memory.KnowledgeSource  `json:"-"`
-	UseSystemPrompt      bool                   `json:"-"`
+	AllowCodeExecution   bool                     `json:"-"`
+	CodeExecutionMode    string                   `json:"-"` // "safe", "unsafe"
+	Multimodal           bool                     `json:"-"`
+	InjectDate           bool                     `json:"-"`
+	DateFormat           string                   `json:"-"`
+	Reasoning            bool                     `json:"-"`
+	MaxReasoningAttempts int                      `json:"-"`
+	EmbedderConfig       map[string]interface{}   `json:"-"`
+	KnowledgeSources     []memory.KnowledgeSource `json:"-"`
+	UseSystemPrompt      bool                     `json:"-"`
 
 	// InterruptCh allows sending async instructions/interrupts to the agent mid-execution.
 	InterruptCh chan string `json:"-"`
@@ -199,7 +199,7 @@ type AgentOption func(*Agent)
 
 // WithMemory enables memory for the agent with a specific store.
 func WithMemory(store memory.Store) AgentOption {
-	return func(a *Agent) { 
+	return func(a *Agent) {
 		a.Memory = store
 	}
 }
@@ -365,7 +365,7 @@ func New(cfg AgentConfig) *Agent {
 	if a.AllowCodeExecution {
 		safe := a.CodeExecutionMode == "safe"
 		opts := []tools.CodeInterpreterOption{tools.WithSafeMode(safe)}
-		
+
 		// Map agent sandbox config to tool options
 		switch strings.ToLower(a.Sandbox) {
 		case "docker":
@@ -469,7 +469,7 @@ func New(cfg AgentConfig) *Agent {
 
 	// 4. Auto-Discovery (mDNS)
 	// Implementation of Zeroconf scanning would go here, adding servers to cfg.MCPS
-	
+
 	// 5. Setup A2A if configured
 	if cfg.A2APort > 0 {
 		a.A2AAuthToken = cfg.A2AAuthToken
@@ -482,11 +482,11 @@ func New(cfg AgentConfig) *Agent {
 func (a *Agent) setupA2A(cfg AgentConfig) {
 	a.A2AID = fmt.Sprintf("%s-%d", strings.ReplaceAll(a.Role, " ", "-"), time.Now().UnixNano())
 	a.A2AClient = protocols.NewA2AClient(cfg.A2AAuthToken)
-	
+
 	router := protocols.NewA2ARouter()
 	router.Handle("delegate_task", a.HandleA2AMessage)
 	router.Handle("status", a.HandleA2AStatus)
-	
+
 	a.A2AServer = protocols.NewA2AServer(cfg.A2APort, router, cfg.A2AAuthToken)
 	if err := a.A2AServer.Start(); err != nil {
 		slog.Error("a2a: failed to start server", slog.Any("error", err))
@@ -503,7 +503,7 @@ func (a *Agent) setupA2A(cfg AgentConfig) {
 		Capabilities: cfg.A2ACapabilities,
 		Endpoint:     fmt.Sprintf("http://localhost:%d", cfg.A2APort),
 	}
-	
+
 	// Register locally and advertise globally (simulated)
 	protocols.GlobalA2ARegistry.Register(card)
 	a.A2ADiscovery.Advertise(context.Background(), card)
@@ -539,7 +539,7 @@ func (a *Agent) HandleA2AMessage(ctx context.Context, msg protocols.A2AMessage) 
 		}
 
 		options := make(map[string]interface{})
-		
+
 		// Check for WebSocket connection in context for streaming
 		if conn, ok := ctx.Value("a2a_ws_conn").(*websocket.Conn); ok {
 			options["stream_callback"] = func(token string) {
@@ -557,7 +557,7 @@ func (a *Agent) HandleA2AMessage(ctx context.Context, msg protocols.A2AMessage) 
 		}
 
 		result, err := a.Execute(ctx, req.Description, options)
-		
+
 		resPayload := protocols.A2ATaskResponse{
 			Success: err == nil,
 			Result:  fmt.Sprintf("%v", result),
@@ -819,13 +819,13 @@ func (a *Agent) Execute(ctx context.Context, taskInput string, options map[strin
 		for _, t := range a.Tools {
 			toolNames = append(toolNames, t.Name())
 		}
-		
+
 		toolList := a.I18N.Process(a.I18N.Slice("tools"), map[string]string{
 			"tools":      toolDescriptions,
 			"tool_names": strings.Join(toolNames, ", "),
 		})
 
-		systemPrompt = fmt.Sprintf("%s%s%s%s%s%s", 
+		systemPrompt = fmt.Sprintf("%s%s%s%s%s%s",
 			rolePlaying, dateInjection, knowledgeSection, fewShotSection, toolList, trainingAdvice)
 	}
 
@@ -1035,7 +1035,7 @@ func (a *Agent) Execute(ctx context.Context, taskInput string, options map[strin
 				var toolResult string
 				var toolErr error
 				toolStartTime := time.Now()
-				
+
 				ctx, toolSpan := telemetry.StartSpan(ctx, "Tool: "+toolReq.Tool)
 				if toolSpan != nil {
 					toolSpan.SetAttributes(attribute.String("tool.name", toolReq.Tool))
@@ -1071,7 +1071,7 @@ func (a *Agent) Execute(ctx context.Context, taskInput string, options map[strin
 						_ = a.Cache.Set(toolCacheKey, toolResult)
 					}
 				}
-				
+
 				if toolSpan != nil {
 					toolSpan.End()
 				}
@@ -1150,7 +1150,7 @@ func (a *Agent) Execute(ctx context.Context, taskInput string, options map[strin
 				{Role: "system", Content: "You are a critical self-reviewer."},
 				{Role: "user", Content: critiquePrompt},
 			}, llm.GenerateOptions{})
-			
+
 			if err == nil && !strings.Contains(strings.ToUpper(critique), "APPROVED") {
 				if a.Verbose {
 					defaultLogger.Info("🔄 Agent self-correcting based on internal critique", slog.String("role", a.Role))
@@ -1173,8 +1173,8 @@ func (a *Agent) Execute(ctx context.Context, taskInput string, options map[strin
 		if a.TrainingMode && a.TrainingDir != "" {
 			store := training.NewStore(a.TrainingDir)
 			data, _ := store.LoadAgentData(a.Role)
-			
-			// We already captured the interaction if it was HITL, 
+
+			// We already captured the interaction if it was HITL,
 			// but here we force-consolidate it into the store.
 			iteration := training.IterationData{
 				InitialOutput:  taskInput,
@@ -1299,8 +1299,8 @@ func (a *Agent) saveMemory(ctx context.Context, taskInput, result string) {
 func (a *Agent) extractAndStoreEntities(ctx context.Context, text string) {
 	prompt := fmt.Sprintf(
 		"Extract key entities and facts from the following text. "+
-		"Return ONLY a JSON array of objects like: [{\"entity\": \"Name\", \"value\": \"Value\", \"description\": \"Context\"}]. "+
-		"If none found, return [].\nText: %s", text)
+			"Return ONLY a JSON array of objects like: [{\"entity\": \"Name\", \"value\": \"Value\", \"description\": \"Context\"}]. "+
+			"If none found, return [].\nText: %s", text)
 
 	response, err := a.LLM.Generate(ctx, []llm.Message{
 		{Role: "system", Content: "You are a precise data extractor."},
@@ -1379,4 +1379,3 @@ func (a *Agent) EquipMCP(ctx context.Context, source string) {
 		}
 	}
 }
-

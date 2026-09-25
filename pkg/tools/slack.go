@@ -30,7 +30,6 @@ func NewSlackTool(token string) *SlackTool {
 	}
 }
 
-
 func (t *SlackTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	action, ok := input["action"].(string)
 	if !ok {
@@ -52,5 +51,5 @@ func (t *SlackTool) Execute(ctx context.Context, input map[string]interface{}) (
 }
 
 func (t *SlackTool) RequiresReview() bool { return true }
-func (t *SlackTool) Name() string { return t.BaseTool.NameValue }
-func (t *SlackTool) Description() string { return t.BaseTool.DescriptionValue }
+func (t *SlackTool) Name() string         { return t.BaseTool.NameValue }
+func (t *SlackTool) Description() string  { return t.BaseTool.DescriptionValue }

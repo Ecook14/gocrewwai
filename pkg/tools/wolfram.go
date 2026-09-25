@@ -45,7 +45,6 @@ func NewWolframAlphaTool(appID string) *WolframAlphaTool {
 	}
 }
 
-
 func (t *WolframAlphaTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	query, ok := input["query"].(string)
 	if !ok {
@@ -63,5 +62,5 @@ func (t *WolframAlphaTool) Execute(ctx context.Context, input map[string]interfa
 	return string(body), nil
 }
 
-func (t *WolframAlphaTool) Name() string { return t.BaseTool.NameValue }
+func (t *WolframAlphaTool) Name() string        { return t.BaseTool.NameValue }
 func (t *WolframAlphaTool) Description() string { return t.BaseTool.DescriptionValue }

@@ -33,8 +33,8 @@ func main() {
 	}
 
 	task2 := &gocrew.Task{
-		Description: "Verify the uniqueness of the fact. Output 'RETRY' if it's too common, or 'FINISH' if it's amazing.",
-		Agent:       verifier,
+		Description:  "Verify the uniqueness of the fact. Output 'RETRY' if it's too common, or 'FINISH' if it's amazing.",
+		Agent:        verifier,
 		Dependencies: []*gocrew.Task{task1},
 	}
 
@@ -58,7 +58,7 @@ func main() {
 
 	fmt.Println("🚀 Starting Elite Cyclic Graph Demo...")
 	fmt.Println("(The crew will loop if the fact isn't 'amazing' enough according to the verifier)")
-	
+
 	result, err := myCrew.Kickoff(context.Background())
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)

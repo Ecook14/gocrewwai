@@ -31,16 +31,16 @@ func main() {
 	}
 
 	myCrew := gocrew.NewCrew(gocrew.CrewConfig{
-		Agents:  []gocrew.CoreAgent{thinker},
-		Tasks:   []*gocrew.Task{task},
+		Agents: []gocrew.CoreAgent{thinker},
+		Tasks:  []*gocrew.Task{task},
 	})
 
 	fmt.Println("🚀 Starting Interrupt Demo...")
-	
+
 	// Start Dashboard to visualize the interrupt
 	dashboard.Start("8081")
 	fmt.Println("🖥️  Dashboard active at http://localhost:8081/web-ui - Open it now!")
-	
+
 	// Send an interrupt after 2 seconds
 	go func() {
 		time.Sleep(2 * time.Second)
@@ -54,7 +54,7 @@ func main() {
 	}
 
 	fmt.Printf("\nFinal Response after Interrupt: %s\n", result)
-	
+
 	fmt.Println("✅ Demo finished. Keep the dashboard open to review the logs!")
 	select {}
 }

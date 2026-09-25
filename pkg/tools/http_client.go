@@ -25,7 +25,7 @@ type HTTPTool struct {
 	BaseURL          string            // Optional base URL prefix
 	Headers          map[string]string // Default headers applied to all requests
 	Timeout          time.Duration
-	ResponseMaxBytes int               // Maximum response body size (0 = use default 5MB)
+	ResponseMaxBytes int // Maximum response body size (0 = use default 5MB)
 	httpClient       *http.Client
 }
 
@@ -185,8 +185,8 @@ func (t *HTTPTool) Execute(ctx context.Context, input map[string]interface{}) (s
 }
 
 func (t *HTTPTool) RequiresReview() bool { return true }
-func (t *HTTPTool) Name() string { return t.BaseTool.NameValue }
-func (t *HTTPTool) Description() string { return t.BaseTool.DescriptionValue }
+func (t *HTTPTool) Name() string         { return t.BaseTool.NameValue }
+func (t *HTTPTool) Description() string  { return t.BaseTool.DescriptionValue }
 
 // validateURL checks the target URL against SSRF and egress restrictions.
 func (t *HTTPTool) validateURL(rawURL string) error {

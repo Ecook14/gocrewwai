@@ -25,7 +25,7 @@ func (a *Agent) Clone(newRole string) *Agent {
 		Goal:                 a.Goal,
 		Backstory:            a.Backstory,
 		Verbose:              a.Verbose,
-		LLM:                 a.LLM,
+		LLM:                  a.LLM,
 		Tools:                make([]Tool, len(a.Tools)),
 		MaxIterations:        a.MaxIterations,
 		MaxRetryLimit:        a.MaxRetryLimit,
@@ -70,18 +70,18 @@ func (a *Agent) Clone(newRole string) *Agent {
 
 // AgentTemplate is a serializable definition for creating agents.
 type AgentTemplate struct {
-	Role        string            `json:"role" yaml:"role"`
-	Goal        string            `json:"goal" yaml:"goal"`
-	Backstory   string            `json:"backstory" yaml:"backstory"`
-	Tools       []string          `json:"tools,omitempty" yaml:"tools,omitempty"`     // Tool names
-	Verbose     bool              `json:"verbose,omitempty" yaml:"verbose,omitempty"`
-	MaxIter     int               `json:"max_iterations,omitempty" yaml:"max_iterations,omitempty"`
-	SelfHealing bool              `json:"self_healing,omitempty" yaml:"self_healing,omitempty"`
-	SelfCritique bool             `json:"self_critique,omitempty" yaml:"self_critique,omitempty"`
-	Delegation  bool              `json:"allow_delegation,omitempty" yaml:"allow_delegation,omitempty"`
-	Knowledge   []string          `json:"knowledge_bases,omitempty" yaml:"knowledge_bases,omitempty"`
-	FewShot     []string          `json:"few_shot_examples,omitempty" yaml:"few_shot_examples,omitempty"`
-	Metadata    map[string]string `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	Role         string            `json:"role" yaml:"role"`
+	Goal         string            `json:"goal" yaml:"goal"`
+	Backstory    string            `json:"backstory" yaml:"backstory"`
+	Tools        []string          `json:"tools,omitempty" yaml:"tools,omitempty"` // Tool names
+	Verbose      bool              `json:"verbose,omitempty" yaml:"verbose,omitempty"`
+	MaxIter      int               `json:"max_iterations,omitempty" yaml:"max_iterations,omitempty"`
+	SelfHealing  bool              `json:"self_healing,omitempty" yaml:"self_healing,omitempty"`
+	SelfCritique bool              `json:"self_critique,omitempty" yaml:"self_critique,omitempty"`
+	Delegation   bool              `json:"allow_delegation,omitempty" yaml:"allow_delegation,omitempty"`
+	Knowledge    []string          `json:"knowledge_bases,omitempty" yaml:"knowledge_bases,omitempty"`
+	FewShot      []string          `json:"few_shot_examples,omitempty" yaml:"few_shot_examples,omitempty"`
+	Metadata     map[string]string `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 }
 
 // ToTemplate exports an agent's configuration as a reusable template.

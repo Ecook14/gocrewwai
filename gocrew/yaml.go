@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/Ecook14/gocrewwai/pkg/agents"
-	"github.com/Ecook14/gocrewwai/pkg/crew"
 	"github.com/Ecook14/gocrewwai/pkg/core"
+	"github.com/Ecook14/gocrewwai/pkg/crew"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/tasks"
 	"gopkg.in/yaml.v3"
@@ -19,32 +19,32 @@ import (
 
 // YAMLConfig is the top-level structure for YAML-based crew definitions.
 type YAMLConfig struct {
-	LLM    YAMLLLMConfig    `yaml:"llm"`
-	Agents []YAMLAgent      `yaml:"agents"`
-	Tasks  []YAMLTask       `yaml:"tasks"`
-	Crew   YAMLCrewConfig   `yaml:"crew"`
+	LLM    YAMLLLMConfig  `yaml:"llm"`
+	Agents []YAMLAgent    `yaml:"agents"`
+	Tasks  []YAMLTask     `yaml:"tasks"`
+	Crew   YAMLCrewConfig `yaml:"crew"`
 }
 
 // YAMLLLMConfig defines the default LLM for the crew.
 type YAMLLLMConfig struct {
 	Provider string `yaml:"provider"` // "openai", "anthropic", "gemini", "groq", "openrouter"
 	Model    string `yaml:"model"`
-	APIKey   string `yaml:"api_key"`   // Can be env var like ${OPENAI_API_KEY}
+	APIKey   string `yaml:"api_key"` // Can be env var like ${OPENAI_API_KEY}
 }
 
 // YAMLAgent defines an agent in YAML.
 type YAMLAgent struct {
-	Role               string   `yaml:"role"`
-	Goal               string   `yaml:"goal"`
-	Backstory          string   `yaml:"backstory"`
-	Verbose            bool     `yaml:"verbose"`
-	AllowDelegation    bool     `yaml:"allow_delegation"`
-	AllowCodeExecution bool     `yaml:"allow_code_execution"`
-	MaxIter            int      `yaml:"max_iter"`
-	MaxRPM             int      `yaml:"max_rpm"`
-	InjectDate         bool     `yaml:"inject_date"`
-	Reasoning          bool     `yaml:"reasoning"`
-	Tools              []string `yaml:"tools"` // Tool names from registry
+	Role               string         `yaml:"role"`
+	Goal               string         `yaml:"goal"`
+	Backstory          string         `yaml:"backstory"`
+	Verbose            bool           `yaml:"verbose"`
+	AllowDelegation    bool           `yaml:"allow_delegation"`
+	AllowCodeExecution bool           `yaml:"allow_code_execution"`
+	MaxIter            int            `yaml:"max_iter"`
+	MaxRPM             int            `yaml:"max_rpm"`
+	InjectDate         bool           `yaml:"inject_date"`
+	Reasoning          bool           `yaml:"reasoning"`
+	Tools              []string       `yaml:"tools"`         // Tool names from registry
 	LLM                *YAMLLLMConfig `yaml:"llm,omitempty"` // Override default LLM
 }
 
@@ -53,8 +53,8 @@ type YAMLTask struct {
 	Name           string   `yaml:"name"`
 	Description    string   `yaml:"description"`
 	ExpectedOutput string   `yaml:"expected_output"`
-	AgentRole      string   `yaml:"agent"`      // Match by role name
-	Context        []string `yaml:"context"`     // List of task names for context
+	AgentRole      string   `yaml:"agent"`   // Match by role name
+	Context        []string `yaml:"context"` // List of task names for context
 	OutputFile     string   `yaml:"output_file"`
 	Markdown       bool     `yaml:"markdown"`
 	AsyncExecution bool     `yaml:"async_execution"`
@@ -63,7 +63,7 @@ type YAMLTask struct {
 
 // YAMLCrewConfig defines crew-level settings in YAML.
 type YAMLCrewConfig struct {
-	Process  string `yaml:"process"`  // "sequential", "hierarchical", etc.
+	Process  string `yaml:"process"` // "sequential", "hierarchical", etc.
 	Verbose  bool   `yaml:"verbose"`
 	MaxRPM   int    `yaml:"max_rpm"`
 	Planning bool   `yaml:"planning"`
@@ -151,15 +151,15 @@ func buildCrewFromYAML(cfg *YAMLConfig) (*Crew, error) {
 		}
 
 		task := tasks.New(tasks.TaskConfig{
-			Name:           yt.Name,
-			Description:    yt.Description,
-			ExpectedOutput: yt.ExpectedOutput,
-			Agent:          taskAgent,
-			AgentRole:      yt.AgentRole,
-			OutputFile:     yt.OutputFile,
-			Markdown:       yt.Markdown,
-			AsyncExecution: yt.AsyncExecution,
-			HumanInput:     yt.HumanInput,
+			Name:            yt.Name,
+			Description:     yt.Description,
+			ExpectedOutput:  yt.ExpectedOutput,
+			Agent:           taskAgent,
+			AgentRole:       yt.AgentRole,
+			OutputFile:      yt.OutputFile,
+			Markdown:        yt.Markdown,
+			AsyncExecution:  yt.AsyncExecution,
+			HumanInput:      yt.HumanInput,
 			CreateDirectory: true,
 		})
 
@@ -197,11 +197,11 @@ func buildCrewFromYAML(cfg *YAMLConfig) (*Crew, error) {
 	}
 
 	return crew.New(crew.CrewConfig{
-		Agents:  agentList,
-		Tasks:   taskList,
-		Process: processType,
-		Verbose: cfg.Crew.Verbose,
-		MaxRPM:  cfg.Crew.MaxRPM,
+		Agents:   agentList,
+		Tasks:    taskList,
+		Process:  processType,
+		Verbose:  cfg.Crew.Verbose,
+		MaxRPM:   cfg.Crew.MaxRPM,
 		Planning: cfg.Crew.Planning,
 	}), nil
 }
