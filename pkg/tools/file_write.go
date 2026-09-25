@@ -25,7 +25,6 @@ func NewFileWriteTool(chroot string) *FileWriteTool {
 	}
 }
 
-
 func (t *FileWriteTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	pathRaw, okPath := input["file_path"]
 	contentRaw, okContent := input["content"]
@@ -67,7 +66,7 @@ func (t *FileWriteTool) Execute(ctx context.Context, input map[string]interface{
 }
 
 func (t *FileWriteTool) RequiresReview() bool { return true }
-func (t *FileWriteTool) Name() string { return t.BaseTool.NameValue }
+func (t *FileWriteTool) Name() string         { return t.BaseTool.NameValue }
 func (t *FileWriteTool) Description() string {
 	return "Writes or overwrites the contents of a local file at the given path. DANGEROUS: this tool overwrites files on disk. Input: {'file_path': 'string', 'content': 'string'}. Path is validated against the chroot directory — files outside the chroot cannot be written."
 }

@@ -10,15 +10,15 @@ import (
 
 // Sentinel errors for common failure modes across the framework.
 var (
-	ErrNoAgent        = errors.New("agent is required but was nil")
-	ErrNoTasks        = errors.New("crew requires at least one task to kickoff")
-	ErrNoAgents       = errors.New("crew requires at least one agent to kickoff")
-	ErrLLMFailed      = errors.New("llm generation failed")
-	ErrToolNotFound   = errors.New("requested tool does not exist")
-	ErrMaxIterations  = errors.New("agent hit maximum iteration limit without providing a final answer")
-	ErrGuardrailFailed = errors.New("output failed guardrail validation")
-	ErrValidation     = errors.New("input validation failed")
-	ErrDelegation     = errors.New("agent delegation failed")
+	ErrNoAgent            = errors.New("agent is required but was nil")
+	ErrNoTasks            = errors.New("crew requires at least one task to kickoff")
+	ErrNoAgents           = errors.New("crew requires at least one agent to kickoff")
+	ErrLLMFailed          = errors.New("llm generation failed")
+	ErrToolNotFound       = errors.New("requested tool does not exist")
+	ErrMaxIterations      = errors.New("agent hit maximum iteration limit without providing a final answer")
+	ErrGuardrailFailed    = errors.New("output failed guardrail validation")
+	ErrValidation         = errors.New("input validation failed")
+	ErrDelegation         = errors.New("agent delegation failed")
 	ErrUnsupportedProcess = errors.New("unsupported process type")
 )
 

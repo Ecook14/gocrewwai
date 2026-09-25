@@ -1,0 +1,215 @@
+{
+  "issues": [
+    {
+      "id": "CR-01",
+      "title": "panic() in production config paths",
+      "severity": "Critical",
+      "location": "pkg/config/config.go:168,181",
+      "description": "Config loading uses panic() when the config file cannot be read or parsed. In a long-running agent framework, panics in startup paths crash the process without graceful degradation or error reporting. A framework competing with CrewAI/LangChain must handle missing/malformed config gracefully (return error, use defaults, or fail with a clear message).",
+      "recommended_fix": "Replace panic() with error returns. If config is required, return a descriptive error from the loading function and let the caller decide to exit. If optional, log a warning and proceed with defaults."
+    },
+    {
+      "id": "CR-02",
+      "title": "go vet failure: zip.Reader lock value copy in excel.go",
+      "severity": "Critical",
+      "location": "pkg/tools/excel.go:163,192",
+      "description": "go vet reports: 'call of readZipFileByPath copies lock value: archive/zip.Reader contains sync.Once contains sync.noCopy' at line 163, and 'readZipFileByPath passes lock by value' at line 192. The caller passes zr.Reader (a value) where the function expects *zip.Reader. This copies the internal sync.Once, breaking the reader's lazy-initialization guarantee and potentially causing data races or duplicate work.",
+      "recommended_fix": "Pass zr (the *zip.Reader pointer) directly to readZipFileByPath instead of zr.Reader. Verify the function signature takes *zip.Reader and all internal usage goes through the pointer. Run go vet again to confirm the fix."
+    },
+    {
+      "id": "HI-01",
+      "title": "God-file: crew.go at 1429 lines",
+      "severity": "High",
+      "location": "pkg/crew/crew.go",
+      "description": "crew.go is 1429 lines and contains the entire crew execution engine: task dispatch, sequential/parallel/hierarchical execution, dynamic replanning, agent assignment, and error recovery. This violates the facade+sibling pattern. Understanding a single feature requires reading the whole file; merging changes creates constant conflict risk.",
+      "recommended_fix": "Split into facade + siblings: crew.go (facade, public API, struct definition), crew_dispatch.go (task assignment and execution routing), crew_sequential.go (sequential execution loop), crew_parallel.go (parallel execution), crew_hierarchical.go (hierarchical process), crew_dynamic.go (dynamic replanning), crew_errors.go (error handling and recovery)."
+    },
+    {
+      "id": "HI-02",
+      "title": "God-file: agent.go at 1382 lines",
+      "severity": "High",
+      "location": "pkg/agents/agent.go",
+      "description": "agent.go is 1382 lines covering agent struct, LLM client management, tool registration, sandbox initialization (WASM + Docker), MCP client setup, A2A server startup, and the agent execution loop. This is a god-file that conflates agent identity, tool hosting, sandbox lifecycle, and protocol servers.",
+      "recommended_fix": "Split into: agent.go (facade, Agent struct, NewAgent), agent_tools.go (tool registry, execution), agent_sandbox.go (WASM/Docker provider init), agent_mcp.go (MCP client), agent_a2a.go (A2A server), agent_loop.go (execution turn loop)."
+    },
+    {
+      "id": "HI-03",
+      "title": "God-file: mcp.go at 976 lines",
+      "severity": "High",
+      "location": "pkg/protocols/mcp.go",
+      "description": "mcp.go is 976 lines implementing the full MCP protocol: stdio transport, SSE transport, client, server, tool discovery, and capability negotiation. No sibling files; all protocol logic is in one file.",
+      "recommended_fix": "Split into: mcp.go (facade, types, interface), mcp_stdio.go (stdio transport), mcp_sse.go (SSE transport), mcp_client.go (client-side operations), mcp_server.go (server-side operations), mcp_tools.go (tool discovery/call)."
+    },
+    {
+      "id": "HI-04",
+      "title": "Missing compile-time interface checks for 5 tools",
+      "severity": "High",
+      "location": "pkg/tools/pdf.go, html.go, csv.go, yaml.go, sqlite.go",
+      "description": "XMLReadTool and JSONParseTool and ExcelReadTool have `var _ Tool = (*XxxTool)(nil)` compile-time interface assertions, but PDFReadTool, HTMLReadTool, CSVReadTool, YAMLReadTool, and SQLiteTool do not. If the Tool interface changes (e.g., a new method is added), these 5 tools will silently break at runtime instead of failing at compile time. The document_loaders_test.go has var _ checks but those are in test files, which don't run in production builds.",
+      "recommended_fix": "Add `var _ Tool = (*PDFReadTool)(nil)` etc. to each of the 5 tool files. This is a one-line addition per file that provides compile-time safety."
+    },
+    {
+      "id": "HI-05",
+      "title": "Inconsistent tool constructor signatures",
+      "severity": "High",
+      "location": "pkg/tools/sqlite.go:20 vs pkg/tools/*.go",
+      "description": "Most tools use `NewXxxTool(chroot string) *XxxTool` (no error return). SQLiteTool uses `NewSQLiteTool(dbPath string) (*SQLiteTool, error)` (returns error). ShellTool and CodeInterpreterTool use functional options patterns. This inconsistency makes it hard to know whether a tool constructor can fail, and the caller must handle different signatures. SQLiteTool is the only tool whose constructor can fail (due to DB open), but the pattern is isolated rather than generalized.",
+      "recommended_fix": "Document the convention: tools that can fail during construction (DB connections, HTTP clients) should return (*T, error); pure-in-memory tools return *T. Consider a unified constructor pattern or at least consistent naming. Add `var _ Tool` checks to SQLiteTool."
+    },
+    {
+      "id": "HI-06",
+      "title": "No tests for sandbox package",
+      "severity": "High",
+      "location": "pkg/sandbox/",
+      "description": "The sandbox package (WASM + Docker execution environments for agent code isolation) has zero test files. This is a critical security boundary: if sandbox initialization or execution is broken, agents can escape isolation or fail silently. Competing frameworks (CrewAI's sandboxed execution) test their isolation boundaries.",
+      "recommended_fix": "Add tests for: sandbox initialization (WASM module loading, Docker container setup), code execution within sandbox, timeout enforcement, resource limits, and escape attempts (e.g., file system access outside sandbox)."
+    },
+    {
+      "id": "HI-07",
+      "title": "No tests for dashboard package",
+      "severity": "High",
+      "location": "pkg/dashboard/dashboard.go",
+      "description": "dashboard.go (600 lines) implements the WebSocket-based real-time dashboard with glassmorphic UI. Zero test coverage. The dashboard handles agent state streaming, entity lists, and WebSocket connections — all untested.",
+      "recommended_fix": "Add tests for: WebSocket upgrade, message serialization/deserialization, entity list marshaling, connection lifecycle, and error handling on write failures."
+    },
+    {
+      "id": "HI-08",
+      "title": "No tests for API mesh (gRPC server/client)",
+      "severity": "High",
+      "location": "pkg/api/mesh_server.go, mesh_client.go, mesh/",
+      "description": "The Agent Mesh gRPC server and client have no tests. This is the A2A communication layer that enables decentralized agent collaboration. Untested mesh code means undiscovered serialization bugs, TLS setup errors, and RPC handling issues.",
+      "recommended_fix": "Add tests for: mesh server startup/shutdown, TLS configuration validation, client dial connectivity, agent discovery RPC, task submission RPC, embedding search RPC, and error handling on connection failures."
+    },
+    {
+      "id": "HI-09",
+      "title": "No tests for agent.go execution core (1382 lines, only adapter_test.go)",
+      "severity": "High",
+      "location": "pkg/agents/agent.go",
+      "description": "agent.go is 1382 lines with only adapter_test.go providing test coverage (which tests the ADK adapter, not the agent itself). The agent execution loop, tool invocation, LLM interaction, sandbox usage, and error recovery are completely untested.",
+      "recommended_fix": "Add unit tests for: agent construction with tool registration, Execute turn with mocked LLM and tools, tool invocation and result handling, sandbox initialization failure handling, A2A server startup, and guardrail validation."
+    },
+    {
+      "id": "HI-10",
+      "title": "No tests for crew.go execution engine (1429 lines, only 2 small test files)",
+      "severity": "High",
+      "location": "pkg/crew/crew.go",
+      "description": "crew.go is 1429 lines with only crew_test.go and async_test.go. The core execution logic — sequential/parallel/hierarchical task dispatch, agent assignment, iterative execution, and error handling — is largely untested. crew_test.go and async_test.go exist but likely cover only surface-level scenarios given the file size.",
+      "recommended_fix": "Add comprehensive tests for: sequential crew execution with mocked agents/tasks, parallel execution, hierarchical execution, dynamic replanning triggers, max iteration limit enforcement, task failure propagation, and checkpoint integration."
+    },
+    {
+      "id": "MI-01",
+      "title": "Ignored type assertion in code_interpreter.go Execute",
+      "severity": "Medium",
+      "location": "pkg/tools/code_interpreter.go:101-102",
+      "description": "`lang, _ := input[\"language\"].(string)` and `code, _ := input[\"code\"].(string)` discard the ok value. If the input map has non-string values for these keys, lang becomes \"\" and code becomes \"\". The code==\"\" check catches empty code, but a non-string language value silently defaults to \"\" and falls through to the default case in the switch, producing a generic 'unsupported language' error instead of a type error.",
+      "recommended_fix": "Check the ok values: `lang, ok := input[\"language\"].(string); if !ok { return \"\", fmt.Errorf(\"language must be a string\") }` and similarly for code."
+    },
+    {
+      "id": "MI-02",
+      "title": "Defense-in-depth blacklist in ShellTool (admitted by comment)",
+      "severity": "Medium",
+      "location": "pkg/tools/shell.go:24,39-42,100-107",
+      "description": "ShellTool.BlockedCommands is a blacklist described in the struct comment as 'defense-in-depth; not a primary boundary.' The BlockedCommands default list includes dangerous commands, and the Execute method checks if the command string CONTAINS any blocked string (case-insensitive substring match). This is both defense-in-depth (which the standards say to avoid) and trivially bypassable (e.g., 'echo rm -rf /' contains 'rm -rf /' but is harmless; 'rm -rf /tmp' does NOT contain 'rm -rf /' but is dangerous).",
+      "recommended_fix": "Remove BlockedCommands entirely or replace with a strict allowlist (AllowedCommands) as the primary boundary. If keeping for logging/detection, document it as such and do not present it as a safety mechanism. The comment already admits it's not a primary boundary — remove the check or make it explicit that it's informational only."
+    },
+    {
+      "id": "MI-03",
+      "title": "No tests for individual tool Execute methods",
+      "severity": "Medium",
+      "location": "pkg/tools/ (most files)",
+      "description": "The tools package has tools_test.go (generic) and document_loaders_test.go (interface compliance only), but no tests for actual tool Execute methods. file_read.go, file_write.go, shell.go, browser.go, pdf.go, html.go, csv.go, xml.go, yaml.go, json_parse.go, sqlite.go, excel.go — none have Execute-level tests. File write operations, shell command execution, browser automation, and document parsing are untested at the integration level.",
+      "recommended_fix": "Add tests for: FileReadTool (read existing file, reject path traversal), FileWriteTool (write file, reject escape), ShellTool (allowlisted command, blocked command), PDFReadTool (extract text from sample PDF), HTMLReadTool (strip tags), CSVReadTool (parse CSV), JSONParseTool (validate/format JSON), SQLiteTool (query database)."
+    },
+    {
+      "id": "MI-04",
+      "title": "No tests for checkpoint backends",
+      "severity": "Medium",
+      "location": "pkg/crew/sqlite_checkpoint.go, redis_checkpoint.go, checkpoint.go",
+      "description": "CheckpointManager (file-based), SQLiteCheckpointStore, and RedisCheckpointStore have no tests. Save/Load/Delete/List operations are untested. Checkpoint corruption, missing data, and schema migration scenarios are uncovered. This is a durability-critical subsystem.",
+      "recommended_fix": "Add tests for each backend: Save then LoadLatest returns same data, LoadByID for specific timestamp, ListCheckpoints returns sorted results, Delete removes entry, cleanup truncates old checkpoints, and error handling on DB/Redis failure."
+    },
+    {
+      "id": "MI-05",
+      "title": "No tests for LLM clients",
+      "severity": "Medium",
+      "location": "pkg/llm/openai.go, anthropic.go, gemini.go, groq.go, ollama.go, openrouter.go",
+      "description": "The 6 LLM client implementations have no unit tests. Generate, StreamGenerate, GenerateStructured, and GenerateWithUsage are untested. Rate limiting, error handling, response parsing, and usage tracking are uncovered. middleware_test.go tests middleware but not the clients themselves.",
+      "recommended_fix": "Add tests with mocked HTTP servers or interfaces: successful response parsing, error response handling, streaming chunk delivery, structured output unmarshaling, usage extraction, and timeout handling."
+    },
+    {
+      "id": "MI-06",
+      "title": "No tests for protocols/mcp.go and a2a.go",
+      "severity": "Medium",
+      "location": "pkg/protocols/mcp.go (976 lines), a2a.go (641 lines)",
+      "description": "MCP protocol implementation (976 lines) and A2A protocol implementation (641 lines) have no tests beyond agentcard_test.go. Tool discovery, tool invocation, transport handling (stdio/SSE), and agent-to-agent messaging are untested.",
+      "recommended_fix": "Add tests for MCP: tool list RPC, tool call RPC, stdio transport round-trip, SSE transport connection. For A2A: agent discovery, message exchange, protocol error handling."
+    },
+    {
+      "id": "MI-07",
+      "title": "Unmaintained PDF library dependency",
+      "severity": "Medium",
+      "location": "go.mod: github.com/ledongthuc/pdf v0.0.0-20220302134840-0c2507a12d80",
+      "description": "The PDF library is a v0.0.0 pseudo-version from March 2022 with no stable release. It has known limitations with complex PDFs, lacks active maintenance, and may have unfixed security issues in its parsing code. PDF reading is a core document loader feature.",
+      "recommended_fix": "Evaluate alternatives: [pdfcpu](github.com/pdfcpu/pdfcpu) (active, pure Go), [go-pdf](github.com/dslipak/go-pdf) (extract text), or [unidoc](github.com/unidoc/unipdf) (commercial). If ledongthuc/pdf is retained, pin to a specific commit hash and document the limitation."
+    },
+    {
+      "id": "MI-08",
+      "title": "Docker dependency marked +incompatible",
+      "severity": "Medium",
+      "location": "go.mod: github.com/docker/docker v24.0.7+incompatible",
+      "description": "The docker/docker module is marked +incompatible despite being at v24. This usually indicates a go.mod mismatch or an older import path. The Docker client is used by CodeInterpreterTool for sandboxed code execution.",
+      "recommended_fix": "Verify the Docker client import path. Modern docker/docker uses proper semver modules. Check if `github.com/docker/docker` should be `github.com/docker/docker/v24` or if the +incompatible is expected for this version. Run `go mod tidy` to see if Go corrects it."
+    },
+    {
+      "id": "MI-09",
+      "title": "No tests for server package handlers",
+      "severity": "Medium",
+      "location": "pkg/server/server.go, pkg/api/handlers.go",
+      "description": "server.go (581 lines) and handlers.go (326 lines) implement the HTTP API server with session management, crew kickoff, and status queries. server_test.go exists (1044 lines) but handlers.go has no dedicated tests. Session persistence, crew execution triggering, and error responses are partially uncovered.",
+      "recommended_fix": "Add handler-level tests: POST /kickoff with valid/invalid payloads, GET /status for running/completed crews, session creation and retrieval, error responses for missing fields, and session persistence verification."
+    },
+    {
+      "id": "LO-01",
+      "title": "Legacy pkg/errors indirect dependency",
+      "severity": "Low",
+      "location": "go.mod: github.com/pkg/errors v0.9.1 // indirect",
+      "description": "pkg/errors is a pre-standard-error-wrapping library. Go 1.13+ has built-in `%w` wrapping. This dependency is only indirect (pulled by another library), so it's not a direct code issue, but it indicates an older dependency in the chain that could be updated.",
+      "recommended_fix": "Run `go mod graph` to find which dependency pulls pkg/errors, and check if that dependency has a newer version that avoids it. Not critical since it's indirect."
+    },
+    {
+      "id": "LO-02",
+      "title": "HTML entity decoding uses 7 sequential ReplaceAll calls",
+      "severity": "Low",
+      "location": "pkg/tools/html.go:116-122",
+      "description": "stripHTMLTagsOnly decodes 6 HTML entities using 7 sequential strings.ReplaceAll calls. This is O(n*6) string allocations. A single-pass decoder would be more efficient for large HTML files, though the current approach is correct and readable.",
+      "recommended_fix": "Consider using strings.NewReplacer(\"&nbsp;\", \" \", \"&amp;\", \"&\", ...) for a single-pass replacement, or a small state machine for entity decoding. Optional optimization; current code is correct."
+    }
+  ],
+  "test_gaps": [
+    "pkg/sandbox/ — no tests (WASM + Docker isolation, critical security boundary)",
+    "pkg/events/ — no tests (event system)",
+    "pkg/dashboard/ — no tests (WebSocket dashboard, 600-line file)",
+    "pkg/testing/ — no tests (testing utilities package)",
+    "pkg/testutil/ — no tests (test utilities package)",
+    "pkg/training/ — no tests (training/replay system)",
+    "pkg/api/mesh/ — no tests (gRPC mesh server and client, A2A communication)",
+    "pkg/agents/agent.go — only adapter_test.go, no tests for agent execution loop, tool invocation, sandbox init, LLM interaction (1382-line file)",
+    "pkg/crew/crew.go — only crew_test.go + async_test.go, core execution engine (sequential/parallel/hierarchical/dynamic) largely untested (1429-line file)",
+    "pkg/protocols/mcp.go — no tests for MCP protocol (976-line file, stdio/SSE transports, tool discovery/call)",
+    "pkg/protocols/a2a.go — no tests for A2A protocol (641-line file, agent messaging)",
+    "pkg/llm/ — no tests for OpenAI, Anthropic, Gemini, Groq, Ollama, OpenRouter clients (Generate, StreamGenerate, GenerateStructured, usage tracking)",
+    "pkg/tools/ — no Execute-level tests for individual tools (file_read, file_write, shell, browser, pdf, html, csv, xml, yaml, json_parse, sqlite, excel, code_interpreter, http_client)",
+    "pkg/crew/sqlite_checkpoint.go — no tests for SQLite checkpoint Save/Load/Delete/List/cleanup",
+    "pkg/crew/redis_checkpoint.go — no tests for Redis checkpoint Save/Load/Delete/List/cleanup",
+    "pkg/server/ — server_test.go exists but handlers.go has no dedicated handler tests",
+    "pkg/guardrails/ — only guardrails_test.go exists (verify scope)",
+    "pkg/flow/ — no tests for flow persistence and typed flow execution",
+    "Critical untested paths: auth, sandbox execution, file write operations, LLM API calls, checkpoint durability, tool security boundaries (chroot validation, path traversal)"
+  ],
+  "static_checks": {
+    "vet_pass": false,
+    "build_pass": true,
+    "notes": "go vet fails on pkg/tools/excel.go:163 and :192 — zip.Reader sync.Once lock value copy. The caller passes zr.Reader (value) to a function expecting *zip.Reader. Build passes cleanly. No unused imports (Go compile catches those). No context.TODO() in production code. No _ = err patterns found. Two panic() calls in config.go (startup path)."
+  },
+  "overall_health": "NeedsWork"
+}

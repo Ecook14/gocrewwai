@@ -22,10 +22,18 @@ func (m *asyncMockLLM) Generate(ctx context.Context, messages []llm.Message, opt
 	}
 	return m.response, nil
 }
-func (m *asyncMockLLM) GenerateWithUsage(ctx context.Context, messages []llm.Message, options llm.GenerateOptions) (string, *llm.Usage, error) { return "", nil, nil }
-func (m *asyncMockLLM) GenerateStructured(ctx context.Context, messages []llm.Message, schema interface{}, options llm.GenerateOptions) (interface{}, error) { return nil, nil }
-func (m *asyncMockLLM) StreamGenerate(ctx context.Context, messages []llm.Message, options llm.GenerateOptions) (<-chan string, error) { return nil, nil }
-func (m *asyncMockLLM) GenerateEmbedding(ctx context.Context, text string, options llm.GenerateOptions) ([]float32, error) { return nil, nil }
+func (m *asyncMockLLM) GenerateWithUsage(ctx context.Context, messages []llm.Message, options llm.GenerateOptions) (string, *llm.Usage, error) {
+	return "", nil, nil
+}
+func (m *asyncMockLLM) GenerateStructured(ctx context.Context, messages []llm.Message, schema interface{}, options llm.GenerateOptions) (interface{}, error) {
+	return nil, nil
+}
+func (m *asyncMockLLM) StreamGenerate(ctx context.Context, messages []llm.Message, options llm.GenerateOptions) (<-chan string, error) {
+	return nil, nil
+}
+func (m *asyncMockLLM) GenerateEmbedding(ctx context.Context, text string, options llm.GenerateOptions) ([]float32, error) {
+	return nil, nil
+}
 
 func TestAsyncExecution(t *testing.T) {
 	mock := &asyncMockLLM{response: "async-result"}

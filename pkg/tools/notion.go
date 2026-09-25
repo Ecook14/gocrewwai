@@ -69,7 +69,9 @@ func (n *NotionTool) searchPages(ctx context.Context, query string) (string, err
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Notion-Version", notionAPIVersion)
 	resp, err := n.client.Do(req.WithContext(ctx))
-	if err != nil { return "", fmt.Errorf("Notion search failed: %w", err) }
+	if err != nil {
+		return "", fmt.Errorf("Notion search failed: %w", err)
+	}
 	defer resp.Body.Close()
 	var result map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&result)
@@ -83,7 +85,9 @@ func (n *NotionTool) readPage(ctx context.Context, pageID string) (string, error
 	req.Header.Set("Authorization", "Bearer "+n.token)
 	req.Header.Set("Notion-Version", notionAPIVersion)
 	resp, err := n.client.Do(req.WithContext(ctx))
-	if err != nil { return "", fmt.Errorf("Notion read failed: %w", err) }
+	if err != nil {
+		return "", fmt.Errorf("Notion read failed: %w", err)
+	}
 	defer resp.Body.Close()
 	var result map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&result)
@@ -112,7 +116,7 @@ func (n *NotionTool) createPage(ctx context.Context, title, content string) (str
 		})
 	}
 	reqBody, _ := json.Marshal(map[string]interface{}{
-		"parent": map[string]interface{}{"type": "page_id", "page_id": title},
+		"parent":   map[string]interface{}{"type": "page_id", "page_id": title},
 		"children": blocks,
 	})
 	req, _ := http.NewRequest("POST", "https://api.notion.com/v1/pages", strings.NewReader(string(reqBody)))
@@ -120,7 +124,9 @@ func (n *NotionTool) createPage(ctx context.Context, title, content string) (str
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Notion-Version", notionAPIVersion)
 	resp, err := n.client.Do(req.WithContext(ctx))
-	if err != nil { return "", fmt.Errorf("Notion create failed: %w", err) }
+	if err != nil {
+		return "", fmt.Errorf("Notion create failed: %w", err)
+	}
 	defer resp.Body.Close()
 	var result map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&result)
@@ -133,7 +139,9 @@ func (n *NotionTool) listDatabases(ctx context.Context) (string, error) {
 	req.Header.Set("Authorization", "Bearer "+n.token)
 	req.Header.Set("Notion-Version", notionAPIVersion)
 	resp, err := n.client.Do(req.WithContext(ctx))
-	if err != nil { return "", fmt.Errorf("Notion list databases failed: %w", err) }
+	if err != nil {
+		return "", fmt.Errorf("Notion list databases failed: %w", err)
+	}
 	defer resp.Body.Close()
 	var result map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&result)
@@ -148,7 +156,9 @@ func (n *NotionTool) queryDatabase(ctx context.Context, dbID string) (string, er
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Notion-Version", notionAPIVersion)
 	resp, err := n.client.Do(req.WithContext(ctx))
-	if err != nil { return "", fmt.Errorf("Notion query database failed: %w", err) }
+	if err != nil {
+		return "", fmt.Errorf("Notion query database failed: %w", err)
+	}
 	defer resp.Body.Close()
 	var result map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&result)
@@ -157,5 +167,5 @@ func (n *NotionTool) queryDatabase(ctx context.Context, dbID string) (string, er
 }
 
 func (n *NotionTool) RequiresReview() bool { return true }
-func (n *NotionTool) Name() string { return n.BaseTool.NameValue }
-func (n *NotionTool) Description() string { return n.BaseTool.DescriptionValue }
+func (n *NotionTool) Name() string         { return n.BaseTool.NameValue }
+func (n *NotionTool) Description() string  { return n.BaseTool.DescriptionValue }

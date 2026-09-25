@@ -36,7 +36,7 @@ type WebMCPToolDeclaration struct {
 	Name        string                 `json:"name"`
 	Description string                 `json:"description"`
 	Endpoint    string                 `json:"endpoint"`
-	Method      string                 `json:"method"` // GET, POST
+	Method      string                 `json:"method"`      // GET, POST
 	InputSchema map[string]interface{} `json:"inputSchema"` // Standard JSON Schema
 }
 
@@ -121,7 +121,7 @@ func (c *WebMCPClient) parseHTMLForMCP(r io.Reader, base string) ([]WebMCPToolDe
 func (c *WebMCPClient) ExecuteTool(ctx context.Context, tool WebMCPToolDeclaration, params map[string]interface{}) ([]byte, error) {
 	var bodyReader io.Reader
 	method := strings.ToUpper(tool.Method)
-	
+
 	if method == "" {
 		method = http.MethodPost // Default to POST if unspecified
 	}

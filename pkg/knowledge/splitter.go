@@ -80,7 +80,7 @@ func (ts *TokenSplitter) SplitText(text string) []string {
 	}
 
 	var chunks []string
-	
+
 	// If the entire document is smaller than the chunk size, just return it.
 	if len(words) <= ts.ChunkSize {
 		return []string{strings.Join(words, " ")}
@@ -94,7 +94,7 @@ func (ts *TokenSplitter) SplitText(text string) []string {
 
 		chunk := strings.Join(words[i:end], " ")
 		chunks = append(chunks, chunk)
-		
+
 		if end == len(words) {
 			break
 		}

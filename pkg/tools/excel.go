@@ -62,8 +62,8 @@ const (
 )
 
 type sharedStringsXML struct {
-	XMLName xml.Name      `xml:"sst"`
-	Items   []sharedItem  `xml:"si"`
+	XMLName xml.Name     `xml:"sst"`
+	Items   []sharedItem `xml:"si"`
 }
 
 type sharedItem struct {
@@ -90,8 +90,8 @@ type sheetRelsXML struct {
 }
 
 type rel struct {
-	Id    string `xml:"Id,attr"`
-	Type  string `xml:"Type,attr"`
+	Id     string `xml:"Id,attr"`
+	Type   string `xml:"Type,attr"`
 	Target string `xml:"Target,attr"`
 }
 
@@ -108,10 +108,10 @@ type row struct {
 }
 
 type cell struct {
-	Ref  string `xml:"r,attr"`
-	T    string `xml:"t,attr,omitempty"`
-	VM   string `xml:"v,omitempty"`
-	Is   inlineStr `xml:"is,omitempty"`
+	Ref string    `xml:"r,attr"`
+	T   string    `xml:"t,attr,omitempty"`
+	VM  string    `xml:"v,omitempty"`
+	Is  inlineStr `xml:"is,omitempty"`
 }
 
 type inlineStr struct {

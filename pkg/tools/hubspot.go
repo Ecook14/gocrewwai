@@ -71,7 +71,9 @@ func (h *HubSpotTool) searchContacts(ctx context.Context, query string) (string,
 	req.Header.Set("Authorization", "Bearer "+h.token)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := h.client.Do(req.WithContext(ctx))
-	if err != nil { return "", err }
+	if err != nil {
+		return "", err
+	}
 	defer resp.Body.Close()
 	var result map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&result)
@@ -84,7 +86,9 @@ func (h *HubSpotTool) getDeal(ctx context.Context, dealID string) (string, error
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("Authorization", "Bearer "+h.token)
 	resp, err := h.client.Do(req.WithContext(ctx))
-	if err != nil { return "", err }
+	if err != nil {
+		return "", err
+	}
 	defer resp.Body.Close()
 	var result map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&result)
@@ -98,7 +102,9 @@ func (h *HubSpotTool) createDeal(ctx context.Context, name string, amount float6
 	req.Header.Set("Authorization", "Bearer "+h.token)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := h.client.Do(req.WithContext(ctx))
-	if err != nil { return "", err }
+	if err != nil {
+		return "", err
+	}
 	defer resp.Body.Close()
 	var result map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&result)
@@ -116,7 +122,9 @@ func (h *HubSpotTool) createContact(ctx context.Context, email, firstName, lastN
 	req.Header.Set("Authorization", "Bearer "+h.token)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := h.client.Do(req.WithContext(ctx))
-	if err != nil { return "", err }
+	if err != nil {
+		return "", err
+	}
 	defer resp.Body.Close()
 	var result map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&result)
@@ -128,7 +136,9 @@ func (h *HubSpotTool) listCompanies(ctx context.Context) (string, error) {
 	req, _ := http.NewRequest("GET", "https://api.crm.hubspot.com/crm/v3/objects/companies?limit=10", nil)
 	req.Header.Set("Authorization", "Bearer "+h.token)
 	resp, err := h.client.Do(req.WithContext(ctx))
-	if err != nil { return "", err }
+	if err != nil {
+		return "", err
+	}
 	defer resp.Body.Close()
 	var result map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&result)
@@ -142,7 +152,9 @@ func (h *HubSpotTool) createCompany(ctx context.Context, name string) (string, e
 	req.Header.Set("Authorization", "Bearer "+h.token)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := h.client.Do(req.WithContext(ctx))
-	if err != nil { return "", err }
+	if err != nil {
+		return "", err
+	}
 	defer resp.Body.Close()
 	var result map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&result)
@@ -151,5 +163,5 @@ func (h *HubSpotTool) createCompany(ctx context.Context, name string) (string, e
 }
 
 func (h *HubSpotTool) RequiresReview() bool { return true }
-func (h *HubSpotTool) Name() string { return h.BaseTool.NameValue }
-func (h *HubSpotTool) Description() string { return h.BaseTool.DescriptionValue }
+func (h *HubSpotTool) Name() string         { return h.BaseTool.NameValue }
+func (h *HubSpotTool) Description() string  { return h.BaseTool.DescriptionValue }

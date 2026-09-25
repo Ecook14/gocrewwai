@@ -34,7 +34,7 @@ func main() {
 
 	task1 := &gocrew.Task{Description: "Analyze the stock market trends for AI.", Agent: analyst}
 	task2 := &gocrew.Task{Description: "Write a Python script to track these trends.", Agent: coder}
-	
+
 	task3 := &gocrew.Task{
 		Description:  "Review the analysis and the code for accuracy.",
 		Agent:        reviewer,
@@ -48,7 +48,7 @@ func main() {
 	})
 
 	fmt.Println("🚀 Starting Graph (DAG) Demo (Task 1 & 2 will run in parallel):")
-	
+
 	dashboard.Start("8081")
 	fmt.Println("🖥️  Dashboard active at http://localhost:8081/web-ui - Watch the parallel execution traces!")
 

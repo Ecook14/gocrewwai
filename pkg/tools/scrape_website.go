@@ -43,9 +43,9 @@ func (t *ScrapeWebsiteTool) Execute(ctx context.Context, input map[string]interf
 		return "", err
 	}
 
-		if t.Options != nil && t.Options["verbose"] == true {
-			slog.Info("Tool [Scrape Website]: Scraping URL: " + urlStr)
-		}
+	if t.Options != nil && t.Options["verbose"] == true {
+		slog.Info("Tool [Scrape Website]: Scraping URL: " + urlStr)
+	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlStr, nil)
 	if err != nil {
@@ -112,7 +112,7 @@ func (t *ScrapeWebsiteTool) validateURL(rawURL string) error {
 			return fmt.Errorf("access to cloud metadata endpoint %s is blocked", host)
 		}
 	}
-	
+
 	// Block the metadata path prefix regardless of host.
 	if strings.HasPrefix(u.Path, "/metadata") || strings.HasPrefix(u.Path, "/latest/meta-data") {
 		return fmt.Errorf("access to metadata paths is blocked")
@@ -160,5 +160,5 @@ func (t *ScrapeWebsiteTool) isBlockedIP(ip net.IP) bool {
 }
 
 func (t *ScrapeWebsiteTool) RequiresReview() bool { return true }
-func (t *ScrapeWebsiteTool) Name() string { return t.BaseTool.NameValue }
-func (t *ScrapeWebsiteTool) Description() string { return t.BaseTool.DescriptionValue }
+func (t *ScrapeWebsiteTool) Name() string         { return t.BaseTool.NameValue }
+func (t *ScrapeWebsiteTool) Description() string  { return t.BaseTool.DescriptionValue }

@@ -117,7 +117,7 @@ func (f *Flow) Kickoff(ctx context.Context) (State, error) {
 	}
 
 	slog.Info("🏁 Flow Complete")
-	
+
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 	return f.state, nil

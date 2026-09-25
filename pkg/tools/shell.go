@@ -180,5 +180,5 @@ func (t *ShellTool) Execute(ctx context.Context, input map[string]interface{}) (
 	return output, nil
 }
 
-func (t *ShellTool) Name() string { return t.BaseTool.NameValue }
+func (t *ShellTool) Name() string        { return t.BaseTool.NameValue }
 func (t *ShellTool) Description() string { return t.BaseTool.DescriptionValue }

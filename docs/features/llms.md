@@ -13,12 +13,13 @@ Gocrewwai is model-agnostic, supporting a wide range of LLM providers through a 
 
 | Provider | SDK Constructor | Key Notes |
 | :--- | :--- | :--- |
-| **OpenAI** | `gocrew.NewOpenAI` | Optimized for `gpt-4o` and `o1` series. |
-| **Anthropic** | `gocrew.NewAnthropic` | High-fidelity reasoning with Claude 3.5. |
-| **Google** | `gocrew.NewGemini` | Access Gemini 1.5 Pro (2M Context) and Flash. |
-| **Groq** | `gocrew.NewGroq` | Blazing-fast inference for Llama 3 and Mixtral. |
-| **OpenRouter** | `gocrew.NewOpenRouter` | Unified gateway to 100+ open-source models. |
-| **Local / Custom** | `llm.NewCustomClient` | Connect to Ollama, vLLM, or any OpenAI-compatible API. |
+|| **OpenAI** | `gocrew.NewOpenAI` | Optimized for `gpt-4o` and `o1` series. |
+|| **Anthropic** | `gocrew.NewAnthropic` | High-fidelity reasoning with Claude 3.5. |
+|| **Gemini** | `gocrew.NewGemini` | Access Gemini 1.5 Pro (2M Context) and Flash. |
+|| **Groq** | `gocrew.NewGroq` | Blazing-fast inference for Llama 3 and Mixtral. |
+|| **OpenRouter** | `gocrew.NewOpenRouter` | Unified gateway to 100+ open-source models. |
+|| **Ollama** | `gocrew.NewOllama` | Local LLM inference, no API key needed. |
+|| **Failover** | `gocrew.NewFailoverClient` | Automatic failover between two LLM clients. |
 
 ## 🚀 Basic Configuration
 

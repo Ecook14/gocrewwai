@@ -22,7 +22,7 @@ func TestTokenSplitter(t *testing.T) {
 	// Chunk 1: one two three four five
 	// Chunk 2: five six seven eight nine (starts at index 5-1=4)
 	// Chunk 3: nine ten (starts at index 9-1=8)
-	
+
 	if chunks[0] != "one two three four five" {
 		t.Errorf("Unexpected chunk 0: %s", chunks[0])
 	}
@@ -65,7 +65,7 @@ func TestIngestionEngine(t *testing.T) {
 	}
 	mockStore := &mockStore{}
 	splitter := NewTokenSplitter(5, 0)
-	
+
 	ie := &IngestionEngine{
 		Store:    mockStore,
 		LLM:      mockLLM,

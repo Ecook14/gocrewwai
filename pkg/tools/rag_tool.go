@@ -29,7 +29,6 @@ func NewNativeRAGTool(mem *memory.LongTermMemory, dir string) *NativeRAGTool {
 	}
 }
 
-
 // Ingest indexes all files in the provided directory.
 func (t *NativeRAGTool) Ingest(ctx context.Context) error {
 	return filepath.Walk(t.Dir, func(path string, info os.FileInfo, err error) error {
@@ -77,5 +76,5 @@ func (t *NativeRAGTool) Execute(ctx context.Context, input map[string]interface{
 }
 
 func (t *NativeRAGTool) RequiresReview() bool { return false }
-func (t *NativeRAGTool) Name() string { return t.BaseTool.NameValue }
-func (t *NativeRAGTool) Description() string { return t.BaseTool.DescriptionValue }
+func (t *NativeRAGTool) Name() string         { return t.BaseTool.NameValue }
+func (t *NativeRAGTool) Description() string  { return t.BaseTool.DescriptionValue }

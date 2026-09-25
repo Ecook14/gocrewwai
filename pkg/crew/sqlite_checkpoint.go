@@ -368,8 +368,8 @@ type CheckpointStore interface {
 }
 
 // Ensure each backend satisfies the interface at compile time.
-var _ CheckpointStore = (*CheckpointManager)(nil)    // file-based
-var _ CheckpointStore = (*RedisCheckpointStore)(nil) // redis-based
+var _ CheckpointStore = (*CheckpointManager)(nil)     // file-based
+var _ CheckpointStore = (*RedisCheckpointStore)(nil)  // redis-based
 var _ CheckpointStore = (*SQLiteCheckpointStore)(nil) // sqlite-based
 
 // AllBackendsReady is a compile-time assertion that all checkpoint backends

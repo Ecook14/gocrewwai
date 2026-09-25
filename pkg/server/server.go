@@ -213,7 +213,9 @@ func (s *Server) Shutdown() error {
 
 // buildHandler constructs the middleware chain.
 // Middleware is applied in this order (outer to inner):
-//   logging -> rateLimit -> auth -> routes
+//
+//	logging -> rateLimit -> auth -> routes
+//
 // This means rate limiting is checked first, then auth, then the route handler.
 func (s *Server) buildHandler() http.Handler {
 	handler := s.copyRoutes()
@@ -232,26 +234,26 @@ func (s *Server) buildHandler() http.Handler {
 // This is needed so middleware can wrap without affecting the original mux.
 func (s *Server) copyRoutes() http.Handler {
 	mux := http.NewServeMux()
-	
+
 	// Copy health endpoints
 	mux.HandleFunc("/healthz", s.handleHealth)
 	mux.HandleFunc("/health", s.handleHealth)
-	
+
 	// Copy readiness endpoints
 	mux.HandleFunc("/readyz", s.handleReadiness)
 	mux.HandleFunc("/ready", s.handleReadiness)
-	
+
 	// Copy metrics
 	if s.metrics != nil {
 		mux.Handle("/metrics", s.metrics.Handler())
 	}
-	
+
 	// Copy info
 	mux.HandleFunc("/info", s.handleInfo)
-	
+
 	// Copy pprof endpoints
 	s.copyPprofRoutes(mux)
-	
+
 	return mux
 }
 
@@ -260,11 +262,11 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/health", s.handleHealth)
 	s.mux.HandleFunc("/readyz", s.handleReadiness)
 	s.mux.HandleFunc("/ready", s.handleReadiness)
-	
+
 	if s.metrics != nil {
 		s.mux.Handle("/metrics", s.metrics.Handler())
 	}
-	
+
 	s.mux.HandleFunc("/info", s.handleInfo)
 	s.registerPprofRoutes()
 }

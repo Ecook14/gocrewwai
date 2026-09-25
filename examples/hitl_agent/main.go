@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/Ecook14/gocrewwai/pkg/dashboard"
 	"github.com/Ecook14/gocrewwai/pkg/agents"
+	"github.com/Ecook14/gocrewwai/pkg/dashboard"
 	"github.com/Ecook14/gocrewwai/pkg/guardrails"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/tools"
@@ -58,14 +58,14 @@ func main() {
 	fmt.Println("## Starting HITL Agent Execution ##")
 	ctx := context.Background()
 	result, err := agent.Execute(ctx, "Write a short 'Hello World' disclaimer to a file named 'disclaimer.txt'", nil)
-	
+
 	if err != nil {
 		fmt.Printf("Execution failed: %v\n", err)
 		return
 	}
 
 	fmt.Printf("\n## Final Result ##\n%v\n", result)
-	
+
 	slog.Info("✅ Demo finished. Keep the dashboard open to review the logs!")
 	select {} // Keep running so user can see dashboard logs
 }

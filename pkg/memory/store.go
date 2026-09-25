@@ -40,6 +40,7 @@ type Store interface {
 	// Reset clears all data in the store.
 	Reset(ctx context.Context) error
 }
+
 // KnowledgeSource defines the interface for external knowledge retrieval.
 type KnowledgeSource interface {
 	Query(ctx context.Context, query string) (string, error)

@@ -66,7 +66,7 @@ func WithMaxRetries(n int) MiddlewareOption {
 // ---------------------------------------------------------------------------
 
 // MiddlewareClient wraps an existing llm.Client with rate limiting, timeout
-// enforcement, structured logging, and retry logic. It implements the full
+// enforcement, structured logging, retry logic, and optional response caching. It implements the full
 // Client interface so it can be used as a drop-in replacement.
 type MiddlewareClient struct {
 	inner       Client
@@ -74,6 +74,15 @@ type MiddlewareClient struct {
 	timeout     time.Duration
 	logger      *slog.Logger
 	maxRetries  int
+	cache       Cache
+}
+
+// WithCache enables response caching on the wrapped client. Cached responses are
+// returned for identical inputs, reducing latency and API cost.
+func WithCache(cache Cache) MiddlewareOption {
+	return func(mc *MiddlewareClient) {
+		mc.cache = cache
+	}
 }
 
 // WrapClient decorates a Client with the given middleware options.

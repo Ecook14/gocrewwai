@@ -251,11 +251,11 @@ func BenchmarkA2AMessageLatency(b *testing.B) {
 
 func BenchmarkAgentCloneSimulated(b *testing.B) {
 	agentConfig := map[string]interface{}{
-		"role":          "Senior Researcher",
-		"goal":          "Conduct deep research",
-		"backstory":     "PhD in CS with 10 years experience",
+		"role":           "Senior Researcher",
+		"goal":           "Conduct deep research",
+		"backstory":      "PhD in CS with 10 years experience",
 		"max_iterations": 10,
-		"verbose":       true,
+		"verbose":        true,
 	}
 
 	b.ResetTimer()

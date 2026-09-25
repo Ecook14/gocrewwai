@@ -128,8 +128,8 @@ type TextPart struct {
 	Text string
 }
 
-func (tp *TextPart) IsText() bool            { return true }
-func (tp *TextPart) IsFunctionCall() bool    { return false }
+func (tp *TextPart) IsText() bool             { return true }
+func (tp *TextPart) IsFunctionCall() bool     { return false }
 func (tp *TextPart) IsFunctionResponse() bool { return false }
 
 // FunctionCallPart represents a tool/function call.
@@ -159,9 +159,9 @@ type RunConfig struct {
 
 // Event is a minimal mirror of ADK's session.Event.
 type Event struct {
-	Role      string
-	Content   string
-	ToolCalls []ToolCall
+	Role        string
+	Content     string
+	ToolCalls   []ToolCall
 	ToolResults []ToolResult
 }
 
@@ -281,10 +281,10 @@ func (a *ADKAgent) GetTools() []gocrew.Tool {
 
 // SessionBridge wraps an ADK Session for use with gocrewwai.
 type SessionBridge struct {
-	session  Session
-	state    map[string]any
-	history  []Event
-	mu       sync.RWMutex
+	session Session
+	state   map[string]any
+	history []Event
+	mu      sync.RWMutex
 }
 
 // NewSessionBridge creates a bridge from an ADK session.
@@ -376,12 +376,12 @@ type sessionAwareAgent struct {
 	maxRPM int
 }
 
-func (a *sessionAwareAgent) GetRole() string             { return a.role }
-func (a *sessionAwareAgent) GetGoal() string             { return a.goal }
-func (a *sessionAwareAgent) GetBackstory() string        { return "" }
-func (a *sessionAwareAgent) GetToolCount() int           { return 0 }
-func (a *sessionAwareAgent) GetMaxRPM() int              { return a.maxRPM }
-func (a *sessionAwareAgent) SetMaxRPM(rpm int)           { a.maxRPM = rpm }
+func (a *sessionAwareAgent) GetRole() string                 { return a.role }
+func (a *sessionAwareAgent) GetGoal() string                 { return a.goal }
+func (a *sessionAwareAgent) GetBackstory() string            { return "" }
+func (a *sessionAwareAgent) GetToolCount() int               { return 0 }
+func (a *sessionAwareAgent) GetMaxRPM() int                  { return a.maxRPM }
+func (a *sessionAwareAgent) SetMaxRPM(rpm int)               { a.maxRPM = rpm }
 func (a *sessionAwareAgent) GetUsageMetrics() map[string]int { return nil }
 func (a *sessionAwareAgent) Equip(tools ...gocrew.Tool) {
 	_ = tools
@@ -427,10 +427,10 @@ type adkToolAdapter struct {
 	inner ADKTool
 }
 
-func (t *adkToolAdapter) Name() string             { return t.inner.Name() }
-func (t *adkToolAdapter) Description() string      { return t.inner.Description() }
-func (t *adkToolAdapter) RequiresReview() bool     { return false }
-func (t *adkToolAdapter) ArgsSchema() []gocrew.ArgSchema { return nil }
+func (t *adkToolAdapter) Name() string                                      { return t.inner.Name() }
+func (t *adkToolAdapter) Description() string                               { return t.inner.Description() }
+func (t *adkToolAdapter) RequiresReview() bool                              { return false }
+func (t *adkToolAdapter) ArgsSchema() []gocrew.ArgSchema                    { return nil }
 func (t *adkToolAdapter) CacheFunction(input map[string]interface{}) string { return "" }
 func (t *adkToolAdapter) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	// Convert gocrewwai input map to ADK-style args
@@ -671,21 +671,21 @@ func (m *mockMemoryStore) Reset(ctx context.Context) error {
 // ---------------------------------------------------------------------------
 
 type mockGocAgent struct {
-	role       string
-	goal       string
-	backstory  string
-	tools      []gocrew.Tool
-	maxRPM     int
+	role      string
+	goal      string
+	backstory string
+	tools     []gocrew.Tool
+	maxRPM    int
 }
 
-func (m *mockGocAgent) GetRole() string             { return m.role }
-func (m *mockGocAgent) GetGoal() string             { return m.goal }
-func (m *mockGocAgent) GetBackstory() string        { return m.backstory }
-func (m *mockGocAgent) GetToolCount() int           { return len(m.tools) }
-func (m *mockGocAgent) GetMaxRPM() int              { return m.maxRPM }
-func (m *mockGocAgent) SetMaxRPM(rpm int)           {}
+func (m *mockGocAgent) GetRole() string                 { return m.role }
+func (m *mockGocAgent) GetGoal() string                 { return m.goal }
+func (m *mockGocAgent) GetBackstory() string            { return m.backstory }
+func (m *mockGocAgent) GetToolCount() int               { return len(m.tools) }
+func (m *mockGocAgent) GetMaxRPM() int                  { return m.maxRPM }
+func (m *mockGocAgent) SetMaxRPM(rpm int)               {}
 func (m *mockGocAgent) GetUsageMetrics() map[string]int { return nil }
-func (m *mockGocAgent) Equip(tools ...gocrew.Tool) { m.tools = append(m.tools, tools...) }
+func (m *mockGocAgent) Equip(tools ...gocrew.Tool)      { m.tools = append(m.tools, tools...) }
 func (m *mockGocAgent) Execute(ctx context.Context, input string, options map[string]interface{}) (interface{}, error) {
 	return fmt.Sprintf("Executed: %s", input), nil
 }
@@ -695,13 +695,13 @@ type mockGocTool struct {
 	desc string
 }
 
-func (m *mockGocTool) Name() string             { return m.name }
-func (m *mockGocTool) Description() string      { return m.desc }
+func (m *mockGocTool) Name() string        { return m.name }
+func (m *mockGocTool) Description() string { return m.desc }
 func (m *mockGocTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	return fmt.Sprintf("mock tool executed: %v", input), nil
 }
-func (m *mockGocTool) RequiresReview() bool     { return false }
-func (m *mockGocTool) ArgsSchema() []gocrew.ArgSchema { return nil }
+func (m *mockGocTool) RequiresReview() bool                              { return false }
+func (m *mockGocTool) ArgsSchema() []gocrew.ArgSchema                    { return nil }
 func (m *mockGocTool) CacheFunction(input map[string]interface{}) string { return "" }
 
 type mockADKTool struct {
@@ -721,8 +721,8 @@ type mockSession struct {
 	createdAt time.Time
 }
 
-func (m *mockSession) ID() string          { return m.id }
-func (m *mockSession) UserID() string      { return m.userID }
-func (m *mockSession) State() State        { return nil }
-func (m *mockSession) Events() []Event     { return m.events }
+func (m *mockSession) ID() string                { return m.id }
+func (m *mockSession) UserID() string            { return m.userID }
+func (m *mockSession) State() State              { return nil }
+func (m *mockSession) Events() []Event           { return m.events }
 func (m *mockSession) LastUpdateTime() time.Time { return m.createdAt }

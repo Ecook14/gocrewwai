@@ -33,8 +33,8 @@ func NewGeminiClient(apiKey, model string) *GeminiClient {
 	}
 
 	return &GeminiClient{
-		APIKey: apiKey,
-		Model:  model,
+		APIKey:  apiKey,
+		Model:   model,
 		BaseURL: "https://generativelanguage.googleapis.com/v1beta",
 		HTTPClient: &http.Client{
 			Timeout: 300 * time.Second,

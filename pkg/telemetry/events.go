@@ -13,16 +13,16 @@ import (
 type EventType string
 
 const (
-	EventAgentStarted   EventType = "agent_started"
-	EventAgentThinking  EventType = "agent_thinking"
-	EventToolStarted    EventType = "tool_started"
-	EventToolFinished   EventType = "tool_finished"
-	EventAgentFinished  EventType = "agent_finished"
-	EventTaskStarted    EventType = "task_started"
-	EventTaskFinished   EventType = "task_finished"
-	EventSystemLog      EventType = "system_log"
-	EventSystemMetrics  EventType = "system_metrics"
-	EventSandboxStatus  EventType = "sandbox_status"
+	EventAgentStarted  EventType = "agent_started"
+	EventAgentThinking EventType = "agent_thinking"
+	EventToolStarted   EventType = "tool_started"
+	EventToolFinished  EventType = "tool_finished"
+	EventAgentFinished EventType = "agent_finished"
+	EventTaskStarted   EventType = "task_started"
+	EventTaskFinished  EventType = "task_finished"
+	EventSystemLog     EventType = "system_log"
+	EventSystemMetrics EventType = "system_metrics"
+	EventSandboxStatus EventType = "sandbox_status"
 )
 
 // Event represents a single unit of telemetry data pushed to the dashboard.
@@ -169,7 +169,7 @@ func (c *ExecutionController) Resume() {
 func (c *ExecutionController) WaitIfPaused(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	for c.paused {
 		// Periodically wake up to check context cancellation while paused
 		done := make(chan struct{})
@@ -188,22 +188,23 @@ func (c *ExecutionController) WaitIfPaused(ctx context.Context) error {
 	}
 	return nil
 }
+
 // ---------------------------------------------------------------------------
 // Dynamic Entity Registry
 // ---------------------------------------------------------------------------
 
 type DynamicRegistry struct {
-	Agents         []interface{}
-	Tasks          []interface{}
-	MCPClients     []interface{}
-	A2ABridges     []interface{}
-	
+	Agents     []interface{}
+	Tasks      []interface{}
+	MCPClients []interface{}
+	A2ABridges []interface{}
+
 	// Internal pending queues for the engine to consume
-	pendingAgents  []interface{}
-	pendingTasks   []interface{}
-	pendingMCP     []interface{}
-	pendingA2A     []interface{}
-	processType    string
+	pendingAgents []interface{}
+	pendingTasks  []interface{}
+	pendingMCP    []interface{}
+	pendingA2A    []interface{}
+	processType   string
 
 	mu sync.RWMutex
 }
@@ -344,8 +345,8 @@ func (r *DynamicRegistry) SyncTaskResult(description string, agentRole string, o
 			SetError(error)
 			SetProcessed(bool)
 		}); ok {
-			if taskPtr.GetDescription() == description && 
-			   (agentRole == "" || strings.EqualFold(taskPtr.GetAgentRole(), agentRole)) {
+			if taskPtr.GetDescription() == description &&
+				(agentRole == "" || strings.EqualFold(taskPtr.GetAgentRole(), agentRole)) {
 				taskPtr.SetOutput(output)
 				taskPtr.SetError(err)
 				taskPtr.SetProcessed(processed)
@@ -355,8 +356,8 @@ func (r *DynamicRegistry) SyncTaskResult(description string, agentRole string, o
 
 		// 2. Fallback: Map Check (UI staged tasks)
 		if taskMap, ok := t.(map[string]interface{}); ok {
-			if taskMap["description"] == description && 
-			   (agentRole == "" || strings.EqualFold(fmt.Sprintf("%v", taskMap["agent_role"]), agentRole)) {
+			if taskMap["description"] == description &&
+				(agentRole == "" || strings.EqualFold(fmt.Sprintf("%v", taskMap["agent_role"]), agentRole)) {
 				taskMap["output"] = output
 				taskMap["processed"] = processed
 				if err != nil {
@@ -368,7 +369,7 @@ func (r *DynamicRegistry) SyncTaskResult(description string, agentRole string, o
 			}
 		}
 	}
-	
+
 	slog.Debug("SyncTaskResult: No match found for task", slog.String("desc", description), slog.String("role", agentRole))
 }
 

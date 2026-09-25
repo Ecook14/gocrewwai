@@ -70,7 +70,9 @@ func (t *TwilioTool) sendSMS(ctx context.Context, to, body string) (string, erro
 	req.SetBasicAuth(t.accountSID, t.authToken)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := t.client.Do(req.WithContext(ctx))
-	if err != nil { return "", fmt.Errorf("Twilio SMS failed: %w", err) }
+	if err != nil {
+		return "", fmt.Errorf("Twilio SMS failed: %w", err)
+	}
 	defer resp.Body.Close()
 	var result map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&result)
@@ -86,7 +88,9 @@ func (t *TwilioTool) makeCall(ctx context.Context, to, twimlURL string) (string,
 	req.SetBasicAuth(t.accountSID, t.authToken)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := t.client.Do(req.WithContext(ctx))
-	if err != nil { return "", fmt.Errorf("Twilio call failed: %w", err) }
+	if err != nil {
+		return "", fmt.Errorf("Twilio call failed: %w", err)
+	}
 	defer resp.Body.Close()
 	var result map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&result)
@@ -102,7 +106,9 @@ func (t *TwilioTool) sendWhatsApp(ctx context.Context, to, body string) (string,
 	req.SetBasicAuth(t.accountSID, t.authToken)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := t.client.Do(req.WithContext(ctx))
-	if err != nil { return "", fmt.Errorf("Twilio WhatsApp failed: %w", err) }
+	if err != nil {
+		return "", fmt.Errorf("Twilio WhatsApp failed: %w", err)
+	}
 	defer resp.Body.Close()
 	var result map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&result)
@@ -111,5 +117,5 @@ func (t *TwilioTool) sendWhatsApp(ctx context.Context, to, body string) (string,
 }
 
 func (t *TwilioTool) RequiresReview() bool { return true }
-func (t *TwilioTool) Name() string { return t.BaseTool.NameValue }
-func (t *TwilioTool) Description() string { return t.BaseTool.DescriptionValue }
+func (t *TwilioTool) Name() string         { return t.BaseTool.NameValue }
+func (t *TwilioTool) Description() string  { return t.BaseTool.DescriptionValue }

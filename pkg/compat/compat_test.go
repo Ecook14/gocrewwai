@@ -48,7 +48,7 @@ func TestConvertValue(t *testing.T) {
 			want:  []any{"a", "b", "c"},
 		},
 		{
-			name: "map of strings",
+			name:  "map of strings",
 			input: map[string]any{"key": "value"},
 			want:  map[string]any{"key": "value"},
 		},

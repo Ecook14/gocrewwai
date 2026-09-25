@@ -39,7 +39,7 @@ func FindMatchingBlock(fullText string, search string) (start int, end int, foun
 func matchLines(fullText, search, mode string) (int, int, bool) {
 	fullLines := strings.Split(fullText, "\n")
 	searchLines := strings.Split(search, "\n")
-	
+
 	if len(searchLines) == 0 {
 		return 0, 0, false
 	}
@@ -76,12 +76,12 @@ func matchLines(fullText, search, mode string) (int, int, bool) {
 			for k := 0; k < i; k++ {
 				startIdx += len(fullLines[k]) + 1 // +1 for the \n
 			}
-			
+
 			endIdx := startIdx
 			for k := i; k < i+len(searchLines); k++ {
 				endIdx += len(fullLines[k]) + 1
 			}
-			
+
 			// Adjust endIdx for trailing newline edge cases
 			if endIdx > len(fullText) {
 				endIdx = len(fullText)

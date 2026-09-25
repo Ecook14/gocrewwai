@@ -152,7 +152,7 @@ Dive deep into the Gocrewwai ecosystem with our world-class documentation guides
 - **[📊 Observability](docs/features/telemetry.md)**: Native OTEL tracing and performance metrics.
 - **[🧰 MCP Hub](docs/features/mcp.md)**: Model Context Protocol integration.
 - **[🌐 A2A Protocols](docs/features/agent_delegation.md)**: Agent-to-agent communication.
-- **[🛡️ Security Architecture](docs/features/production.md)**: Sandboxing, TLS, access control.
+- **[🛡️ Security Architecture](docs/features/production.md)**: Sandboxing, TLS, access control, audit logging.
 
 ---
 
@@ -164,24 +164,29 @@ gocrewwai/
 │   ├── gocrew/        # CLI entrypoint (gocrew create/run/kickoff)
 │   └── server/        # API server with mesh + dashboard support
 ├── gocrew/            # Ergonomic SDK facade (gocrew.NewAgent, gocrew.NewCrew, etc.)
-├── pkg/
-│   ├── agents/        # Agent definitions and lifecycle
-│   ├── crew/          # Crew orchestration + checkpoint stores (SQLite/Redis)
-│   ├── llm/           # LLM clients (OpenAI, Ollama, etc.)
-│   ├── memory/        # Unified memory with vector search
-│   ├── tools/         # 60+ built-in tools (search, browser, DB, code interp)
-│   ├── api/           # Gin REST API + gRPC mesh server
-│   ├── flow/          # Multi-crew orchestration flows
-│   ├── knowledge/     # RAG knowledge sources
-│   ├── events/        # Event bus for cross-component communication
-│   ├── guardrails/    # Input/output validation guardrails
-│   └── core/          # Core types and interfaces
-├── internal/
-│   ├── cli/           # CLI command handlers
-│   ├── delegation/    # Agent-to-agent delegation tools
-│   └── guardrails/    # Guardrail implementations
-├── web/               # Embedded web UI assets
-└── docs/              # 40+ documentation files
+|   ├── pkg/
+│   │   ├── agents/        # Agent definitions and lifecycle
+│   │   ├── crew/          # Crew orchestration + checkpoint stores (SQLite/Redis)
+│   │   ├── llm/           # LLM clients (OpenAI, Anthropic, Gemini, Groq, OpenRouter, Ollama, Failover) and caching
+│   │   ├── memory/        # Unified memory with vector search (12 store types: SQLite, Redis, Chroma, Pinecone, Qdrant, Weaviate, InMemCosine, Conversation, Entity, ShortTerm, LongTerm, Unified)
+│   │   ├── tools/         # 57 built-in tools (search, browser, DB, code interp, SaaS integrations)
+│   │   ├── api/           # Gin REST API + gRPC mesh server
+│   │   ├── flow/          # Multi-crew orchestration flows
+│   │   ├── knowledge/     # RAG knowledge sources (PDFs, URLs, text, directories, CSV, JSON)
+│   │   ├── events/        # Event bus for cross-component communication
+│   │   ├── guardrails/    # Input/output validation guardrails (6 types: MaxToken, ContentFilter, Schema, PIIRedaction, Toxicity, HumanReview)
+│   │   ├── protocols/     # MCP, A2A, WebMCP protocol implementations
+│   │   ├── sandbox/       # Docker and WASM code sandboxing
+│   │   ├── server/        # Production HTTP server with health/metrics/graceful shutdown
+│   │   ├── telemetry/     # Native OpenTelemetry tracing and metrics
+│   │   ├── config/        # YAML/JSON configuration loading
+│   │   ├── core/          # Core types, interfaces, and primitives
+│   │   ├── errors/        # Structured error types
+│   │   ├── files/         # File abstraction with provider backends
+│   │   ├── i18n/          # Internationalization and localization
+│   │   ├── training/      # Human-in-the-loop training data and advice
+│   │   ├── utils/         # Shared utilities and helpers
+│   │   └── ... (31 core packages total)
 ```
 
 ---

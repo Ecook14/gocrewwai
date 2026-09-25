@@ -19,7 +19,7 @@ type WASMSandboxTool struct {
 
 func NewWASMSandboxTool(ctx context.Context) *WASMSandboxTool {
 	r := wazero.NewRuntime(ctx)
-	
+
 	// Instantiate WASI to allow basic I/O
 	wasi_snapshot_preview1.MustInstantiate(ctx, r)
 
@@ -47,7 +47,6 @@ func NewWASMSandboxTool(ctx context.Context) *WASMSandboxTool {
 		MountedDirs: make(map[string]string),
 	}
 }
-
 
 func (t *WASMSandboxTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	path, ok := input["path"].(string)

@@ -340,11 +340,11 @@ func parsePrice(s string) float64 {
 // ---------------------------------------------------------------------------
 
 var (
-	globalCache      *PriceCache
-	globalCacheOnce  sync.Once
-	GlobalUsage      *UsageTracker
-	GlobalUsageOnce  sync.Once
-	globalMaxBudget  float64
+	globalCache     *PriceCache
+	globalCacheOnce sync.Once
+	GlobalUsage     *UsageTracker
+	GlobalUsageOnce sync.Once
+	globalMaxBudget float64
 )
 
 // SetGlobalBudget sets the maximum USD budget allowed for the engine.
@@ -411,4 +411,3 @@ func CalculateCostStatic(u Usage) float64 {
 	return float64(u.PromptTokens)*pricing.PromptPricePerToken +
 		float64(u.CompletionTokens)*pricing.CompletionPricePerToken
 }
-

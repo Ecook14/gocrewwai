@@ -14,15 +14,15 @@ import (
 
 // TrainingExample represents a single training data point.
 type TrainingExample struct {
-	TaskDescription string `json:"task_description"`
-	AgentRole       string `json:"agent_role"`
-	Input           string `json:"input"`
-	Output          string `json:"output"`
-	Feedback        string `json:"feedback,omitempty"`   // Human correction
+	TaskDescription string   `json:"task_description"`
+	AgentRole       string   `json:"agent_role"`
+	Input           string   `json:"input"`
+	Output          string   `json:"output"`
+	Feedback        string   `json:"feedback,omitempty"` // Human correction
 	ToolsUsed       []string `json:"tools_used,omitempty"`
-	TokensUsed      int    `json:"tokens_used,omitempty"`
-	LatencyMs       int64  `json:"latency_ms,omitempty"`
-	Timestamp       string `json:"timestamp"`
+	TokensUsed      int      `json:"tokens_used,omitempty"`
+	LatencyMs       int64    `json:"latency_ms,omitempty"`
+	Timestamp       string   `json:"timestamp"`
 }
 
 // TrainingDataset holds a collection of training examples with metadata.
@@ -123,16 +123,16 @@ func LoadDataset(path string) (*TrainingDataset, error) {
 
 // EvalResult holds evaluation metrics for a training dataset.
 type EvalResult struct {
-	TotalExamples     int     `json:"total_examples"`
-	WithFeedback      int     `json:"with_feedback"`     // Examples that needed correction
-	AccuracyRate      float64 `json:"accuracy_rate"`     // % accepted without feedback
-	AvgTokensUsed     float64 `json:"avg_tokens_used"`
-	AvgLatencyMs      float64 `json:"avg_latency_ms"`
-	TotalTokens       int     `json:"total_tokens"`
-	UniqueAgents      int     `json:"unique_agents"`
-	UniqueTools       int     `json:"unique_tools"`
-	ToolUsageRate     float64 `json:"tool_usage_rate"`   // % of examples using tools
-	CostEstimateUSD   float64 `json:"cost_estimate_usd"` // Estimated at $0.01/1K tokens
+	TotalExamples   int     `json:"total_examples"`
+	WithFeedback    int     `json:"with_feedback"` // Examples that needed correction
+	AccuracyRate    float64 `json:"accuracy_rate"` // % accepted without feedback
+	AvgTokensUsed   float64 `json:"avg_tokens_used"`
+	AvgLatencyMs    float64 `json:"avg_latency_ms"`
+	TotalTokens     int     `json:"total_tokens"`
+	UniqueAgents    int     `json:"unique_agents"`
+	UniqueTools     int     `json:"unique_tools"`
+	ToolUsageRate   float64 `json:"tool_usage_rate"`   // % of examples using tools
+	CostEstimateUSD float64 `json:"cost_estimate_usd"` // Estimated at $0.01/1K tokens
 }
 
 // Evaluate computes metrics for the dataset.

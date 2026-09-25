@@ -55,7 +55,9 @@ func (b *BraveSearchTool) Execute(ctx context.Context, input map[string]interfac
 	req.Header.Set("X-Subscription-Token", b.APIKey)
 
 	resp, err := HTTPClient.Do(req.WithContext(ctx))
-	if err != nil { return "", fmt.Errorf("Brave search failed: %w", err) }
+	if err != nil {
+		return "", fmt.Errorf("Brave search failed: %w", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
@@ -63,9 +65,9 @@ func (b *BraveSearchTool) Execute(ctx context.Context, input map[string]interfac
 	}
 
 	var br struct {
-		Query   string         `json:"query"`
-		Results []braveResult  `json:"results"`
-		Total int            `json:"total"`
+		Query   string        `json:"query"`
+		Results []braveResult `json:"results"`
+		Total   int           `json:"total"`
 	}
 	json.NewDecoder(resp.Body).Decode(&br)
 
@@ -83,5 +85,5 @@ func (b *BraveSearchTool) Execute(ctx context.Context, input map[string]interfac
 }
 
 func (b *BraveSearchTool) RequiresReview() bool { return false }
-func (b *BraveSearchTool) Name() string { return b.BaseTool.NameValue }
-func (b *BraveSearchTool) Description() string { return b.BaseTool.DescriptionValue }
+func (b *BraveSearchTool) Name() string         { return b.BaseTool.NameValue }
+func (b *BraveSearchTool) Description() string  { return b.BaseTool.DescriptionValue }

@@ -25,11 +25,11 @@ func main() {
 
 	// 3. Create Agent with Cache (Elite Style)
 	agent := gocrew.NewAgent(gocrew.AgentConfig{
-		Role:      "Fast Researcher",
-		Goal:      "Provide quick answers.",
-		LLM:       client,
-		Cache:     cache,
-		Verbose:   true,
+		Role:    "Fast Researcher",
+		Goal:    "Provide quick answers.",
+		LLM:     client,
+		Cache:   cache,
+		Verbose: true,
 	})
 
 	ctx := context.Background()

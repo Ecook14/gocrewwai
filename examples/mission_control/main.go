@@ -24,7 +24,7 @@ func main() {
 		Backstory: "You are a cyber-security researcher focused on LLM safety.",
 		A2APort:   5001,
 	})
-	
+
 	// Register worker in the Global Registry for discovery
 	protocols.GlobalA2ARegistry.Register(&protocols.AgentCard{
 		ID:           worker.A2AID,

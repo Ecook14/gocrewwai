@@ -43,7 +43,6 @@ func NewSerperTool(apiKey string) *SerperTool {
 	}
 }
 
-
 func (t *SerperTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	query, ok := input["query"].(string)
 	if !ok {
@@ -101,5 +100,5 @@ func (t *SerperTool) Execute(ctx context.Context, input map[string]interface{}) 
 	return output.String(), nil
 }
 
-func (t *SerperTool) Name() string { return t.BaseTool.NameValue }
+func (t *SerperTool) Name() string        { return t.BaseTool.NameValue }
 func (t *SerperTool) Description() string { return t.BaseTool.DescriptionValue }

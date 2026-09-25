@@ -89,7 +89,7 @@ func (s *ChromaStore) Add(ctx context.Context, item *MemoryItem) error {
 	json.Unmarshal(metadataJSON, &meta)
 
 	payload := map[string]interface{}{
-		"ids":      []string{item.ID},
+		"ids":        []string{item.ID},
 		"embeddings": [][]float32{item.Vector},
 		"metadatas":  []map[string]interface{}{meta},
 		"documents":  []string{item.Text},

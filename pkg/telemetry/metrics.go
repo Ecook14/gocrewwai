@@ -1,11 +1,11 @@
 package telemetry
 
 import (
+	"fmt"
 	"net/http"
+	"runtime"
 	"sync"
 	"time"
-	"fmt"
-	"runtime"
 )
 
 // ---------------------------------------------------------------------------
@@ -29,14 +29,14 @@ type Metrics struct {
 	mu sync.RWMutex
 
 	// LLM Metrics
-	llmCallsTotal    map[string]int64         // model → count
-	llmCallErrors    map[string]int64         // model → error count
-	llmLatencySum    map[string]float64       // model → total seconds
+	llmCallsTotal    map[string]int64             // model → count
+	llmCallErrors    map[string]int64             // model → error count
+	llmLatencySum    map[string]float64           // model → total seconds
 	llmLatencyBucket map[string]map[float64]int64 // model → bucket → count
 
 	// Token Metrics
-	promptTokensTotal     map[string]int64 // model → total prompt tokens
-	completionTokensTotal map[string]int64 // model → total completion tokens
+	promptTokensTotal     map[string]int64   // model → total prompt tokens
+	completionTokensTotal map[string]int64   // model → total completion tokens
 	costTotal             map[string]float64 // model → total cost USD
 
 	// Task Metrics
@@ -45,8 +45,8 @@ type Metrics struct {
 	taskLatencySum      map[string]float64 // task_type → total seconds
 
 	// Agent Metrics
-	activeAgents   int64
-	agentsCreated  int64
+	activeAgents  int64
+	agentsCreated int64
 
 	// Tool Metrics
 	toolCallsTotal map[string]int64   // tool_name → count
@@ -63,20 +63,20 @@ var defaultBuckets = []float64{0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10,
 // NewMetrics creates a new metrics collector.
 func NewMetrics() *Metrics {
 	return &Metrics{
-		llmCallsTotal:        make(map[string]int64),
-		llmCallErrors:        make(map[string]int64),
-		llmLatencySum:        make(map[string]float64),
-		llmLatencyBucket:     make(map[string]map[float64]int64),
-		promptTokensTotal:    make(map[string]int64),
+		llmCallsTotal:         make(map[string]int64),
+		llmCallErrors:         make(map[string]int64),
+		llmLatencySum:         make(map[string]float64),
+		llmLatencyBucket:      make(map[string]map[float64]int64),
+		promptTokensTotal:     make(map[string]int64),
 		completionTokensTotal: make(map[string]int64),
-		costTotal:            make(map[string]float64),
-		taskExecutionsTotal:  make(map[string]int64),
-		taskErrors:           make(map[string]int64),
-		taskLatencySum:       make(map[string]float64),
-		toolCallsTotal:       make(map[string]int64),
-		toolErrors:           make(map[string]int64),
-		toolLatencySum:       make(map[string]float64),
-		startTime:            time.Now(),
+		costTotal:             make(map[string]float64),
+		taskExecutionsTotal:   make(map[string]int64),
+		taskErrors:            make(map[string]int64),
+		taskLatencySum:        make(map[string]float64),
+		toolCallsTotal:        make(map[string]int64),
+		toolErrors:            make(map[string]int64),
+		toolLatencySum:        make(map[string]float64),
+		startTime:             time.Now(),
 	}
 }
 
@@ -180,9 +180,9 @@ type MetricsSnapshot struct {
 	AgentsCreated         int64
 
 	// System Stats
-	CPUUsage     float64
-	MemoryUsage  uint64 // In MB
-	Goroutines   int
+	CPUUsage    float64
+	MemoryUsage uint64 // In MB
+	Goroutines  int
 }
 
 // Snapshot returns a thread-safe copy of current metrics.

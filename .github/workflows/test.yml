@@ -12,6 +12,12 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
       - run: go mod tidy
-      - run: go build ./pkg/... ./cmd/...
-      - run: go test ./pkg/... -v -count=1
-      - run: go test ./pkg/... -race -count=1
+      - run: go build ./pkg/... ./cmd/... ./gocrew/...
+      - name: Test without race
+        env:
+          CREW_CONFIG_PATH: config.json
+        run: go test ./pkg/... ./cmd/... ./gocrew/... -v -count=1
+      - name: Test with race detector
+        env:
+          CREW_CONFIG_PATH: config.json
+        run: go test ./pkg/... ./cmd/... ./gocrew/... -race -count=1 -timeout 120s

@@ -28,23 +28,23 @@ func main() {
 
 	// 2. Define Advanced Agents (Elite Style)
 	researcher := gocrew.NewAgent(gocrew.AgentConfig{
-		Role:             "Strategic Researcher",
-		Goal:             "Deeply analyze market trends and provide data-driven insights.",
-		Backstory:        "Expert in synthesis and trend forecasting with a decade of experience.",
-		LLM:              model,
-		Tools:            []gocrew.Tool{gocrew.NewSearchWebTool(), gocrew.NewCalculatorTool()},
-		AllowDelegation:  true,
-		Memory:           sqliteStore,
-		Verbose:          true,
+		Role:            "Strategic Researcher",
+		Goal:            "Deeply analyze market trends and provide data-driven insights.",
+		Backstory:       "Expert in synthesis and trend forecasting with a decade of experience.",
+		LLM:             model,
+		Tools:           []gocrew.Tool{gocrew.NewSearchWebTool(), gocrew.NewCalculatorTool()},
+		AllowDelegation: true,
+		Memory:          sqliteStore,
+		Verbose:         true,
 	})
 
 	writer := gocrew.NewAgent(gocrew.AgentConfig{
-		Role:             "Technical Storyteller",
-		Goal:             "Translate complex research into engaging, actionable content.",
-		Backstory:        "Award-winning writer known for making technology relatable.",
-		LLM:              model,
-		Memory:           sqliteStore,
-		Verbose:          true,
+		Role:      "Technical Storyteller",
+		Goal:      "Translate complex research into engaging, actionable content.",
+		Backstory: "Award-winning writer known for making technology relatable.",
+		LLM:       model,
+		Memory:    sqliteStore,
+		Verbose:   true,
 	})
 
 	// 3. Define Parallel Tasks (Elite Style)
@@ -61,18 +61,18 @@ func main() {
 
 	// 4. Assemble Advanced Crew (Elite Style)
 	execCrew := gocrew.NewCrew(gocrew.CrewConfig{
-		Agents:  []gocrew.CoreAgent{researcher, writer},
-		Tasks:   []*gocrew.Task{marketTask, contentTask},
-		Process: gocrew.Hierarchical, // Dynamic delegation via Manager
+		Agents:     []gocrew.CoreAgent{researcher, writer},
+		Tasks:      []*gocrew.Task{marketTask, contentTask},
+		Process:    gocrew.Hierarchical, // Dynamic delegation via Manager
 		ManagerLLM: model,
-		Verbose: true,
+		Verbose:    true,
 	})
 
 	// 5. Execution with Orchestration
 	fmt.Println("🚀 ## Starting Advanced Level Crew Execution (Elite Style) ##")
 	start := time.Now()
 	ctx := context.WithValue(context.Background(), "timestamp", start.Unix())
-	
+
 	result, err := execCrew.Kickoff(ctx)
 	if err != nil {
 		fmt.Printf("❌ Execution failed: %v\n", err)

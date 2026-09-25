@@ -25,8 +25,8 @@ type StringSource struct {
 	Label   string
 }
 
-func (s *StringSource) Type() string                           { return "string" }
-func (s *StringSource) Identifier() string                     { return "string:" + s.Label }
+func (s *StringSource) Type() string                             { return "string" }
+func (s *StringSource) Identifier() string                       { return "string:" + s.Label }
 func (s *StringSource) Load(ctx context.Context) (string, error) { return s.Content, nil }
 
 // TextFileSource provides knowledge from .txt files.
@@ -84,15 +84,63 @@ func (s *URLSource) Load(ctx context.Context) (string, error) {
 	return "", fmt.Errorf("use IngestionEngine.IngestURL for URL sources")
 }
 
+// DirectorySource provides knowledge from all files inside a directory tree.
+type DirectorySource struct {
+	Path      string
+	Recursive bool
+	Pattern   string
+}
+
+func (s *DirectorySource) Type() string       { return "directory" }
+func (s *DirectorySource) Identifier() string { return fmt.Sprintf("directory:%s", s.Path) }
+func (s *DirectorySource) Load(ctx context.Context) (string, error) {
+	return "", fmt.Errorf("use IngestionEngine.IngestDirectory for directory sources")
+}
+
+// ============================================================
+// Knowledge Source Constructors
+// ============================================================
+
+// NewPDFSource creates a PDF knowledge source from one or more file paths.
+func NewPDFSource(filePaths ...string) *PDFSource {
+	return &PDFSource{FilePaths: filePaths}
+}
+
+// NewURLSource creates a URL knowledge source from one or more URLs.
+func NewURLSource(urls ...string) *URLSource {
+	return &URLSource{URLs: urls}
+}
+
+// NewTextSource creates a text knowledge source from raw string content.
+func NewTextSource(content string, label string) *StringSource {
+	return &StringSource{Content: content, Label: label}
+}
+
+// NewDirectorySource creates a directory knowledge source.
+// If recursive is true, scans subdirectories; pattern filters files (e.g. "*.md").
+func NewDirectorySource(path string, pattern string) *DirectorySource {
+	return &DirectorySource{Path: path, Pattern: pattern, Recursive: true}
+}
+
+// NewCSVSource creates a CSV knowledge source from one or more file paths.
+func NewCSVSource(filePaths ...string) *CSVSource {
+	return &CSVSource{FilePaths: filePaths}
+}
+
+// NewJSONSource creates a JSON knowledge source from one or more file paths.
+func NewJSONSource(filePaths ...string) *JSONSource {
+	return &JSONSource{FilePaths: filePaths}
+}
+
 // ============================================================
 // Knowledge Config
 // ============================================================
 
 // Config controls knowledge retrieval behavior.
 type Config struct {
-	ResultsLimit   int     `yaml:"results_limit" json:"results_limit"`       // Default: 3
-	ScoreThreshold float64 `yaml:"score_threshold" json:"score_threshold"`   // Default: 0.35
-	CollectionName string  `yaml:"collection_name" json:"collection_name"`   // Default: "knowledge"
+	ResultsLimit   int     `yaml:"results_limit" json:"results_limit"`     // Default: 3
+	ScoreThreshold float64 `yaml:"score_threshold" json:"score_threshold"` // Default: 0.35
+	CollectionName string  `yaml:"collection_name" json:"collection_name"` // Default: "knowledge"
 }
 
 // DefaultConfig returns the default knowledge configuration.

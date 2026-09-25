@@ -40,7 +40,6 @@ func NewBrowserTool() *BrowserTool {
 	}
 }
 
-
 func (t *BrowserTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	action, ok := input["action"].(string)
 	if !ok {
@@ -77,7 +76,7 @@ func (t *BrowserTool) Execute(ctx context.Context, input map[string]interface{})
 		if waitSelector != "" {
 			actions = append(actions, chromedp.WaitVisible(waitSelector, chromedp.ByQuery))
 		}
-		
+
 		err := chromedp.Run(ctx, actions...)
 		if err != nil {
 			return "", err
@@ -89,7 +88,7 @@ func (t *BrowserTool) Execute(ctx context.Context, input map[string]interface{})
 		if selector == "" {
 			return "", fmt.Errorf("click requires 'selector'")
 		}
-		err := chromedp.Run(ctx, 
+		err := chromedp.Run(ctx,
 			chromedp.WaitVisible(selector, chromedp.ByQuery),
 			chromedp.Click(selector, chromedp.ByQuery),
 		)
@@ -104,7 +103,7 @@ func (t *BrowserTool) Execute(ctx context.Context, input map[string]interface{})
 		if selector == "" || text == "" {
 			return "", fmt.Errorf("type requires 'selector' and 'text'")
 		}
-		err := chromedp.Run(ctx, 
+		err := chromedp.Run(ctx,
 			chromedp.WaitVisible(selector, chromedp.ByQuery),
 			chromedp.SendKeys(selector, text, chromedp.ByQuery),
 		)
@@ -141,7 +140,7 @@ func (t *BrowserTool) Execute(ctx context.Context, input map[string]interface{})
 				return "", err
 			}
 		} else {
-			err := chromedp.Run(ctx, 
+			err := chromedp.Run(ctx,
 				chromedp.WaitVisible(selector, chromedp.ByQuery),
 				chromedp.Text(selector, &text, chromedp.ByQuery),
 			)
@@ -159,5 +158,5 @@ func (t *BrowserTool) Execute(ctx context.Context, input map[string]interface{})
 }
 
 func (t *BrowserTool) RequiresReview() bool { return true }
-func (t *BrowserTool) Name() string { return t.BaseTool.NameValue }
-func (t *BrowserTool) Description() string { return t.BaseTool.DescriptionValue }
+func (t *BrowserTool) Name() string         { return t.BaseTool.NameValue }
+func (t *BrowserTool) Description() string  { return t.BaseTool.DescriptionValue }

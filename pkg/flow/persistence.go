@@ -206,6 +206,11 @@ type PersistentFlow struct {
 	flowID      string
 }
 
+// SetPersistence sets or replaces the persistence backend.
+func (pf *PersistentFlow) SetPersistence(persistence FlowPersistence) {
+	pf.persistence = persistence
+}
+
 // NewPersistentFlow creates a flow that auto-persists state after each node.
 func NewPersistentFlow(flowID string, persistence FlowPersistence, initial State) *PersistentFlow {
 	return &PersistentFlow{

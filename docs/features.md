@@ -23,8 +23,8 @@
 ### LLM Providers (7)
 - **7 LLM providers** — OpenAI, Anthropic, Gemini, Groq, OpenRouter, Ollama, Failover
 
-### Memory & RAG (7 backends)
-- SQLite, Redis, Chroma, Pinecone, Qdrant, Weaviate
+### Memory & RAG (12 backends)
+- SQLite, Redis, Chroma, Pinecone, Qdrant, Weaviate, InMemCosine, Conversation, Entity, ShortTerm, LongTerm, Unified
 
 ### Protocols
 - MCP, A2A, gRPC, WebSocket

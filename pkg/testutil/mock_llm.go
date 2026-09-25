@@ -173,8 +173,8 @@ type MockTool struct {
 	ExecuteFunc      func(ctx context.Context, input map[string]interface{}) (string, error)
 }
 
-func (t *MockTool) Name() string        { return t.NameValue }
-func (t *MockTool) Description() string { return t.DescriptionValue }
+func (t *MockTool) Name() string         { return t.NameValue }
+func (t *MockTool) Description() string  { return t.DescriptionValue }
 func (t *MockTool) RequiresReview() bool { return t.ReviewRequired }
 
 func (t *MockTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {

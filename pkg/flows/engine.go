@@ -55,7 +55,7 @@ func (e *Engine) executeNode(ctx context.Context, f *Flow, nodeID string, curren
 		var wg sync.WaitGroup
 		mu := sync.Mutex{}
 		branchStates := make([]State, 0)
-		
+
 		for _, branch := range node.ParallelBranches {
 			wg.Add(1)
 			go func(bID string) {
@@ -70,15 +70,15 @@ func (e *Engine) executeNode(ctx context.Context, f *Flow, nodeID string, curren
 			}(branch)
 		}
 		wg.Wait()
-		
+
 		// If the next node is a Reduce node, we pass the branchStates
 		if len(node.Next) > 0 {
 			reduceNode := f.Nodes[node.Next[0]]
 			if reduceNode != nil && reduceNode.Type == NodeReduce && reduceNode.Merge != nil {
 				nextState = reduceNode.Merge(branchStates)
-				// Skip to the node AFTER reduce if needed, 
+				// Skip to the node AFTER reduce if needed,
 				// but here we just let the recursion handle it.
-				nextNodeID = node.Next[0] 
+				nextNodeID = node.Next[0]
 			} else {
 				// Default: take the first branch result or keep original
 				if len(branchStates) > 0 {
@@ -118,7 +118,7 @@ func (e *Engine) executeNode(ctx context.Context, f *Flow, nodeID string, curren
 		}
 
 	case NodeReduce:
-		// Logic is usually handled by Parallel/Map parent 
+		// Logic is usually handled by Parallel/Map parent
 		// but if reached normally, just move forward
 		if len(node.Next) > 0 {
 			nextNodeID = node.Next[0]

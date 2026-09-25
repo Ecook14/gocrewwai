@@ -13,10 +13,10 @@ import (
 // SupabaseTool allows agents to interact with Supabase.
 type SupabaseTool struct {
 	BaseTool
-	client   *http.Client
-	url      string
-	apiKey   string
-	table    string
+	client *http.Client
+	url    string
+	apiKey string
+	table  string
 }
 
 // NewSupabaseTool creates a Supabase integration tool.
@@ -33,9 +33,9 @@ func NewSupabaseTool(url, apiKey, table string) *SupabaseTool {
 			DescriptionValue: "Interacts with Supabase. Actions: select, insert, update, delete, rpc.",
 		},
 		client: &http.Client{Timeout: 30 * time.Second},
-		url:     url,
-		apiKey:  apiKey,
-		table:   table,
+		url:    url,
+		apiKey: apiKey,
+		table:  table,
 	}
 }
 
@@ -53,7 +53,9 @@ func (s *SupabaseTool) Execute(ctx context.Context, input map[string]interface{}
 	switch action {
 	case "select":
 		columns, _ := input["columns"].(string)
-		if columns == "" { columns = "*" }
+		if columns == "" {
+			columns = "*"
+		}
 		filter, _ := input["filter"].(string)
 		return s.selectRows(ctx, table, columns, filter)
 	case "insert":
@@ -85,7 +87,9 @@ func (s *SupabaseTool) selectRows(ctx context.Context, table, columns, filter st
 	req.Header.Set("Authorization", "Bearer "+s.apiKey)
 	req.Header.Set("apikey", s.apiKey)
 	resp, err := s.client.Do(req.WithContext(ctx))
-	if err != nil { return "", err }
+	if err != nil {
+		return "", err
+	}
 	defer resp.Body.Close()
 	var result []map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&result)
@@ -101,7 +105,9 @@ func (s *SupabaseTool) insertRow(ctx context.Context, table string, record map[s
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("apikey", s.apiKey)
 	resp, err := s.client.Do(req.WithContext(ctx))
-	if err != nil { return "", err }
+	if err != nil {
+		return "", err
+	}
 	defer resp.Body.Close()
 	var result map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&result)
@@ -116,7 +122,9 @@ func (s *SupabaseTool) updateRows(ctx context.Context, table, filter string, upd
 	req.Header.Set("Authorization", "Bearer "+s.apiKey)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := s.client.Do(req.WithContext(ctx))
-	if err != nil { return "", err }
+	if err != nil {
+		return "", err
+	}
 	defer resp.Body.Close()
 	return fmt.Sprintf("Updated rows in %s", table), nil
 }
@@ -126,7 +134,9 @@ func (s *SupabaseTool) deleteRows(ctx context.Context, table, filter string) (st
 	req, _ := http.NewRequest("DELETE", url, nil)
 	req.Header.Set("Authorization", "Bearer "+s.apiKey)
 	resp, err := s.client.Do(req.WithContext(ctx))
-	if err != nil { return "", err }
+	if err != nil {
+		return "", err
+	}
 	defer resp.Body.Close()
 	return fmt.Sprintf("Deleted rows from %s", table), nil
 }
@@ -138,7 +148,9 @@ func (s *SupabaseTool) rpc(ctx context.Context, fn string, params map[string]int
 	req.Header.Set("Authorization", "Bearer "+s.apiKey)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := s.client.Do(req.WithContext(ctx))
-	if err != nil { return "", err }
+	if err != nil {
+		return "", err
+	}
 	defer resp.Body.Close()
 	var result []map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&result)
@@ -147,5 +159,5 @@ func (s *SupabaseTool) rpc(ctx context.Context, fn string, params map[string]int
 }
 
 func (s *SupabaseTool) RequiresReview() bool { return true }
-func (s *SupabaseTool) Name() string { return s.BaseTool.NameValue }
-func (s *SupabaseTool) Description() string { return s.BaseTool.DescriptionValue }
+func (s *SupabaseTool) Name() string         { return s.BaseTool.NameValue }
+func (s *SupabaseTool) Description() string  { return s.BaseTool.DescriptionValue }

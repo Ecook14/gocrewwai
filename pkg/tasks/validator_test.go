@@ -6,7 +6,7 @@ import (
 
 func TestValidator_RepairJSON(t *testing.T) {
 	v := &Validator{}
-	
+
 	tests := []struct {
 		name     string
 		input    string
@@ -45,7 +45,7 @@ func TestValidator_RepairJSON(t *testing.T) {
 
 func TestValidator_ValidateSchema(t *testing.T) {
 	v := &Validator{}
-	
+
 	type TestSchema struct {
 		Name string `json:"name"`
 		Age  int    `json:"age"`

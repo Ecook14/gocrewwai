@@ -92,10 +92,10 @@ type baseFile struct {
 	mimeType string
 }
 
-func (f *baseFile) Type() FileType       { return f.fileType }
-func (f *baseFile) Source() string        { return f.source }
-func (f *baseFile) Mode() FileMode       { return f.mode }
-func (f *baseFile) MimeType() string      { return f.mimeType }
+func (f *baseFile) Type() FileType   { return f.fileType }
+func (f *baseFile) Source() string   { return f.source }
+func (f *baseFile) Mode() FileMode   { return f.mode }
+func (f *baseFile) MimeType() string { return f.mimeType }
 
 func (f *baseFile) Data() ([]byte, error) {
 	if strings.HasPrefix(f.source, "http://") || strings.HasPrefix(f.source, "https://") {
@@ -150,35 +150,45 @@ func (f *baseFile) TransmitAs() TransmitMethod {
 // ImageFile creates a file handle for an image.
 func ImageFile(source string, mode ...FileMode) File {
 	m := ModeAuto
-	if len(mode) > 0 { m = mode[0] }
+	if len(mode) > 0 {
+		m = mode[0]
+	}
 	return &baseFile{source: source, mode: m, fileType: TypeImage, mimeType: detectMIME(source, "image/png")}
 }
 
 // PDFFile creates a file handle for a PDF.
 func PDFFile(source string, mode ...FileMode) File {
 	m := ModeAuto
-	if len(mode) > 0 { m = mode[0] }
+	if len(mode) > 0 {
+		m = mode[0]
+	}
 	return &baseFile{source: source, mode: m, fileType: TypePDF, mimeType: "application/pdf"}
 }
 
 // AudioFile creates a file handle for audio content.
 func AudioFile(source string, mode ...FileMode) File {
 	m := ModeAuto
-	if len(mode) > 0 { m = mode[0] }
+	if len(mode) > 0 {
+		m = mode[0]
+	}
 	return &baseFile{source: source, mode: m, fileType: TypeAudio, mimeType: detectMIME(source, "audio/mpeg")}
 }
 
 // VideoFile creates a file handle for video content.
 func VideoFile(source string, mode ...FileMode) File {
 	m := ModeAuto
-	if len(mode) > 0 { m = mode[0] }
+	if len(mode) > 0 {
+		m = mode[0]
+	}
 	return &baseFile{source: source, mode: m, fileType: TypeVideo, mimeType: detectMIME(source, "video/mp4")}
 }
 
 // TextFile creates a file handle for text content.
 func TextFile(source string, mode ...FileMode) File {
 	m := ModeAuto
-	if len(mode) > 0 { m = mode[0] }
+	if len(mode) > 0 {
+		m = mode[0]
+	}
 	return &baseFile{source: source, mode: m, fileType: TypeText, mimeType: "text/plain"}
 }
 
@@ -202,7 +212,9 @@ func NewFile(source string, mode ...FileMode) File {
 // FromBytes creates a file from raw bytes.
 func FromBytes(fb FileBytes, mode ...FileMode) File {
 	m := ModeAuto
-	if len(mode) > 0 { m = mode[0] }
+	if len(mode) > 0 {
+		m = mode[0]
+	}
 	ext := strings.ToLower(filepath.Ext(fb.Filename))
 	ft := TypeGeneric
 	mime := "application/octet-stream"
@@ -232,7 +244,7 @@ type bytesFile struct {
 	rawData []byte
 }
 
-func (f *bytesFile) Data() ([]byte, error) { return f.rawData, nil }
+func (f *bytesFile) Data() ([]byte, error)     { return f.rawData, nil }
 func (f *bytesFile) SizeBytes() (int64, error) { return int64(len(f.rawData)), nil }
 
 // detectMIME infers MIME type from file extension.

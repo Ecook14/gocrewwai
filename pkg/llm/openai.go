@@ -6,12 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"mime/multipart"
 	"net/http"
-	"time"
-	"log/slog"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/sashabaranov/go-openai"
 )
@@ -54,7 +54,7 @@ func (r *retryRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 		}
 
 		resp, err = r.next.RoundTrip(req)
-		
+
 		if err != nil {
 			// Network err
 		} else if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusForbidden || resp.StatusCode >= 500 {
@@ -74,7 +74,7 @@ func (r *retryRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 				if resp.Body != nil {
 					bodyBytes, _ := io.ReadAll(resp.Body)
 					bodyStr := strings.ToLower(string(bodyBytes))
-					
+
 					// Re-wrap body for potential next retry or return
 					resp.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
@@ -94,7 +94,7 @@ func (r *retryRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 					}
 				}
 			}
-			
+
 			status := 0
 			if resp != nil {
 				status = resp.StatusCode
@@ -104,7 +104,7 @@ func (r *retryRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 				provider = "LLM"
 			}
 			slog.Warn(fmt.Sprintf("%s API rate limited or unavailable, retrying", provider), "status", status, "delay", delay, "attempt", i+1)
-			
+
 			select {
 			case <-req.Context().Done():
 				return nil, req.Context().Err()
@@ -260,7 +260,7 @@ func (c *OpenAIClient) GenerateStructured(ctx context.Context, messages []Messag
 		return nil, fmt.Errorf("ChatCompletion unstructured error: %v", err)
 	}
 	rawJSON := resp.Choices[0].Message.Content
-	
+
 	err = json.Unmarshal([]byte(rawJSON), schema)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract schema: %w\nRaw Output: %s", err, rawJSON)
@@ -317,8 +317,6 @@ func (c *OpenAIClient) StreamGenerate(ctx context.Context, messages []Message, o
 
 	return ch, nil
 }
-
-
 
 // GenerateSpeech converts text to audio using OpenAI's TTS.
 func (c *OpenAIClient) GenerateSpeech(ctx context.Context, text string, options map[string]interface{}) ([]byte, error) {

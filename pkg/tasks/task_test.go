@@ -19,20 +19,28 @@ func (m *mockLLMClient) Generate(ctx context.Context, messages []llm.Message, op
 	}
 	return "Task Output", nil
 }
-func (m *mockLLMClient) GenerateWithUsage(ctx context.Context, messages []llm.Message, options llm.GenerateOptions) (string, *llm.Usage, error) { return "", nil, nil }
-func (m *mockLLMClient) GenerateStructured(ctx context.Context, messages []llm.Message, schema interface{}, options llm.GenerateOptions) (interface{}, error) { return nil, nil }
-func (m *mockLLMClient) StreamGenerate(ctx context.Context, messages []llm.Message, options llm.GenerateOptions) (<-chan string, error) { return nil, nil }
-func (m *mockLLMClient) GenerateEmbedding(ctx context.Context, text string, options llm.GenerateOptions) ([]float32, error) { return nil, nil }
+func (m *mockLLMClient) GenerateWithUsage(ctx context.Context, messages []llm.Message, options llm.GenerateOptions) (string, *llm.Usage, error) {
+	return "", nil, nil
+}
+func (m *mockLLMClient) GenerateStructured(ctx context.Context, messages []llm.Message, schema interface{}, options llm.GenerateOptions) (interface{}, error) {
+	return nil, nil
+}
+func (m *mockLLMClient) StreamGenerate(ctx context.Context, messages []llm.Message, options llm.GenerateOptions) (<-chan string, error) {
+	return nil, nil
+}
+func (m *mockLLMClient) GenerateEmbedding(ctx context.Context, text string, options llm.GenerateOptions) ([]float32, error) {
+	return nil, nil
+}
 
 func TestTaskExecute(t *testing.T) {
 	mockLLM := &mockLLMClient{}
 	i18nInst, _ := i18n.NewI18N("en")
 	agent := agents.NewAgent(agents.AgentConfig{
-		Role:    "Tester",
-		Goal:    "Test",
+		Role:      "Tester",
+		Goal:      "Test",
 		Backstory: "Test agent",
-		LLM:     mockLLM,
-		Tools:   nil,
+		LLM:       mockLLM,
+		Tools:     nil,
 	})
 	agent.I18N = i18nInst
 	task := &Task{

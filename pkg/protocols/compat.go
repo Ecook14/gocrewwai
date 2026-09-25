@@ -8,7 +8,8 @@
 //   - MCP (Model Context Protocol): modelcontextprotocol/go-sdk
 //
 // Architecture:
-//   Gocrewwai Core <-> Protocol Adapters <-> External Frameworks
+//
+//	Gocrewwai Core <-> Protocol Adapters <-> External Frameworks
 //
 // The adapters translate between gocrewwai's native types and the
 // external framework's types, enabling seamless interoperation.

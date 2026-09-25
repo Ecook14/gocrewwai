@@ -48,10 +48,10 @@ func NewTavilyTool(apiKey string) *TavilyTool {
 
 // tavilyResponse represents the Tavily search API response.
 type tavilyResponse struct {
-	Query         string        `json:"query"`
+	Query         string         `json:"query"`
 	Results       []tavilyResult `json:"results"`
-	TotalResults  int           `json:"total_results"`
-	ExecutionTime float64       `json:"execution_time"`
+	TotalResults  int            `json:"total_results"`
+	ExecutionTime float64        `json:"execution_time"`
 }
 
 type tavilyResult struct {
@@ -124,5 +124,5 @@ func (t *TavilyTool) Execute(ctx context.Context, input map[string]interface{}) 
 }
 
 func (t *TavilyTool) RequiresReview() bool { return true }
-func (t *TavilyTool) Name() string { return t.BaseTool.NameValue }
-func (t *TavilyTool) Description() string { return t.BaseTool.DescriptionValue }
+func (t *TavilyTool) Name() string         { return t.BaseTool.NameValue }
+func (t *TavilyTool) Description() string  { return t.BaseTool.DescriptionValue }

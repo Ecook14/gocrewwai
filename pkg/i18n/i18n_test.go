@@ -1,8 +1,8 @@
 package i18n_test
 
 import (
-	"testing"
 	"github.com/Ecook14/gocrewwai/pkg/i18n"
+	"testing"
 )
 
 func TestI18N_Retrieve(t *testing.T) {
@@ -20,9 +20,9 @@ func TestI18N_Retrieve(t *testing.T) {
 	// Test nested retrieval (Process)
 	rolePlaying := i.Slice("role_playing")
 	processed := i.Process(rolePlaying, map[string]string{
-		"role": "Researcher",
+		"role":      "Researcher",
 		"backstory": "You focus on AI research.",
-		"goal": "Write a report.",
+		"goal":      "Write a report.",
 	})
 
 	if !testing.Short() {

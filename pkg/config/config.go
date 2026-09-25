@@ -14,18 +14,18 @@ import (
 
 // Config represents the unified application configuration.
 type Config struct {
-	LLM           LLMConfig               `json:"llm"`
-	Providers     map[string]Provider     `json:"providers"`
-	Routing       RoutingConfig           `json:"routing"`
-	Orchestration OrchestrationConfig     `json:"orchestration"`
-	MCPServers    map[string]MCPServer    `json:"mcp_servers"`
-	Tools         map[string]interface{}  `json:"tools"`
-	Memory        MemoryConfig            `json:"memory"`
-	Models        map[string]ModelConfig  `json:"models"`
-	Persistence   PersistenceConfig       `json:"persistence"`
-	Observability ObservabilityConfig     `json:"observability"`
-	Security      SecurityConfig          `json:"security"`
-	HITL          HITLConfig              `json:"hitl"`
+	LLM           LLMConfig              `json:"llm"`
+	Providers     map[string]Provider    `json:"providers"`
+	Routing       RoutingConfig          `json:"routing"`
+	Orchestration OrchestrationConfig    `json:"orchestration"`
+	MCPServers    map[string]MCPServer   `json:"mcp_servers"`
+	Tools         map[string]interface{} `json:"tools"`
+	Memory        MemoryConfig           `json:"memory"`
+	Models        map[string]ModelConfig `json:"models"`
+	Persistence   PersistenceConfig      `json:"persistence"`
+	Observability ObservabilityConfig    `json:"observability"`
+	Security      SecurityConfig         `json:"security"`
+	HITL          HITLConfig             `json:"hitl"`
 }
 
 type LLMConfig struct {
@@ -57,7 +57,7 @@ type ModelConfig struct {
 type RoutingConfig struct {
 	Default        string `json:"default"`
 	Vision         string `json:"vision"`
-	RAG           string `json:"rag"`
+	RAG            string `json:"rag"`
 	LongContext    string `json:"long_context"`
 	CodeGeneration string `json:"code_generation"`
 }
@@ -81,15 +81,15 @@ type MemoryConfig struct {
 }
 
 type PersistenceConfig struct {
-	Sessions SessionConfig        `json:"sessions"`
+	Sessions SessionConfig          `json:"sessions"`
 	Cache    PersistenceCacheConfig `json:"cache"`
 }
 
 type SessionConfig struct {
-	Driver             string        `json:"driver"`
-	ConnectionString   string        `json:"connection_string"`
-	CheckpointInterval time.Duration `json:"-"`
-	CheckpointIntervalStr string    `json:"checkpoint_interval"`
+	Driver                string        `json:"driver"`
+	ConnectionString      string        `json:"connection_string"`
+	CheckpointInterval    time.Duration `json:"-"`
+	CheckpointIntervalStr string        `json:"checkpoint_interval"`
 }
 
 type PersistenceCacheConfig struct {

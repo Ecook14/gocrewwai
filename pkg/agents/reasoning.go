@@ -22,8 +22,8 @@ type reasoningPlan struct {
 // runReasoningLoop implements the Reflect-Evaluate-Refine lifecycle.
 func (a *Agent) runReasoningLoop(ctx context.Context, messages []llm.Message, options map[string]interface{}) (string, error) {
 	events.GlobalBus.Publish(events.Event{
-		Type:      events.AgentReasoningStarted,
-		Source:    a.Role,
+		Type:   events.AgentReasoningStarted,
+		Source: a.Role,
 	})
 
 	maxAttempts := a.MaxReasoningAttempts
@@ -46,16 +46,16 @@ func (a *Agent) runReasoningLoop(ctx context.Context, messages []llm.Message, op
 		})
 
 		currentMessages = append(currentMessages, llm.Message{Role: "user", Content: prompt})
-		
+
 		response, err := a.LLM.Generate(ctx, currentMessages, llm.MapToOptions(options))
 		if err != nil {
 			return "", err
 		}
 
 		// 2. Evaluate
-		isReady := strings.Contains(strings.ToUpper(response), "READY: I AM READY") || 
-		           strings.Contains(strings.ToUpper(response), "READY: YES") ||
-		           strings.Contains(strings.ToUpper(response), "STATUS: YES")
+		isReady := strings.Contains(strings.ToUpper(response), "READY: I AM READY") ||
+			strings.Contains(strings.ToUpper(response), "READY: YES") ||
+			strings.Contains(strings.ToUpper(response), "STATUS: YES")
 
 		if isReady {
 			finalPlan = response
@@ -69,7 +69,7 @@ func (a *Agent) runReasoningLoop(ctx context.Context, messages []llm.Message, op
 		if a.Verbose {
 			defaultLogger.Info("🧠 Agent reasoning loop: REFINING", slog.String("role", a.Role), slog.Int("attempt", i+1))
 		}
-		
+
 		refineMsg := a.I18N.Process(a.I18N.Retrieve("reasoning", "refine_plan_prompt"), map[string]string{
 			"role":         a.Role,
 			"backstory":    a.Backstory,
@@ -78,13 +78,13 @@ func (a *Agent) runReasoningLoop(ctx context.Context, messages []llm.Message, op
 		})
 		currentMessages = append(currentMessages, llm.Message{Role: "assistant", Content: response})
 		currentMessages = append(currentMessages, llm.Message{Role: "user", Content: refineMsg})
-		
+
 		finalPlan = response // Fallback if loop ends
 	}
 
 	events.GlobalBus.Publish(events.Event{
-		Type:      events.AgentReasoningCompleted,
-		Source:    a.Role,
+		Type:   events.AgentReasoningCompleted,
+		Source: a.Role,
 		Payload: map[string]interface{}{
 			"plan": finalPlan,
 		},

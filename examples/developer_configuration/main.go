@@ -14,11 +14,11 @@ func main() {
 
 	// 2. Feature Toggles at Agent Level
 	researcher := gocrew.NewAgent(gocrew.AgentConfig{
-		Role:      "Researcher",
-		Goal:      "Find the latest AI trends",
-		Backstory: "Expert researcher",
-		LLM:       model,
-		SelfHealing: true,
+		Role:          "Researcher",
+		Goal:          "Find the latest AI trends",
+		Backstory:     "Expert researcher",
+		LLM:           model,
+		SelfHealing:   true,
 		MaxIterations: 5,
 	})
 
@@ -28,8 +28,8 @@ func main() {
 
 	// 4. Crew-Level Configuration
 	myCrew := gocrew.NewCrew(gocrew.CrewConfig{
-		Agents:  []gocrew.CoreAgent{researcher},
-		Tasks:   []*gocrew.Task{
+		Agents: []gocrew.CoreAgent{researcher},
+		Tasks: []*gocrew.Task{
 			{Description: "Analyze the current state of Go for AI agents."},
 		},
 		Verbose: true,

@@ -23,17 +23,17 @@ import (
 // the session, and dispatches execution to the Crew engine.
 func (s *Server) handleKickoff(c *gin.Context) {
 	var payload struct {
-		SessionID         string   `json:"session_id"`
-		AgentRole         string   `json:"agent_role"`
-		AgentGoal         string   `json:"agent_goal"`
-		AgentBackstory    string   `json:"agent_backstory"`
-		AgentModel        string   `json:"agent_model"`
-		AgentSystemPrompt string   `json:"agent_system_prompt"`
-		TaskDescription   string   `json:"task_description"`
-		TaskExpectedOutput string  `json:"task_expected_output"`
+		SessionID          string   `json:"session_id"`
+		AgentRole          string   `json:"agent_role"`
+		AgentGoal          string   `json:"agent_goal"`
+		AgentBackstory     string   `json:"agent_backstory"`
+		AgentModel         string   `json:"agent_model"`
+		AgentSystemPrompt  string   `json:"agent_system_prompt"`
+		TaskDescription    string   `json:"task_description"`
+		TaskExpectedOutput string   `json:"task_expected_output"`
 		TaskTools          []string `json:"task_tools"`
-		CrewProcess       string   `json:"crew_process"`
-		MaxIterations     int      `json:"max_iterations"`
+		CrewProcess        string   `json:"crew_process"`
+		MaxIterations      int      `json:"max_iterations"`
 	}
 
 	if err := c.ShouldBindJSON(&payload); err != nil {
@@ -216,12 +216,12 @@ func (s *Server) persistSessionComplete(sessionID string) error {
 
 // SessionState holds the observable state of a running session.
 type SessionState struct {
-	SessionID   string                 `json:"session_id"`
-	Status      string                 `json:"status"`
-	StartedAt   time.Time              `json:"started_at,omitempty"`
-	FinishedAt  time.Time              `json:"finished_at,omitempty"`
-	Result      map[string]interface{} `json:"result,omitempty"`
-	Error       string                 `json:"error,omitempty"`
+	SessionID  string                 `json:"session_id"`
+	Status     string                 `json:"status"`
+	StartedAt  time.Time              `json:"started_at,omitempty"`
+	FinishedAt time.Time              `json:"finished_at,omitempty"`
+	Result     map[string]interface{} `json:"result,omitempty"`
+	Error      string                 `json:"error,omitempty"`
 }
 
 // handleGetSession returns the current state of a session from the persistence layer.

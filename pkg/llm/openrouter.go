@@ -2,11 +2,11 @@ package llm
 
 import (
 	"context"
+	"fmt"
+	"github.com/sashabaranov/go-openai"
 	"net/http"
 	"os"
 	"time"
-	"fmt"
-	"github.com/sashabaranov/go-openai"
 )
 
 // OpenRouterClient leverages the OpenAI-compatible API of OpenRouter.
@@ -127,6 +127,7 @@ func (c *OpenRouterClient) GenerateEmbedding(ctx context.Context, text string) (
 
 	return resp.Data[0].Embedding, nil
 }
+
 // WithBaseURL allows reconfiguring the client's endpoint.
 func (c *OpenRouterClient) WithBaseURL(url string) *OpenRouterClient {
 	c.OpenAIClient.WithBaseURL(url)

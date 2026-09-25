@@ -32,15 +32,15 @@ func (g *HumanReviewGuardrail) Name() string { return "HumanReviewGuardrail" }
 
 func (g *HumanReviewGuardrail) Validate(output string) error {
 	reviewID := generateReviewID()
-	
+
 	// Issue request to global review manager.
-	// This generates a 'review_requested' event on the bus and fully blocks the 
+	// This generates a 'review_requested' event on the bus and fully blocks the
 	// calling Goroutine until GlobalReviewManager.SubmitReview is called by the ws.go API.
 	approved := telemetry.GlobalReviewManager.RequestReview(reviewID, g.AgentRole, g.ToolName, output)
-	
+
 	if !approved {
 		return fmt.Errorf("human reviewer explicitly rejected the execution")
 	}
-	
+
 	return nil
 }

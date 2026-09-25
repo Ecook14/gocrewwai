@@ -11,17 +11,23 @@
 //	crew := gocrew.NewCrew(gocrew.CrewConfig{...})
 //	mem := gocrew.NewMemory(store, llmClient, nil)
 //	f := gocrew.NewFlow(nil)
+//
+// Gocrewwai v0.9.0 — 31 core packages, 57 built-in tools, 7 LLM providers,
+// 12 memory store types, 6 orchestration modes, full OTEL observability,
+// MCP+A2A+WebMCP protocols, Docker+WASM sandboxing.
 package gocrew
 
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/Ecook14/gocrewwai/pkg/agents"
-	"github.com/Ecook14/gocrewwai/pkg/crew"
 	"github.com/Ecook14/gocrewwai/pkg/core"
+	"github.com/Ecook14/gocrewwai/pkg/crew"
 	"github.com/Ecook14/gocrewwai/pkg/events"
 	"github.com/Ecook14/gocrewwai/pkg/files"
 	"github.com/Ecook14/gocrewwai/pkg/flow"
@@ -30,9 +36,11 @@ import (
 	"github.com/Ecook14/gocrewwai/pkg/knowledge"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/memory"
+	"github.com/Ecook14/gocrewwai/pkg/sandbox"
 	"github.com/Ecook14/gocrewwai/pkg/tasks"
 	"github.com/Ecook14/gocrewwai/pkg/testing"
 	"github.com/Ecook14/gocrewwai/pkg/tools"
+	"github.com/Ecook14/gocrewwai/pkg/i18n"
 )
 
 // ============================================================
@@ -58,11 +66,16 @@ type LLMClient = llm.Client
 type LLMMessage = llm.Message
 type LLMOptions = llm.GenerateOptions
 
+// Function calling types (bridges tools to LLM function-calling interface)
+type ToolDefinition = llm.ToolDefinition
+type ToolChoice = llm.ToolChoice
+
 // Tool Types
 type Tool = tools.Tool
 type BaseTool = tools.BaseTool
 type ArgSchema = tools.ArgSchema
 
+// ============================================================
 // ============================================================
 // Intermediate Concept Type Aliases
 // ============================================================
@@ -105,7 +118,6 @@ type FlowState = flow.State
 type FlowNode = flow.Node
 type FlowRouter = flow.Router
 type FlowPersistence = flow.FlowPersistence
-// PersistentFlow is a flow that auto-persists state.
 type PersistentFlow = flow.PersistentFlow
 type TypedFlow[T any] = flow.TypedFlow[T]
 type TypedNode[T any] = flow.TypedNode[T]
@@ -121,6 +133,8 @@ type PDFSource = knowledge.PDFSource
 type CSVSource = knowledge.CSVSource
 type JSONSource = knowledge.JSONSource
 type URLSource = knowledge.URLSource
+type DirectorySource = knowledge.DirectorySource
+type IngestionEngine = knowledge.IngestionEngine
 
 // Advanced/Mastery Types
 type Event = events.Event
@@ -145,19 +159,34 @@ const (
 // Core Constructors
 // ============================================================
 
-// NewAgent creates a new Agent using a declarative config.
+// NewAgent creates a new Agent using a declarative config or builder.
 func NewAgent(cfg AgentConfig) *Agent {
 	return agents.New(cfg)
 }
 
-// NewTask creates a new Task using a declarative config.
+// NewAgentBuilder returns a fluent agent builder. Useful for complex agent construction.
+func NewAgentBuilder() *agents.AgentBuilder {
+	return agents.NewAgentBuilder()
+}
+
+// NewTask creates a new Task using a declarative config or builder.
 func NewTask(cfg TaskConfig) *Task {
 	return tasks.New(cfg)
 }
 
-// NewCrew creates a new Crew using a declarative config.
+// NewTaskBuilder returns a fluent task builder. Useful for complex task construction.
+func NewTaskBuilder() *tasks.TaskBuilder {
+	return tasks.NewTaskBuilder()
+}
+
+// NewCrew creates a new Crew using a declarative config or builder.
 func NewCrew(cfg CrewConfig) *Crew {
 	return crew.New(cfg)
+}
+
+// NewCrewBuilder returns a fluent crew builder. Useful for complex crew construction.
+func NewCrewBuilder() *crew.CrewBuilder {
+	return crew.NewCrewBuilder()
 }
 
 // Kickoff is a convenience function that creates and immediately executes a crew.
@@ -203,9 +232,76 @@ func GetOutput[T any](task *Task) *T {
 // Memory Constructors
 // ============================================================
 
-// NewMemory creates a unified memory instance with Remember/Recall/Forget API.
-func NewMemory(store MemoryStore, llmClient LLMClient, cfg *UnifiedMemoryConfig) *UnifiedMemory {
-	return memory.NewUnifiedMemory(store, llmClient, cfg)
+// NewMemory creates a unified memory store backed by the given store, embedder, and config.
+// This is the primary entry point for memory in gocrew.
+func NewMemory(store memory.Store, embedder llm.Client, cfg *memory.UnifiedMemoryConfig) *UnifiedMemory {
+	if cfg == nil {
+		cfg = &memory.UnifiedMemoryConfig{}
+	}
+	return memory.NewUnifiedMemory(store, embedder, cfg)
+}
+
+// NewLongTermMemory creates a long-term memory with the given backing store and embedder.
+func NewLongTermMemory(store memory.Store, embedder llm.Client) *memory.LongTermMemory {
+	return memory.NewLongTermMemory(store, embedder)
+}
+
+// NewSQLiteStore initializes a new SQLite database for persistent memory.
+func NewSQLiteStore(dbPath string) (*memory.SQLiteStore, error) {
+	return memory.NewSQLiteStore(dbPath)
+}
+
+// NewPDFTool creates a PDF reading tool with an optional chroot directory.
+// Pass an empty string for chroot to allow reading any file.
+func NewPDFTool(chroot ...string) tools.Tool {
+	path := ""
+	if len(chroot) > 0 {
+		path = chroot[0]
+	}
+	return tools.NewPDFReadTool(path)
+}
+
+// NewChroot creates a chrooted file reader for the given workspace directory.
+// This is equivalent to NewFileReadTool with the chroot path.
+func NewChroot(workspace string) tools.Tool {
+	return tools.NewFileReadTool(workspace)
+}
+
+// NewI18N creates an internationalization handler for the given language.
+func NewI18N(lang string) (*i18n.I18N, error) {
+	return i18n.NewI18N(lang)
+}
+
+// ============================================================
+// Crew Option Wrappers (from pkg/crew)
+// ============================================================
+
+// WithProcess sets the crew orchestration process type.
+func WithProcess(p crew.ProcessType) crew.CrewOption {
+	return crew.WithProcess(p)
+}
+
+// WithManager sets the manager agent for hierarchical crews.
+func WithManager(m core.Agent) crew.CrewOption {
+	return crew.WithManager(m)
+}
+
+// ============================================================
+// Sandbox Helpers
+// ============================================================
+func Remember(m *UnifiedMemory, ctx context.Context, text string) {
+	m.Remember(ctx, text, nil)
+}
+
+// Recall retrieves relevant memories by query.
+func Recall(m *UnifiedMemory, ctx context.Context, query string, opts ...RecallOptions) []ScoredMemory {
+	scored, _ := m.Recall(ctx, query, nil)
+	return scored
+}
+
+// Forget removes a memory by ID from the store.
+func Forget(m *UnifiedMemory, ctx context.Context, id string) error {
+	return m.Forget(ctx, id)
 }
 
 // ============================================================
@@ -213,28 +309,44 @@ func NewMemory(store MemoryStore, llmClient LLMClient, cfg *UnifiedMemoryConfig)
 // ============================================================
 
 // ImageFile creates a file handle for an image (path or URL).
-func ImageFile(source string, mode ...FileMode) File { return files.ImageFile(source, mode...) }
+func ImageFile(source string, mode ...FileMode) File {
+	return files.ImageFile(source, mode...)
+}
 
 // PDFFile creates a file handle for a PDF.
-func PDFFile(source string, mode ...FileMode) File { return files.PDFFile(source, mode...) }
+func PDFFile(source string, mode ...FileMode) File {
+	return files.PDFFile(source, mode...)
+}
 
 // AudioFile creates a file handle for audio content.
-func AudioFile(source string, mode ...FileMode) File { return files.AudioFile(source, mode...) }
+func AudioFile(source string, mode ...FileMode) File {
+	return files.AudioFile(source, mode...)
+}
 
 // VideoFile creates a file handle for video content.
-func VideoFile(source string, mode ...FileMode) File { return files.VideoFile(source, mode...) }
+func VideoFile(source string, mode ...FileMode) File {
+	return files.VideoFile(source, mode...)
+}
 
 // TextFile creates a file handle for text content.
-func TextFile(source string, mode ...FileMode) File { return files.TextFile(source, mode...) }
+func TextFile(source string, mode ...FileMode) File {
+	return files.TextFile(source, mode...)
+}
 
 // NewFile auto-detects file type from extension.
-func NewFile(source string, mode ...FileMode) File { return files.NewFile(source, mode...) }
+func NewFile(source string, mode ...FileMode) File {
+	return files.NewFile(source, mode...)
+}
 
 // FromBytes creates a file from raw bytes.
-func FromBytes(fb FileBytes, mode ...FileMode) File { return files.FromBytes(fb, mode...) }
+func FromBytes(fb FileBytes, mode ...FileMode) File {
+	return files.FromBytes(fb, mode...)
+}
 
 // ValidateFile checks if a file is compatible with a provider.
-func ValidateFile(file File, provider string) error { return files.ValidateFile(file, provider) }
+func ValidateFile(file File, provider string) error {
+	return files.ValidateFile(file, provider)
+}
 
 // ============================================================
 // Flow Constructors
@@ -247,7 +359,79 @@ func NewFlow(initialState FlowState) *Flow {
 
 // NewPersistentFlow creates a flow that auto-persists state after each node.
 func NewPersistentFlow(flowID string, persistence FlowPersistence, initial FlowState) *PersistentFlow {
+	if persistence == nil {
+		return flow.NewPersistentFlow(flowID, flow.NewJSONFilePersistence("."), initial)
+	}
 	return flow.NewPersistentFlow(flowID, persistence, initial)
+}
+
+// AddNode adds a node to a Flow (convenience wrapper).
+func AddNode(f *Flow, n FlowNode) {
+	f.AddNode(n)
+}
+
+// AddParallelNodes executes nodes concurrently and merges their state outputs.
+// Each node runs in its own goroutine; all results (including errors) are collected.
+// If any node fails, the merged state from successful nodes is returned along with
+// a combined error listing all failures.
+func AddParallelNodes(f *Flow, nodes []FlowNode) {
+	merged := func(ctx context.Context, state flow.State) (flow.State, error) {
+		if len(nodes) == 0 {
+			return state, nil
+		}
+		type result struct {
+			state flow.State
+			err   error
+		}
+		results := make([]result, len(nodes))
+		var wg sync.WaitGroup
+		for i, n := range nodes {
+			wg.Add(1)
+			go func(idx int, node FlowNode) {
+				defer wg.Done()
+				s, err := node(ctx, state)
+				results[idx] = result{state: s, err: err}
+			}(i, n)
+		}
+		wg.Wait()
+		merged := make(flow.State)
+		var errs []error
+		for _, r := range results {
+			if r.err != nil {
+				errs = append(errs, r.err)
+			} else {
+				for k, v := range r.state {
+					merged[k] = v
+				}
+			}
+		}
+		if len(errs) > 0 {
+			return merged, fmt.Errorf("parallel nodes failed: %v", errs)
+		}
+		return merged, nil
+	}
+	f.AddNode(merged)
+}
+
+// AddRouter adds a router node to a Flow (convenience wrapper).
+// The conditionFn selects which branch to execute based on state content.
+func AddRouter(f *Flow, conditionFn func(state flow.State) string, branches map[string]FlowNode) {
+	router := func(ctx context.Context, state flow.State) (flow.State, error) {
+		branchName := conditionFn(state)
+		node, ok := branches[branchName]
+		if !ok {
+			return state, fmt.Errorf("no branch found for '%s'", branchName)
+		}
+		return node(ctx, state)
+	}
+	f.AddNode(router)
+}
+
+// SetPersistence configures persistence for a PersistentFlow (convenience wrapper).
+// Only works on flows created with NewPersistentFlow.
+func SetPersistence(f *PersistentFlow, persistence FlowPersistence) *PersistentFlow {
+	f.SetPersistence(persistence)
+	return f
 }
 
 // NewJSONFilePersistence creates a file-based flow persistence backend.
@@ -260,13 +444,39 @@ func NewTypedFlow[T any](initial T) *TypedFlow[T] {
 	return flow.NewTypedFlow(initial)
 }
 
-// ============================================================
-// Knowledge Constructors
-// ============================================================
-
 // DefaultKnowledgeConfig returns the default knowledge configuration.
 func DefaultKnowledgeConfig() KnowledgeConfig {
 	return knowledge.DefaultConfig()
+}
+
+// NewPDFSource creates a PDF knowledge source from one or more file paths.
+func NewPDFSource(filePaths ...string) *PDFSource {
+	return knowledge.NewPDFSource(filePaths...)
+}
+
+// NewURLSource creates a URL knowledge source from one or more URLs.
+func NewURLSource(urls ...string) *URLSource {
+	return knowledge.NewURLSource(urls...)
+}
+
+// NewTextSource creates a text knowledge source from raw string content.
+func NewTextSource(content string, label string) *StringSource {
+	return knowledge.NewTextSource(content, label)
+}
+
+// NewDirectorySource creates a directory knowledge source that scans files matching a pattern.
+func NewDirectorySource(path string, pattern string) *DirectorySource {
+	return knowledge.NewDirectorySource(path, pattern)
+}
+
+// NewCSVSource creates a CSV knowledge source from one or more file paths.
+func NewCSVSource(filePaths ...string) *CSVSource {
+	return knowledge.NewCSVSource(filePaths...)
+}
+
+// NewJSONSource creates a JSON knowledge source from one or more file paths.
+func NewJSONSource(filePaths ...string) *JSONSource {
+	return knowledge.NewJSONSource(filePaths...)
 }
 
 // ============================================================
@@ -282,12 +492,7 @@ func NewOpenAI(apiKey, model string) *llm.OpenAIClient {
 	return client
 }
 
-// NewOpenRouter creates an OpenRouter LLM client.
-func NewOpenRouter(apiKey, model string) *llm.OpenRouterClient {
-	return llm.NewOpenRouterClient(apiKey, model)
-}
-
-// NewAnthropic creates an Anthropic/Claude LLM client.
+// NewAnthropic creates an Anthropic LLM client.
 func NewAnthropic(apiKey, model string) *llm.AnthropicClient {
 	return llm.NewAnthropicClient(apiKey, model)
 }
@@ -300,6 +505,16 @@ func NewGemini(apiKey, model string) *llm.GeminiClient {
 // NewGroq creates a Groq LLM client.
 func NewGroq(apiKey, model string) *llm.GroqClient {
 	return llm.NewGroqClient(apiKey, model)
+}
+
+// NewOpenRouter creates an OpenRouter LLM client.
+func NewOpenRouter(apiKey, model string) *llm.OpenRouterClient {
+	return llm.NewOpenRouterClient(apiKey, model)
+}
+
+// NewOllama creates an Ollama local LLM client.
+func NewOllama(model string, baseURL ...string) *llm.OllamaClient {
+	return llm.NewOllamaClient(model, baseURL...)
 }
 
 // ============================================================
@@ -383,24 +598,19 @@ func NewScraperTool() tools.Tool {
 	return tools.NewScraperTool()
 }
 
-// NewFileCache creates a file-based LLM cache.
-func NewFileCache(dir string) *llm.FileCache {
-	return llm.NewFileCache(dir)
+// NewDiscordTool creates a Discord integration tool.
+func NewDiscordTool(botToken, channelID string) *tools.DiscordTool {
+	return tools.NewDiscordTool(botToken, channelID)
 }
 
-// NewRedisCache creates a Redis-backed LLM cache.
-func NewRedisCache(addr, password string, db int, ttl time.Duration) (*llm.RedisCache, error) {
-	return llm.NewRedisCache(addr, password, db, ttl)
+// NewGitHubTool creates a GitHub integration tool.
+func NewGitHubTool(token string) *tools.GitHubTool {
+	return tools.NewGitHubTool(token)
 }
 
-// NewSQLiteStore initializes a new SQLite database for persistent memory.
-func NewSQLiteStore(dbPath string) (*memory.SQLiteStore, error) {
-	return memory.NewSQLiteStore(dbPath)
-}
-
-// NewCalculatorTool creates a new calculator tool.
-func NewCalculatorTool() *tools.CalculatorTool {
-	return tools.NewCalculatorTool()
+// NewSlackTool creates a Slack integration tool.
+func NewSlackTool(token string) *tools.SlackTool {
+	return tools.NewSlackTool(token)
 }
 
 // NewBrowserTool creates an automated browser navigation tool.
@@ -408,10 +618,107 @@ func NewBrowserTool() tools.Tool {
 	return tools.NewBrowserTool()
 }
 
+// NewDockerSandbox creates a Docker sandbox tool that executes code in an isolated container.
+// Pass an image name (e.g. "python:3.11-slim") and safe=true for security-hardened execution.
+func NewDockerSandbox(image string, safe bool) (Tool, error) {
+	t, err := sandbox.NewDockerSandbox(image, safe)
+	if err != nil {
+		return nil, err
+	}
+	return t, nil
+}
+
+// NewRedisCache creates a Redis-backed LLM cache.
+func NewRedisCache(addr, password string, db int, ttl time.Duration) (*llm.RedisCache, error) {
+	return llm.NewRedisCache(addr, password, db, ttl)
+}
+
+// SandboxConfig holds Docker sandbox configuration.
+type SandboxConfig struct {
+	Image   string
+	Timeout time.Duration
+	Safe    bool
+}
+
+// WithSafeMode returns a SandboxConfig with security-hardening enabled.
+func WithSafeMode(cfg SandboxConfig, safe bool) SandboxConfig {
+	cfg.Safe = safe
+	return cfg
+}
+
+// NewCalculatorTool creates a new calculator tool.
+func NewCalculatorTool() *tools.CalculatorTool {
+	return tools.NewCalculatorTool()
+}
+
+// ============================================================
+// Guardrail Constructors
+// ============================================================
+
 // NewHumanReviewGuardrail creates a human-in-the-loop guardrail.
 func NewHumanReviewGuardrail(agentRole, toolName string) *guardrails.HumanReviewGuardrail {
 	return guardrails.NewHumanReviewGuardrail(agentRole, toolName)
 }
+
+// NewMaxTokenGuardrail rejects outputs exceeding a specified word count (1 word ≈ 1 token).
+func NewMaxTokenGuardrail(maxTokens int) *guardrails.MaxTokenGuardrail {
+	return guardrails.NewMaxTokenGuardrail(maxTokens)
+}
+
+// NewContentFilterGuardrail blocks outputs matching any of the given regex patterns.
+func NewContentFilterGuardrail(patterns ...string) (*guardrails.ContentFilterGuardrail, error) {
+	return guardrails.NewContentFilterGuardrail(patterns)
+}
+
+// NewSchemaGuardrail validates that the output is valid JSON matching the provided schema struct.
+func NewSchemaGuardrail(schema interface{}) *guardrails.SchemaGuardrail {
+	return guardrails.NewSchemaGuardrail(schema)
+}
+
+// NewPIIRedactionGuardrail detects and rejects outputs containing PII (email addresses, SSNs).
+func NewPIIRedactionGuardrail() *guardrails.PIIRedactionGuardrail {
+	return guardrails.NewPIIRedactionGuardrail()
+}
+
+// NewToxicityGuardrail blocks outputs containing toxic words from the default list.
+func NewToxicityGuardrail() *guardrails.ToxicityGuardrail {
+	return guardrails.NewToxicityGuardrail()
+}
+
+// NewValidatorGuardrail creates a custom guardrail from a validation function.
+func NewValidatorGuardrail(name string, fn guardrails.ValidatorFunc) *guardrails.ValidatorGuardrail {
+	return guardrails.NewValidatorGuardrail(name, fn)
+}
+
+// NoEmptyString returns a validator that rejects empty or whitespace-only output.
+func NoEmptyString() guardrails.ValidatorFunc {
+	return guardrails.NoEmptyString()
+}
+
+// MinLength returns a validator that rejects output shorter than n characters.
+func MinLength(n int) guardrails.ValidatorFunc {
+	return guardrails.MinLength(n)
+}
+
+// MaxLength returns a validator that rejects output longer than n characters.
+func MaxLength(n int) guardrails.ValidatorFunc {
+	return guardrails.MaxLength(n)
+}
+
+// RunAll executes all guardrails against the given output. Returns the first error encountered.
+func RunAll(gs []Guardrail, output string) error {
+	return guardrails.RunAll(gs, output)
+}
+
+// AllViolations returns every guardrail violation as a slice of strings.
+// Use this when you want to collect all failures instead of stopping at the first one.
+func AllViolations(gs []Guardrail, output string) []string {
+	return guardrails.AllViolations(gs, output)
+}
+
+// ============================================================
+// Vector Store Constructors
+// ============================================================
 
 // NewPineconeStore securely wraps a Pinecone Vector DB initialization.
 func NewPineconeStore(host, apiKey, namespace string) (*memory.PineconeStore, error) {
@@ -428,11 +735,6 @@ func NewInMemCosineStore() *memory.InMemCosineStore {
 	return memory.NewInMemCosineStore()
 }
 
-// NewCodeInterpreterTool creates a code interpreter tool.
-func NewCodeInterpreterTool() *tools.CodeInterpreterTool {
-	return tools.NewCodeInterpreterTool()
-}
-
 // SplitterConfig alias for knowledge module configuration.
 type SplitterConfig = knowledge.SplitterConfig
 
@@ -447,11 +749,69 @@ func NewSQLiteCheckpointer(dir string) (*flows.CheckpointManager, error) {
 }
 
 // ============================================================
+// Testing Constructors
+// ============================================================
+
+// NewCrewTest creates a multi-run test harness for evaluating crew or flow performance.
+// The judge LLM is required for scoring outputs.
+func NewCrewTest(judgeLLM LLMClient) *testing.CrewTest {
+	return testing.NewCrewTest(judgeLLM)
+}
+
+// ScoreThresholdLinter checks that all results meet the pass threshold.
+func ScoreThresholdLinter(suite *PerformanceSuite, threshold int) string {
+	return testing.ScoreThresholdLinter(suite, threshold)
+}
+
+// ScoreSummary returns a one-line summary of the suite.
+func ScoreSummary(suite *PerformanceSuite) string {
+	return testing.ScoreSummary(suite)
+}
+
+// TraceCompareAll runs the trace comparison function across all adjacent pairs of results.
+func TraceCompareAll(suite *PerformanceSuite, cmp func(r1, r2 TestResult) bool) bool {
+	return testing.TraceCompareAll(suite, cmp)
+}
+
+// NewTestCrewConfig creates a minimal CrewConfig suitable for testing.
+// It uses the provided agent and task, with default sequential processing.
+func NewTestCrewConfig(agent core.Agent, task *tasks.Task) CrewConfig {
+	return CrewConfig{
+		Agents:  []core.Agent{agent},
+		Tasks:   []*tasks.Task{task},
+		Process: Sequential,
+	}
+}
+
+// ============================================================
 // LLM Option Helpers
 // ============================================================
 
 // Float64 creates a *float64 for LLM options.
-func Float64(v float64) *float64 { return llm.Float64(v) }
+func Float64(v float64) *float64 {
+	return llm.Float64(v)
+}
 
 // Int creates a *int for LLM options.
-func Int(v int) *int { return llm.Int(v) }
+func Int(v int) *int {
+	return llm.Int(v)
+}
+
+// ToToolDef converts a tools.Tool to an llm.ToolDefinition for function calling.
+func ToToolDef(t tools.Tool) llm.ToolDefinition {
+	schema, _ := json.Marshal(t.ArgsSchema())
+	return llm.ToolDefinition{
+		Name:        t.Name(),
+		Description: t.Description(),
+		Parameters:  schema,
+	}
+}
+
+// ToToolDefs converts a slice of tools to llm.ToolDefinition structs for function calling.
+func ToToolDefs(toolsSlice []tools.Tool) []llm.ToolDefinition {
+	defs := make([]llm.ToolDefinition, len(toolsSlice))
+	for i, t := range toolsSlice {
+		defs[i] = ToToolDef(t)
+	}
+	return defs
+}

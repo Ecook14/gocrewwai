@@ -13,8 +13,8 @@ func main() {
 
 	// Example: create agents, tasks, and run a crew
 	agent := gocrew.NewAgent(gocrew.AgentConfig{
-		Role:  "assistant",
-		Goal:  "A helpful assistant",
+		Role: "assistant",
+		Goal: "A helpful assistant",
 	})
 
 	task := gocrew.NewTask(gocrew.TaskConfig{

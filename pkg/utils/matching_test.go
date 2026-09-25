@@ -1,8 +1,8 @@
 package utils_test
 
 import (
-	"testing"
 	"github.com/Ecook14/gocrewwai/pkg/utils"
+	"testing"
 )
 
 func TestFindMatchingBlock(t *testing.T) {
@@ -15,10 +15,10 @@ func main() {
 }`
 
 	tests := []struct {
-		name    string
-		search  string
-		found   bool
-		mode    string
+		name   string
+		search string
+		found  bool
+		mode   string
 	}{
 		{"Exact Match", "fmt.Println(\"Hello, World!\")", true, "exact"},
 		{"Rstrip Match", "fmt.Println(\"Hello, World!\")  ", true, "rstrip"},

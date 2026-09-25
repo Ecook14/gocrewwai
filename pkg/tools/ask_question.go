@@ -28,7 +28,6 @@ func NewAskQuestionTool() *AskQuestionTool {
 	}
 }
 
-
 func (t *AskQuestionTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	question, ok := input["question"].(string)
 	if !ok {
@@ -49,5 +48,5 @@ func (t *AskQuestionTool) Execute(ctx context.Context, input map[string]interfac
 }
 
 func (t *AskQuestionTool) RequiresReview() bool { return false }
-func (t *AskQuestionTool) Name() string { return t.BaseTool.NameValue }
-func (t *AskQuestionTool) Description() string { return t.BaseTool.DescriptionValue }
+func (t *AskQuestionTool) Name() string         { return t.BaseTool.NameValue }
+func (t *AskQuestionTool) Description() string  { return t.BaseTool.DescriptionValue }

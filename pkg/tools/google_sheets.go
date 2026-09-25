@@ -73,7 +73,9 @@ func (g *GoogleSheetsTool) readRange(ctx context.Context, spreadsheetID, rangeNa
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("Authorization", "Bearer "+g.token)
 	resp, err := g.client.Do(req.WithContext(ctx))
-	if err != nil { return "", fmt.Errorf("Google Sheets read failed: %w", err) }
+	if err != nil {
+		return "", fmt.Errorf("Google Sheets read failed: %w", err)
+	}
 	defer resp.Body.Close()
 	var result map[string]interface{}
 	json.NewDecoder(resp.Body).Decode(&result)
@@ -88,7 +90,9 @@ func (g *GoogleSheetsTool) appendRows(ctx context.Context, spreadsheetID, rangeN
 	req.Header.Set("Authorization", "Bearer "+g.token)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := g.client.Do(req.WithContext(ctx))
-	if err != nil { return "", fmt.Errorf("Google Sheets append failed: %w", err) }
+	if err != nil {
+		return "", fmt.Errorf("Google Sheets append failed: %w", err)
+	}
 	defer resp.Body.Close()
 	return fmt.Sprintf("Appended %d rows to %s", len(values), rangeName), nil
 }
@@ -100,7 +104,9 @@ func (g *GoogleSheetsTool) updateCells(ctx context.Context, spreadsheetID, range
 	req.Header.Set("Authorization", "Bearer "+g.token)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := g.client.Do(req.WithContext(ctx))
-	if err != nil { return "", fmt.Errorf("Google Sheets update failed: %w", err) }
+	if err != nil {
+		return "", fmt.Errorf("Google Sheets update failed: %w", err)
+	}
 	defer resp.Body.Close()
 	return fmt.Sprintf("Updated %d cells in %s", len(values), rangeName), nil
 }
@@ -110,11 +116,13 @@ func (g *GoogleSheetsTool) clearRange(ctx context.Context, spreadsheetID, rangeN
 	req, _ := http.NewRequest("POST", url, nil)
 	req.Header.Set("Authorization", "Bearer "+g.token)
 	resp, err := g.client.Do(req.WithContext(ctx))
-	if err != nil { return "", fmt.Errorf("Google Sheets clear failed: %w", err) }
+	if err != nil {
+		return "", fmt.Errorf("Google Sheets clear failed: %w", err)
+	}
 	defer resp.Body.Close()
 	return fmt.Sprintf("Cleared range %s", rangeName), nil
 }
 
 func (g *GoogleSheetsTool) RequiresReview() bool { return true }
-func (g *GoogleSheetsTool) Name() string { return g.BaseTool.NameValue }
-func (g *GoogleSheetsTool) Description() string { return g.BaseTool.DescriptionValue }
+func (g *GoogleSheetsTool) Name() string         { return g.BaseTool.NameValue }
+func (g *GoogleSheetsTool) Description() string  { return g.BaseTool.DescriptionValue }

@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -35,27 +35,37 @@ func NewSendGridTool(apiKey string) *SendGridTool {
 // Execute implements the Tool interface for SendGrid.
 func (s *SendGridTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	to, _ := input["to"].(string)
-	if to == "" { return "", fmt.Errorf("missing 'to' parameter") }
+	if to == "" {
+		return "", fmt.Errorf("missing 'to' parameter")
+	}
 	subject, _ := input["subject"].(string)
-	if subject == "" { subject = "No Subject" }
+	if subject == "" {
+		subject = "No Subject"
+	}
 	body, _ := input["body"].(string)
-	if body == "" { body = "" }
+	if body == "" {
+		body = ""
+	}
 	isHTML, _ := input["html"].(bool)
-	if !isHTML { isHTML = false }
+	if !isHTML {
+		isHTML = false
+	}
 
 	contentType := "text/plain"
-	if isHTML { contentType = "text/html" }
+	if isHTML {
+		contentType = "text/html"
+	}
 
 	personalizations := []map[string]interface{}{{
-		"to": []map[string]string{{"email": to}},
+		"to":      []map[string]string{{"email": to}},
 		"subject": subject,
 	}}
 	content := []map[string]string{{"type": contentType, "value": body}}
 
 	reqBody := map[string]interface{}{
 		"personalizations": personalizations,
-		"from": map[string]string{"email": os.Getenv("SENDGRID_FROM")},
-		"content": content,
+		"from":             map[string]string{"email": os.Getenv("SENDGRID_FROM")},
+		"content":          content,
 	}
 
 	data, _ := json.Marshal(reqBody)
@@ -64,7 +74,9 @@ func (s *SendGridTool) Execute(ctx context.Context, input map[string]interface{}
 	req.Header.Set("Authorization", "Bearer "+s.apiKey)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := s.client.Do(req.WithContext(ctx))
-	if err != nil { return "", fmt.Errorf("SendGrid request failed: %w", err) }
+	if err != nil {
+		return "", fmt.Errorf("SendGrid request failed: %w", err)
+	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 202 {
 		return "", fmt.Errorf("SendGrid returned status %d", resp.StatusCode)
@@ -73,5 +85,5 @@ func (s *SendGridTool) Execute(ctx context.Context, input map[string]interface{}
 }
 
 func (s *SendGridTool) RequiresReview() bool { return true }
-func (s *SendGridTool) Name() string { return s.BaseTool.NameValue }
-func (s *SendGridTool) Description() string { return s.BaseTool.DescriptionValue }
+func (s *SendGridTool) Name() string         { return s.BaseTool.NameValue }
+func (s *SendGridTool) Description() string  { return s.BaseTool.DescriptionValue }

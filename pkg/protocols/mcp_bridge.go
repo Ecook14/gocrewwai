@@ -57,8 +57,8 @@ type mcpToolAdapter struct {
 	def    MCPToolDefinition
 }
 
-func (t *mcpToolAdapter) Name() string        { return "mcp:" + t.def.Name }
-func (t *mcpToolAdapter) Description() string { return t.def.Description }
+func (t *mcpToolAdapter) Name() string         { return "mcp:" + t.def.Name }
+func (t *mcpToolAdapter) Description() string  { return t.def.Description }
 func (t *mcpToolAdapter) RequiresReview() bool { return false }
 
 func (t *mcpToolAdapter) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
@@ -85,7 +85,7 @@ func (t *mcpToolAdapter) ArgsSchema() []tools.ArgSchema {
 	if t.def.InputSchema == nil {
 		return nil
 	}
-	
+
 	properties, ok := t.def.InputSchema["properties"].(map[string]interface{})
 	if !ok {
 		return nil
@@ -158,7 +158,7 @@ func (t *mcpResourceAdapter) Execute(ctx context.Context, input map[string]inter
 	return result, nil
 }
 
-func (t *mcpResourceAdapter) ArgsSchema() []tools.ArgSchema { return nil }
+func (t *mcpResourceAdapter) ArgsSchema() []tools.ArgSchema                     { return nil }
 func (t *mcpResourceAdapter) CacheFunction(input map[string]interface{}) string { return "" }
 
 // RegisterAllToolsOnMCPServer registers all Gocrew tools from a registry onto an MCP server.

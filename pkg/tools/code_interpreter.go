@@ -43,8 +43,8 @@ type CodeInterpreterOption func(*CodeInterpreterTool)
 // CodeInterpreterTool allows agents to execute Python or Go code snippets.
 type CodeInterpreterTool struct {
 	BaseTool
-	SafeMode   bool
-	E2BKey     string
+	SafeMode    bool
+	E2BKey      string
 	DockerImage string
 	MemoryMB    int64
 	CPUShares   int64
