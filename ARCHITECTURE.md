@@ -26,7 +26,7 @@ Crew-GO/
 │   ├── tools/            # Tool ecosystem & custom tool patterns
 │   └── training/         # Synthetic data pipelines & evaluation
 ├── internal/             # Private implementation details
-├── web/                  # Modern React/Vite Glassmorphic Dashboard
+├── web/                  # Modern React/Vite Dashboard
 └── web-ui/               # Static/Vanilla UI embeds
 ```
 

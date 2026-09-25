@@ -15,7 +15,7 @@ While many AI tools remain in the Python ecosystem, we chose **Go** for its inhe
 
 1. **⚡ Massive Concurrency**: Go's native goroutines allow hundreds of agents to work, fetch data, and reason in true parallel without the bottlenecks of a Global Interpreter Lock (GIL).
 2. **🛡️ Rock-Solid Reliability**: Eliminate random `KeyError` crashes. Every LLM response is strictly unmarshaled into your Go structs with type-safe guarantees.
-3. **🧠 Elite Memory & State**: Built-in, vector-indexed memory (SQLite, Redis, Chroma) and durable flow persistence (Checkpoints/Time-Travel).
+3. **🧠 Elite Memory & State**: Built-in, vector-indexed memory (11 backends: SQLite, Redis, Chroma, Pinecone, Qdrant, Weaviate, InMemCosine, Conversation, Entity, ShortTerm, LongTerm) and durable flow persistence (Checkpoints/Time-Travel).
 4. **Single-Binary Deployment**: Compile your entire orchestrator into a tiny, zero-dependency binary. Drop it in a container or on an edge device and it just works.
 
 ---
@@ -26,7 +26,7 @@ While many AI tools remain in the Python ecosystem, we chose **Go** for its inhe
 Gocrewwai provides robust persistence, allowing you to pause, resume, and "time-travel" through long-running agentic workflows. State is automatically checkpointed to SQLite or Redis after every node execution.
 
 ### 👤 2. Human-in-the-Loop (HITL)
-Native support for manual interrupts and approvals. Pause an agent's execution for review and approval through the CLI or the real-time Glassmorphic Dashboard.
+Native support for manual interrupts and approvals. Pause an agent's execution for review and approval through the CLI or the real-time Dashboard (web/).
 
 ### 🛡️ 3. Recursive Self-Correction (CrewAI Parity)
 Agents can reflect on their own work using internal reflection loops or peer-review "Reflective Crews," ensuring 100% adherence to task requirements.
@@ -174,7 +174,7 @@ gocrewwai/
 │   │   ├── flow/          # Multi-crew orchestration flows
 │   │   ├── knowledge/     # RAG knowledge sources (PDFs, URLs, text, directories, CSV, JSON)
 │   │   ├── events/        # Event bus for cross-component communication
-│   │   ├── guardrails/    # Input/output validation guardrails (6 types: MaxToken, ContentFilter, Schema, PIIRedaction, Toxicity, HumanReview)
+│   │   ├── guardrails/    # Input/output validation guardrails (8 types: MaxToken, ContentFilter, Schema, PIIRedaction, Toxicity, LLMReview, Validator, HumanReview)
 │   │   ├── protocols/     # MCP, A2A, WebMCP protocol implementations
 │   │   ├── sandbox/       # Docker and WASM code sandboxing
 │   │   ├── server/        # Production HTTP server with health/metrics/graceful shutdown

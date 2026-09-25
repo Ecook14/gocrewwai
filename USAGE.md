@@ -34,14 +34,6 @@ task := gocrew.NewTaskBuilder().
 
 Gocrew allows agents to solve problems by writing and running code. Safety is our priority.
 
-### E2B (Recommended for Production)
-The E2B sandbox provides a remote, secure cloud environment for code execution.
-```go
-interpreter := tools.NewCodeInterpreterTool(
-    tools.WithE2B("your-e2b-api-key"),
-)
-```
-
 ### Docker (Local Isolation)
 Run code in ephemeral containers with strict resource limits.
 ```go
@@ -50,6 +42,9 @@ interpreter := tools.NewCodeInterpreterTool(
     tools.WithLimits(512, 1024), // 512MB RAM, 1024 CPU Shares
 )
 ```
+
+### E2B (Remote Cloud)
+E2B support is wired through the code interpreter tool via `tools.WithE2B(...)`. Requires an E2B API key.
 
 ---
 
