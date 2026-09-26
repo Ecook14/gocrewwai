@@ -186,7 +186,7 @@ gocrewwai/
 │   │   ├── i18n/          # Internationalization and localization
 │   │   ├── training/      # Human-in-the-loop training data and advice
 │   │   ├── utils/         # Shared utilities and helpers
-│   │   └── ... (31 core packages total)
+│   │   └── ... (30 core packages total)
 ```
 
 ---

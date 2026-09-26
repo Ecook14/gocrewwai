@@ -292,8 +292,11 @@ func (s *A2AServer) Start() error {
 	mux.HandleFunc("/ws", s.handleWebSocket)
 
 	s.server = &http.Server{
-		Addr:    fmt.Sprintf(":%d", s.Port),
-		Handler: mux,
+		Addr:         fmt.Sprintf(":%d", s.Port),
+		Handler:      mux,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 
 	go func() {
@@ -320,14 +323,10 @@ func (s *A2AServer) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Auth Validation (same as handleMessage)
+	// Auth Validation (same as handleMessage). Header-only: bearer tokens in
+	// URLs leak via access logs, proxy history, and referers (DCR-04).
 	if s.AuthToken != "" {
 		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" {
-			// Subprotocols or query params could also be used for WS auth,
-			// but here we check the initial header.
-			authHeader = r.URL.Query().Get("token")
-		}
 		if authHeader != "Bearer "+s.AuthToken && authHeader != s.AuthToken {
 			slog.Warn("a2a: ws unauthorized access attempt")
 			return

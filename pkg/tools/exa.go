@@ -51,9 +51,15 @@ func (t *ExaTool) Execute(ctx context.Context, input map[string]interface{}) (st
 		},
 	}
 
-	payloadBytes, _ := json.Marshal(payload)
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("exa failed to encode request: %w", err)
+	}
 
-	req, _ := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(payloadBytes))
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		return "", fmt.Errorf("exa failed to create request: %w", err)
+	}
 	req.Header.Set("x-api-key", t.APIKey)
 	req.Header.Set("Content-Type", "application/json")
 

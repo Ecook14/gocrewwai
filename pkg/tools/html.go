@@ -15,6 +15,8 @@ type HTMLReadTool struct {
 	Chroot string
 }
 
+var _ Tool = (*HTMLReadTool)(nil)
+
 func NewHTMLReadTool(chroot string) *HTMLReadTool {
 	return &HTMLReadTool{
 		BaseTool: BaseTool{
@@ -48,9 +50,16 @@ func (t *HTMLReadTool) Execute(ctx context.Context, input map[string]interface{}
 	return stripHTMLTagsOnly(string(content)), nil
 }
 
-func (t *HTMLReadTool) Name() string                                      { return t.BaseTool.NameValue }
-func (t *HTMLReadTool) Description() string                               { return t.BaseTool.DescriptionValue }
-func (t *HTMLReadTool) CacheFunction(input map[string]interface{}) string { return "" }
+func (t *HTMLReadTool) Name() string        { return t.BaseTool.NameValue }
+func (t *HTMLReadTool) Description() string { return t.BaseTool.DescriptionValue }
+
+// CacheFunction isolates cache entries per file path.
+func (t *HTMLReadTool) CacheFunction(input map[string]interface{}) string {
+	if p, ok := input["file_path"].(string); ok && p != "" {
+		return "HTMLReadTool:" + p
+	}
+	return ""
+}
 
 // stripHTML removes HTML tags and decodes basic entities from content.
 // Whitespace inside <pre>...</pre> blocks is preserved; outside <pre>,
@@ -112,18 +121,23 @@ func stripHTMLTagsOnly(html string) string {
 	}
 
 	// Decode common HTML entities (after whitespace handling so entities
-	// inside <pre> are also decoded).
-	text := result.String()
-	text = strings.ReplaceAll(text, "&nbsp;", " ")
-	text = strings.ReplaceAll(text, "&amp;", "&")
-	text = strings.ReplaceAll(text, "&lt;", "<")
-	text = strings.ReplaceAll(text, "&gt;", ">")
-	text = strings.ReplaceAll(text, "&quot;", "\"")
-	text = strings.ReplaceAll(text, "&#39;", "'")
-	text = strings.ReplaceAll(text, "&#x27;", "'")
+	// inside <pre> are also decoded). Single-pass replacer avoids O(n*k)
+	// allocations from sequential ReplaceAll calls.
+	text := htmlEntityReplacer.Replace(result.String())
 
 	return text
 }
+
+// htmlEntityReplacer decodes common entities in a single pass.
+var htmlEntityReplacer = strings.NewReplacer(
+	"&nbsp;", " ",
+	"&amp;", "&",
+	"&lt;", "<",
+	"&gt;", ">",
+	"&quot;", "\"",
+	"&#39;", "'",
+	"&#x27;", "'",
+)
 
 func removeTag(s, tag string) string {
 	open := "<" + tag

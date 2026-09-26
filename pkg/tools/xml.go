@@ -61,6 +61,11 @@ func (t *XMLReadTool) ArgsSchema() []ArgSchema {
 		{Name: "file_path", Type: "string", Description: "Path to the XML file to read", Required: true},
 	}
 }
-func (t *XMLReadTool) CacheFunction(input map[string]interface{}) string { return "" }
+func (t *XMLReadTool) CacheFunction(input map[string]interface{}) string {
+	if p, ok := input["file_path"].(string); ok && p != "" {
+		return "XMLReadTool:" + p
+	}
+	return ""
+}
 
 var _ Tool = (*XMLReadTool)(nil)

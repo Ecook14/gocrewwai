@@ -13,10 +13,47 @@ import (
 	"github.com/Ecook14/gocrewwai/pkg/agents"
 	"github.com/Ecook14/gocrewwai/pkg/core"
 	"github.com/Ecook14/gocrewwai/pkg/crew"
+	"github.com/Ecook14/gocrewwai/pkg/events"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/tasks"
 	"github.com/Ecook14/gocrewwai/pkg/telemetry"
 )
+
+// kickoffSem bounds concurrent async crew executions to prevent goroutine
+// exhaustion under load. Acquired before spawning the background worker.
+var kickoffSem = make(chan struct{}, 10)
+
+// checkIdem returns the ledger entry for an Idempotency-Key. Entries are
+// owner-scoped: a key presented by a different token is treated as unseen
+// (no cross-tenant oracle).
+func (s *Server) checkIdem(key, owner string) (*idemEntry, bool) {
+	s.idemMu.Lock()
+	defer s.idemMu.Unlock()
+	e, ok := s.idemKeys[key]
+	if !ok || (owner != "" && e.owner != "" && e.owner != owner) {
+		return nil, false
+	}
+	return e, true
+}
+
+func (s *Server) storeIdem(key, owner, sessionID string) {
+	s.idemMu.Lock()
+	defer s.idemMu.Unlock()
+	s.idemKeys[key] = &idemEntry{sessionID: sessionID, owner: owner}
+	s.idemBySession[sessionID] = key
+}
+
+func (s *Server) finishIdem(sessionID, status string) {
+	s.idemMu.Lock()
+	defer s.idemMu.Unlock()
+	if key, ok := s.idemBySession[sessionID]; ok {
+		if e, ok := s.idemKeys[key]; ok {
+			e.done = true
+			e.status = status
+		}
+		delete(s.idemBySession, sessionID)
+	}
+}
 
 // handleKickoff accepts a full crew execution request and starts execution.
 // It validates the payload, constructs the crew from the definition, persists
@@ -44,6 +81,45 @@ func (s *Server) handleKickoff(c *gin.Context) {
 	if payload.SessionID == "" {
 		payload.SessionID = fmt.Sprintf("sess_%d", time.Now().UnixMilli())
 	}
+
+	owner := c.GetString("token_fp")
+	idemKey := c.GetHeader("Idempotency-Key")
+
+	// Idempotency-Key (DCR-04): replaying a request with the same key never
+	// executes twice. Running → 409; finished → cached outcome replay.
+	// Keys live in memory (a restart clears them; session-409 below still
+	// guards concurrent duplicates).
+	if idemKey != "" {
+		if entry, dup := s.checkIdem(idemKey, owner); dup {
+			if !entry.done {
+				c.JSON(http.StatusConflict, gin.H{
+					"error":      "duplicate request still running",
+					"session_id": entry.sessionID,
+				})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{
+				"message":           "duplicate request (idempotent replay)",
+				"session_id":        entry.sessionID,
+				"status":            entry.status,
+				"idempotent_replay": true,
+			})
+			return
+		}
+	}
+
+	// Idempotency (DCR-04): a replayed kickoff for an already-running session
+	// returns 409 instead of spawning a duplicate crew execution.
+	s.mu.RLock()
+	if st, ok := s.sessions[payload.SessionID]; ok && st.Status == "running" {
+		s.mu.RUnlock()
+		c.JSON(http.StatusConflict, gin.H{
+			"error":      "session already running",
+			"session_id": payload.SessionID,
+		})
+		return
+	}
+	s.mu.RUnlock()
 
 	if payload.AgentRole == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "'agent_role' is required"})
@@ -95,19 +171,36 @@ func (s *Server) handleKickoff(c *gin.Context) {
 	crw := crew.NewCrew([]core.Agent{agent}, []*tasks.Task{task})
 
 	// Persist the session as "running" via the checkpoint backend.
-	if err := s.persistSessionStart(payload.SessionID); err != nil {
+	if err := s.persistSessionStart(payload.SessionID, owner); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": fmt.Sprintf("failed to persist session: %v", err),
 		})
 		return
 	}
 
+	// Record the idempotency key now that the session durably exists.
+	if idemKey != "" {
+		s.storeIdem(idemKey, owner, payload.SessionID)
+	}
+
 	// Dispatch execution asynchronously so the HTTP response returns immediately.
+	// Bounded by kickoffSem and propagates the request context (detached from
+	// cancellation so the crew survives client disconnect, but keeps values).
+	select {
+	case kickoffSem <- struct{}{}:
+	default:
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "server busy: too many concurrent crew executions"})
+		return
+	}
+	bgCtx := context.WithoutCancel(c.Request.Context())
 	go func() {
-		if _, err := crw.Kickoff(context.Background()); err != nil {
+		defer func() { <-kickoffSem }()
+		if _, err := crw.Kickoff(bgCtx); err != nil {
 			s.persistSessionFailure(payload.SessionID, err.Error())
+			s.finishIdem(payload.SessionID, "failed")
 		} else {
 			s.persistSessionComplete(payload.SessionID)
+			s.finishIdem(payload.SessionID, "completed")
 		}
 	}()
 
@@ -120,13 +213,14 @@ func (s *Server) handleKickoff(c *gin.Context) {
 // persistSessionStart records that a session has been created and is running.
 // It writes a checkpoint via the SQLite backend when available, otherwise
 // falls back to the in-memory session tracker.
-func (s *Server) persistSessionStart(sessionID string) error {
+func (s *Server) persistSessionStart(sessionID, owner string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.sessions[sessionID] = SessionState{
 		SessionID: sessionID,
 		Status:    "running",
+		Owner:     owner,
 		StartedAt: time.Now().UTC(),
 	}
 
@@ -134,7 +228,7 @@ func (s *Server) persistSessionStart(sessionID string) error {
 		cp := &crew.Checkpoint{
 			CrewID:  sessionID,
 			Status:  "running",
-			State:   map[string]interface{}{"session_id": sessionID},
+			State:   map[string]interface{}{"session_id": sessionID, "owner": owner},
 			Version: 1,
 		}
 		if err := s.checkpointStore.Save(context.Background(), cp); err != nil {
@@ -215,9 +309,12 @@ func (s *Server) persistSessionComplete(sessionID string) error {
 }
 
 // SessionState holds the observable state of a running session.
+// Owner is the fingerprint of the API token that created the session;
+// sessions are only visible to their owning token (DCR-04).
 type SessionState struct {
 	SessionID  string                 `json:"session_id"`
 	Status     string                 `json:"status"`
+	Owner      string                 `json:"owner,omitempty"`
 	StartedAt  time.Time              `json:"started_at,omitempty"`
 	FinishedAt time.Time              `json:"finished_at,omitempty"`
 	Result     map[string]interface{} `json:"result,omitempty"`
@@ -233,7 +330,7 @@ func (s *Server) handleGetSession(c *gin.Context) {
 		return
 	}
 
-	state, err := s.loadSessionState(id)
+	state, err := s.loadSessionState(id, c.GetString("token_fp"))
 	if err != nil {
 		if err == ErrSessionNotFound {
 			c.JSON(http.StatusNotFound, gin.H{
@@ -256,13 +353,18 @@ func (s *Server) handleGetSession(c *gin.Context) {
 
 // loadSessionState resolves a session's current state from the persistence layer.
 // It checks the in-memory session tracker first, then falls back to the
-// checkpoint backend (SQLite / Redis) when configured.
-func (s *Server) loadSessionState(sessionID string) (map[string]interface{}, error) {
+// checkpoint backend (SQLite / Redis) when configured. Sessions owned by a
+// different token resolve as not-found (no existence oracle for cross-tenant
+// IDs).
+func (s *Server) loadSessionState(sessionID, owner string) (map[string]interface{}, error) {
 	s.mu.RLock()
 	st, ok := s.sessions[sessionID]
 	s.mu.RUnlock()
 
 	if ok {
+		if owner != "" && st.Owner != "" && st.Owner != owner {
+			return nil, ErrSessionNotFound
+		}
 		return map[string]interface{}{
 			"session_id": st.SessionID,
 			"status":     st.Status,
@@ -276,6 +378,9 @@ func (s *Server) loadSessionState(sessionID string) (map[string]interface{}, err
 			return nil, fmt.Errorf("failed to load session checkpoint: %w", err)
 		}
 		if cp != nil {
+			if storedOwner, _ := cp.State["owner"].(string); owner != "" && storedOwner != "" && storedOwner != owner {
+				return nil, ErrSessionNotFound
+			}
 			result := map[string]interface{}{
 				"session_id": cp.CrewID,
 				"status":     cp.Status,
@@ -294,16 +399,35 @@ func (s *Server) loadSessionState(sessionID string) (map[string]interface{}, err
 var ErrSessionNotFound = fmt.Errorf("session not found")
 
 // handleSSEStream streams events from the GlobalBus to the client.
+// The :id must be a live session owned by the caller (DCR-04): anonymous
+// enumeration of arbitrary stream IDs returns 404 without leaking existence.
 func (s *Server) handleSSEStream(c *gin.Context) {
+	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "session id is required"})
+		return
+	}
+	if _, err := s.loadSessionState(id, c.GetString("token_fp")); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"session_id": id,
+			"status":     "not_found",
+			"error":      "session not found",
+		})
+		return
+	}
+
 	// 1. Set headers for SSE
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
 	c.Header("Transfer-Encoding", "chunked")
 
-	// 2. Subscribe to the GlobalBus
+	// 2. Subscribe to the GlobalBus (system metrics, global) and the crew
+	// lifecycle bus (filtered to this session below).
 	eventChan := telemetry.GlobalBus.Subscribe()
 	defer telemetry.GlobalBus.Unsubscribe(eventChan)
+	crewChan := events.GlobalBus.Subscribe()
+	defer events.GlobalBus.Unsubscribe(crewChan)
 
 	// 3. Stream loop
 	c.Stream(func(w io.Writer) bool {
@@ -319,8 +443,29 @@ func (s *Server) handleSSEStream(c *gin.Context) {
 			}
 			fmt.Fprintf(w, "data: %s\n\n", string(data))
 			return true
+		case cev, ok := <-crewChan:
+			if !ok {
+				return false
+			}
+			// Session-scoped: only this session's lifecycle events.
+			if !passSSEEvent(id, cev) {
+				return true
+			}
+			data, err := json.Marshal(cev)
+			if err != nil {
+				return true
+			}
+			fmt.Fprintf(w, "data: %s\n\n", string(data))
+			return true
 		case <-c.Request.Context().Done():
 			return false
 		}
 	})
+}
+
+// passSSEEvent reports whether a crew lifecycle event belongs on the stream
+// for sessionID. Untagged events belong to no session and are dropped —
+// session streams never carry another session's activity (DCR-04).
+func passSSEEvent(sessionID string, e events.Event) bool {
+	return e.SessionID != "" && e.SessionID == sessionID
 }

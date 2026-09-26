@@ -81,17 +81,36 @@ CREATE TABLE IF NOT EXISTS checkpoints (
 );
 CREATE INDEX IF NOT EXISTS idx_checkpoints_crew_id ON checkpoints(crew_id);
 CREATE INDEX IF NOT EXISTS idx_checkpoints_timestamp ON checkpoints(timestamp);
+CREATE TABLE IF NOT EXISTS latest_pointers (
+	crew_id TEXT PRIMARY KEY,
+	checkpoint_ts INTEGER NOT NULL,
+	updated_at TEXT DEFAULT (datetime('now'))
+);
 `
 	_, err := s.db.Exec(query)
 	return err
 }
 
+// jsonNull marshals v to JSON, returning "null" on nil or marshal failure.
+// Marshal failures are logged by the caller via the returned error.
 func jsonNull(v interface{}) []byte {
-	if v == nil {
+	b, err := marshalJSONNull(v)
+	if err != nil {
+		slog.Warn("checkpoint: failed to marshal value, using null", "error", err)
 		return []byte("null")
 	}
-	b, _ := json.Marshal(v)
 	return b
+}
+
+func marshalJSONNull(v interface{}) ([]byte, error) {
+	if v == nil {
+		return []byte("null"), nil
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		return nil, fmt.Errorf("marshal checkpoint field: %w", err)
+	}
+	return b, nil
 }
 
 // Save writes a checkpoint to SQLite.
@@ -102,16 +121,21 @@ func (s *SQLiteCheckpointStore) Save(ctx context.Context, cp *Checkpoint) error 
 	cp.Timestamp = time.Now()
 	cp.Version++
 
-	latestData, _ := json.Marshal(cp)
-	_, err := s.db.ExecContext(ctx,
+	taskResultsJSON := jsonNull(cp.TaskResults)
+	stateJSON := jsonNull(cp.State)
+	latestData, err := json.Marshal(cp)
+	if err != nil {
+		return fmt.Errorf("failed to marshal checkpoint for latest pointer: %w", err)
+	}
+	_, err = s.db.ExecContext(ctx,
 		`INSERT INTO checkpoints (crew_id, timestamp, version, task_index, task_results, state_data, status, error_msg)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		cp.CrewID,
 		cp.Timestamp.UnixMilli(),
 		cp.Version,
 		cp.TaskIndex,
-		jsonNull(cp.TaskResults),
-		jsonNull(cp.State),
+		taskResultsJSON,
+		stateJSON,
 		cp.Status,
 		cp.Error,
 	)
@@ -119,14 +143,22 @@ func (s *SQLiteCheckpointStore) Save(ctx context.Context, cp *Checkpoint) error 
 		return fmt.Errorf("failed to save checkpoint to sqlite: %w", err)
 	}
 
-	// Update latest pointer in a separate row per crew
+	// Update latest pointer in dedicated table (clean) + legacy row for
+	// backward compatibility with DBs created before the migration.
+	if _, err := s.db.ExecContext(ctx,
+		`INSERT INTO latest_pointers (crew_id, checkpoint_ts) VALUES (?, ?)
+		 ON CONFLICT(crew_id) DO UPDATE SET checkpoint_ts=excluded.checkpoint_ts, updated_at=datetime('now')`,
+		cp.CrewID, cp.Timestamp.UnixMilli(),
+	); err != nil {
+		s.logger.Warn("failed to update latest checkpoint pointer", "crew_id", cp.CrewID, "error", err)
+	}
 	_, err = s.db.ExecContext(ctx,
 		`INSERT OR REPLACE INTO checkpoints (crew_id, timestamp, version, task_index, task_results, state_data, status, error_msg)
 		 VALUES (?, 0, 0, 0, '[]', ?, 'latest', '')`,
 		cp.CrewID, string(latestData),
 	)
 	if err != nil {
-		s.logger.Warn("failed to update latest checkpoint pointer", "crew_id", cp.CrewID, "error", err)
+		s.logger.Warn("failed to update legacy latest checkpoint row", "crew_id", cp.CrewID, "error", err)
 	}
 
 	s.cleanup(ctx, cp.CrewID)
@@ -134,10 +166,25 @@ func (s *SQLiteCheckpointStore) Save(ctx context.Context, cp *Checkpoint) error 
 }
 
 // LoadLatest reads the most recent checkpoint for a crew.
+// It prefers the dedicated latest_pointers table, falling back to the legacy
+// timestamp=0 row for databases created before the migration.
 func (s *SQLiteCheckpointStore) LoadLatest(ctx context.Context, crewID string) (*Checkpoint, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	var ts int64
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT checkpoint_ts FROM latest_pointers WHERE crew_id = ?`, crewID,
+	).Scan(&ts); err == nil && ts > 0 {
+		if cp, err := s.loadByTimestampLocked(ctx, crewID, ts); err == nil && cp != nil {
+			return s.cacheLatest(crewID, cp), nil
+		}
+		// Fall through to legacy row on load failure.
+	} else if err != nil && err != sql.ErrNoRows {
+		return nil, fmt.Errorf("failed to query latest pointer from sqlite: %w", err)
+	}
+
+	// Legacy fallback: timestamp=0 row stores the full checkpoint JSON in state_data.
 	var cp Checkpoint
 	var stateData, taskResultsStr string
 
@@ -163,6 +210,17 @@ func (s *SQLiteCheckpointStore) LoadLatest(ctx context.Context, crewID string) (
 		return nil, fmt.Errorf("failed to load latest checkpoint from sqlite: %w", err)
 	}
 
+	// Legacy rows store the full Checkpoint JSON in state_data (see Save).
+	// Try full-checkpoint decode first, then fall back to field-wise decode.
+	var full Checkpoint
+	if err := json.Unmarshal([]byte(stateData), &full); err == nil && full.CrewID != "" {
+		full.ID = fmt.Sprintf("%s_latest", crewID)
+		if full.CrewID == "" {
+			return nil, nil
+		}
+		return s.cacheLatest(crewID, &full), nil
+	}
+
 	if err := json.Unmarshal([]byte(stateData), &cp.State); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal checkpoint state: %w", err)
 	}
@@ -177,17 +235,59 @@ func (s *SQLiteCheckpointStore) LoadLatest(ctx context.Context, crewID string) (
 		return nil, nil
 	}
 
-	// Cache in memory for fast repeated reads
+	return s.cacheLatest(crewID, &cp), nil
+}
+
+// cacheLatest stores cp in the in-memory latest cache and returns it.
+func (s *SQLiteCheckpointStore) cacheLatest(crewID string, cp *Checkpoint) *Checkpoint {
 	s.latestMu.Lock()
+	defer s.latestMu.Unlock()
 	if existing, ok := s.latestCache[crewID]; ok {
 		cp.CreatedAt = existing.CreatedAt
-		*existing = cp
-	} else {
-		cp.CreatedAt = time.Now()
-		s.latestCache[crewID] = &cp
+		*existing = *cp
+		return existing
 	}
-	s.latestMu.Unlock()
+	if cp.CreatedAt.IsZero() {
+		cp.CreatedAt = time.Now()
+	}
+	s.latestCache[crewID] = cp
+	return cp
+}
 
+// loadByTimestampLocked loads a checkpoint row by exact timestamp.
+// Caller must hold s.mu.
+func (s *SQLiteCheckpointStore) loadByTimestampLocked(ctx context.Context, crewID string, timestamp int64) (*Checkpoint, error) {
+	var cp Checkpoint
+	var stateData, taskResultsStr string
+
+	err := s.db.QueryRowContext(ctx,
+		`SELECT crew_id, timestamp, version, task_index, task_results, state_data, status, error_msg
+		 FROM checkpoints WHERE crew_id = ? AND timestamp = ?`,
+		crewID, timestamp,
+	).Scan(
+		&cp.CrewID,
+		&cp.Timestamp,
+		&cp.Version,
+		&cp.TaskIndex,
+		&taskResultsStr,
+		&stateData,
+		&cp.Status,
+		&cp.Error,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to load checkpoint from sqlite: %w", err)
+	}
+
+	cp.Timestamp = time.UnixMilli(timestamp)
+	if err := json.Unmarshal([]byte(stateData), &cp.State); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal checkpoint state: %w", err)
+	}
+	if err := json.Unmarshal([]byte(taskResultsStr), &cp.TaskResults); err != nil {
+		cp.TaskResults = nil
+	}
 	return &cp, nil
 }
 

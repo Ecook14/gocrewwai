@@ -3,7 +3,9 @@ package telemetry
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 )
@@ -55,6 +57,11 @@ type Metrics struct {
 
 	// System
 	startTime time.Time
+
+	// CPU tracking state (/proc/stat deltas on Linux)
+	cpuPrevIdle  uint64
+	cpuPrevTotal uint64
+	cpuInit      bool
 }
 
 // Standard histogram buckets for latency (seconds)
@@ -292,8 +299,6 @@ func (m *Metrics) startSystemMonitoring() {
 		var ms runtime.MemStats
 		runtime.ReadMemStats(&ms)
 
-		// Simple CPU usage approximation or just metrics reporting
-		// For a real dashboard, we care about Memory and Goroutines mostly
 		snap := m.Snapshot()
 		snap.MemoryUsage = ms.Alloc / 1024 / 1024
 		snap.Goroutines = runtime.NumGoroutine()
@@ -304,10 +309,53 @@ func (m *Metrics) startSystemMonitoring() {
 				"memory_mb":   snap.MemoryUsage,
 				"goroutines":  snap.Goroutines,
 				"uptime_secs": snap.UptimeSeconds,
-				"cpu_usage":   0.0, // Placeholder as real CPU tracking requires OS-specific calls or libraries
+				"cpu_usage":   m.cpuUsage(),
 			},
 		})
 	}
+}
+
+// cpuUsage returns host CPU utilization in [0,1] derived from /proc/stat
+// deltas on Linux. Returns 0.0 on other platforms or read errors (the metric
+// degrades to "unknown", never to a fabricated load value).
+func (m *Metrics) cpuUsage() float64 {
+	if runtime.GOOS != "linux" {
+		return 0.0
+	}
+	data, err := os.ReadFile("/proc/stat")
+	if err != nil {
+		return 0.0
+	}
+	var user, nice, system, idle, iowait, irq, softirq, steal uint64
+	line := strings.SplitN(string(data), "\n", 2)[0]
+	if _, err := fmt.Sscanf(line, "cpu %d %d %d %d %d %d %d %d",
+		&user, &nice, &system, &idle, &iowait, &irq, &softirq, &steal); err != nil {
+		return 0.0
+	}
+	idleAll := idle + iowait
+	total := user + nice + system + idle + iowait + irq + softirq + steal
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if !m.cpuInit {
+		m.cpuInit = true
+		m.cpuPrevIdle, m.cpuPrevTotal = idleAll, total
+		return 0.0
+	}
+	idleDelta := float64(idleAll - m.cpuPrevIdle)
+	totalDelta := float64(total - m.cpuPrevTotal)
+	m.cpuPrevIdle, m.cpuPrevTotal = idleAll, total
+	if totalDelta <= 0 {
+		return 0.0
+	}
+	usage := 1.0 - idleDelta/totalDelta
+	if usage < 0 {
+		return 0.0
+	}
+	if usage > 1 {
+		return 1.0
+	}
+	return usage
 }
 
 // ---------------------------------------------------------------------------

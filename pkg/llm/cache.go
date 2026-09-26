@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -75,7 +76,7 @@ func NewCache(cfg CacheConfig) Cache {
 		if c, err := NewRedisCache(cfg.Redis.Addr, cfg.Redis.Password, cfg.Redis.DB, cfg.Redis.TTL); err == nil {
 			return c
 		}
-		fmt.Printf("Warning: Failed to init Redis cache, falling back to FileCache\n")
+		slog.Warn("llm cache: redis init failed, falling back to FileCache")
 		return NewFileCache(cfg.Dir)
 	default:
 		return NewFileCache(cfg.Dir)

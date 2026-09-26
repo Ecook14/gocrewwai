@@ -10,7 +10,7 @@ This document outlines the foundational wins we've achieved and the ambitious fu
 2. **Standardized Tool Interface**: 24+ native tools with standardized `ArgsSchema`.
 3. **Advanced Sandboxing**: Secure code execution via Docker, E2B, and WASM.
 4. **Unified Memory**: Recency/Relevance/Importance scoring with SQLite, Redis, and Vector DB support.
-5. **Glassmorphic Dashboard**: Real-time monitoring, HITL approvals, and creator studio.
+5. **Dashboard (web/)**: Real-time monitoring, HITL approvals, and creator studio.
 6. **Ergonomic SDK**: The `gocrew` facade for a "library-first" developer experience.
 7. **Production CLI**: Project scaffolding, training, testing, and replay capabilities.
 

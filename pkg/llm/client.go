@@ -26,10 +26,10 @@ type GenerateOptions struct {
 	Stop        []string               `json:"stop,omitempty"`
 	Extra       map[string]interface{} `json:"extra,omitempty"` // Provider-specific extensions
 	// Function-calling fields — used to pass tool definitions and control tool selection
-	Tools       []ToolDefinition       `json:"tools,omitempty"`
-	ToolChoice  ToolChoice             `json:"tool_choice,omitempty"`
+	Tools      []ToolDefinition `json:"tools,omitempty"`
+	ToolChoice ToolChoice       `json:"tool_choice,omitempty"`
 	// Structured output — when set, the LLM must return JSON matching this schema
-	JSONSchema  string                 `json:"json_schema,omitempty"`
+	JSONSchema string `json:"json_schema,omitempty"`
 }
 
 // ToolDefinition describes a tool/function that the LLM may call.
@@ -41,8 +41,8 @@ type ToolDefinition struct {
 
 // ToolChoice controls whether the LLM may call tools.
 type ToolChoice struct {
-	Type       string          `json:"type"` // "auto", "any", "none"
-	ToolName   string          `json:"name,omitempty"` // specific tool name when Type is "any"
+	Type     string `json:"type"`           // "auto", "any", "none"
+	ToolName string `json:"name,omitempty"` // specific tool name when Type is "any"
 }
 
 // Client represents the base capabilities for language model generation.

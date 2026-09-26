@@ -15,6 +15,8 @@ type PDFReadTool struct {
 	Chroot string
 }
 
+var _ Tool = (*PDFReadTool)(nil)
+
 func NewPDFReadTool(chroot string) *PDFReadTool {
 	return &PDFReadTool{
 		BaseTool: BaseTool{
@@ -70,4 +72,12 @@ func (t *PDFReadTool) ArgsSchema() []ArgSchema {
 	return []ArgSchema{
 		{Name: "file_path", Type: "string", Description: "Path to the PDF file to read", Required: true},
 	}
+}
+
+// CacheFunction isolates cache entries per file path.
+func (t *PDFReadTool) CacheFunction(input map[string]interface{}) string {
+	if p, ok := input["file_path"].(string); ok && p != "" {
+		return "PDFReadTool:" + p
+	}
+	return ""
 }

@@ -9,13 +9,21 @@ import (
 	"sync"
 
 	"github.com/Ecook14/gocrewwai/pkg/llm"
+	"github.com/Ecook14/gocrewwai/pkg/tools"
+)
+
+var (
+	_ llm.Client         = (*MockClient)(nil)
+	_ llm.Embedder       = (*MockClient)(nil)
+	_ llm.AudioGenerator = (*MockClient)(nil)
+	_ tools.Tool         = (*MockTool)(nil)
 )
 
 // MockCall records a single invocation to any method on MockClient.
 type MockCall struct {
 	Method   string
 	Messages []llm.Message
-	Options  map[string]interface{}
+	Options  llm.GenerateOptions
 	Schema   interface{}
 	Text     string // for embedding calls
 }
@@ -27,10 +35,10 @@ type MockClient struct {
 	Calls []MockCall
 
 	// Configurable response functions
-	GenerateFunc           func(ctx context.Context, msgs []llm.Message, opts map[string]interface{}) (string, error)
-	GenerateStructuredFunc func(ctx context.Context, msgs []llm.Message, schema interface{}, opts map[string]interface{}) (interface{}, error)
+	GenerateFunc           func(ctx context.Context, msgs []llm.Message, opts llm.GenerateOptions) (string, error)
+	GenerateStructuredFunc func(ctx context.Context, msgs []llm.Message, schema interface{}, opts llm.GenerateOptions) (interface{}, error)
 	EmbeddingFunc          func(ctx context.Context, text string) ([]float32, error)
-	StreamFunc             func(ctx context.Context, msgs []llm.Message, opts map[string]interface{}) (<-chan string, error)
+	StreamFunc             func(ctx context.Context, msgs []llm.Message, opts llm.GenerateOptions) (<-chan string, error)
 	SpeechFunc             func(ctx context.Context, text string, opts map[string]interface{}) ([]byte, error)
 	TranscribeFunc         func(ctx context.Context, audio []byte, opts map[string]interface{}) (string, error)
 
@@ -73,7 +81,7 @@ func (m *MockClient) Reset() {
 }
 
 // Generate implements llm.Client.
-func (m *MockClient) Generate(ctx context.Context, messages []llm.Message, options map[string]interface{}) (string, error) {
+func (m *MockClient) Generate(ctx context.Context, messages []llm.Message, options llm.GenerateOptions) (string, error) {
 	m.record(MockCall{Method: "Generate", Messages: messages, Options: options})
 	if m.GenerateFunc != nil {
 		return m.GenerateFunc(ctx, messages, options)
@@ -82,7 +90,7 @@ func (m *MockClient) Generate(ctx context.Context, messages []llm.Message, optio
 }
 
 // GenerateWithUsage implements llm.Client — returns both text and usage data.
-func (m *MockClient) GenerateWithUsage(ctx context.Context, messages []llm.Message, options map[string]interface{}) (string, *llm.Usage, error) {
+func (m *MockClient) GenerateWithUsage(ctx context.Context, messages []llm.Message, options llm.GenerateOptions) (string, *llm.Usage, error) {
 	m.record(MockCall{Method: "GenerateWithUsage", Messages: messages, Options: options})
 
 	var text string
@@ -106,7 +114,7 @@ func (m *MockClient) GenerateWithUsage(ctx context.Context, messages []llm.Messa
 }
 
 // GenerateStructured implements llm.Client.
-func (m *MockClient) GenerateStructured(ctx context.Context, messages []llm.Message, schema interface{}, options map[string]interface{}) (interface{}, error) {
+func (m *MockClient) GenerateStructured(ctx context.Context, messages []llm.Message, schema interface{}, options llm.GenerateOptions) (interface{}, error) {
 	m.record(MockCall{Method: "GenerateStructured", Messages: messages, Schema: schema, Options: options})
 	if m.GenerateStructuredFunc != nil {
 		return m.GenerateStructuredFunc(ctx, messages, schema, options)
@@ -114,7 +122,7 @@ func (m *MockClient) GenerateStructured(ctx context.Context, messages []llm.Mess
 	return schema, nil
 }
 
-// GenerateEmbedding implements llm.Client.
+// GenerateEmbedding implements llm.Embedder.
 func (m *MockClient) GenerateEmbedding(ctx context.Context, text string) ([]float32, error) {
 	m.record(MockCall{Method: "GenerateEmbedding", Text: text})
 	if m.EmbeddingFunc != nil {
@@ -130,7 +138,7 @@ func (m *MockClient) GenerateEmbedding(ctx context.Context, text string) ([]floa
 }
 
 // StreamGenerate implements llm.Client.
-func (m *MockClient) StreamGenerate(ctx context.Context, messages []llm.Message, options map[string]interface{}) (<-chan string, error) {
+func (m *MockClient) StreamGenerate(ctx context.Context, messages []llm.Message, options llm.GenerateOptions) (<-chan string, error) {
 	m.record(MockCall{Method: "StreamGenerate", Messages: messages, Options: options})
 	if m.StreamFunc != nil {
 		return m.StreamFunc(ctx, messages, options)
@@ -145,18 +153,18 @@ func (m *MockClient) StreamGenerate(ctx context.Context, messages []llm.Message,
 	return ch, nil
 }
 
-// GenerateSpeech implements llm.Client.
+// GenerateSpeech implements llm.AudioGenerator.
 func (m *MockClient) GenerateSpeech(ctx context.Context, text string, options map[string]interface{}) ([]byte, error) {
-	m.record(MockCall{Method: "GenerateSpeech", Text: text, Options: options})
+	m.record(MockCall{Method: "GenerateSpeech", Text: text})
 	if m.SpeechFunc != nil {
 		return m.SpeechFunc(ctx, text, options)
 	}
 	return []byte("mock-audio-bytes"), nil
 }
 
-// TranscribeSpeech implements llm.Client.
+// TranscribeSpeech implements llm.AudioGenerator.
 func (m *MockClient) TranscribeSpeech(ctx context.Context, audio []byte, options map[string]interface{}) (string, error) {
-	m.record(MockCall{Method: "TranscribeSpeech", Options: options})
+	m.record(MockCall{Method: "TranscribeSpeech"})
 	if m.TranscribeFunc != nil {
 		return m.TranscribeFunc(ctx, audio, options)
 	}
@@ -184,12 +192,16 @@ func (t *MockTool) Execute(ctx context.Context, input map[string]interface{}) (s
 	return fmt.Sprintf("mock tool '%s' executed", t.NameValue), nil
 }
 
+func (t *MockTool) ArgsSchema() []tools.ArgSchema { return nil }
+
+func (t *MockTool) CacheFunction(input map[string]interface{}) string { return "" }
+
 // --- Convenience Factories ---
 
 // NewSimpleMock creates a MockClient that always returns the given text.
 func NewSimpleMock(response string) *MockClient {
 	return &MockClient{
-		GenerateFunc: func(ctx context.Context, msgs []llm.Message, opts map[string]interface{}) (string, error) {
+		GenerateFunc: func(ctx context.Context, msgs []llm.Message, opts llm.GenerateOptions) (string, error) {
 			return response, nil
 		},
 	}
@@ -201,7 +213,7 @@ func NewSequenceMock(responses ...string) *MockClient {
 	idx := 0
 	var mu sync.Mutex
 	return &MockClient{
-		GenerateFunc: func(ctx context.Context, msgs []llm.Message, opts map[string]interface{}) (string, error) {
+		GenerateFunc: func(ctx context.Context, msgs []llm.Message, opts llm.GenerateOptions) (string, error) {
 			mu.Lock()
 			defer mu.Unlock()
 			if idx < len(responses) {
@@ -217,7 +229,7 @@ func NewSequenceMock(responses ...string) *MockClient {
 // NewErrorMock creates a MockClient that always returns the given error.
 func NewErrorMock(err error) *MockClient {
 	return &MockClient{
-		GenerateFunc: func(ctx context.Context, msgs []llm.Message, opts map[string]interface{}) (string, error) {
+		GenerateFunc: func(ctx context.Context, msgs []llm.Message, opts llm.GenerateOptions) (string, error) {
 			return "", err
 		},
 	}

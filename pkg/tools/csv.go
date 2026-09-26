@@ -17,6 +17,8 @@ type CSVReadTool struct {
 	Chroot string
 }
 
+var _ Tool = (*CSVReadTool)(nil)
+
 func NewCSVReadTool(chroot string) *CSVReadTool {
 	return &CSVReadTool{
 		BaseTool: BaseTool{
@@ -72,6 +74,9 @@ func (t *CSVReadTool) Execute(ctx context.Context, input map[string]interface{})
 }
 
 func (t *CSVReadTool) CacheFunction(input map[string]interface{}) string {
+	if p, ok := input["file_path"].(string); ok && p != "" {
+		return "CSVReadTool:" + p
+	}
 	return ""
 }
 

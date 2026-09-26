@@ -111,12 +111,12 @@ func handleRun(args []string) error {
 	var safeEnv []string
 	for _, e := range os.Environ() {
 		if strings.HasPrefix(e, "PATH=") ||
-		   strings.HasPrefix(e, "GOPATH=") ||
-		   strings.HasPrefix(e, "GOROOT=") ||
-		   strings.HasPrefix(e, "GOPROXY=") ||
-		   strings.HasPrefix(e, "GOSUMDB=") ||
-		   strings.HasPrefix(e, "GOFLAGS=") ||
-		   strings.HasPrefix(e, "GOMODCACHE=") {
+			strings.HasPrefix(e, "GOPATH=") ||
+			strings.HasPrefix(e, "GOROOT=") ||
+			strings.HasPrefix(e, "GOPROXY=") ||
+			strings.HasPrefix(e, "GOSUMDB=") ||
+			strings.HasPrefix(e, "GOFLAGS=") ||
+			strings.HasPrefix(e, "GOMODCACHE=") {
 			safeEnv = append(safeEnv, e)
 		}
 	}
@@ -196,11 +196,11 @@ func handleKickoff(showUI bool) error {
 
 	slog.Info("🚀 Kicking off the Crew-GO Demo...")
 
-		apiKey := os.Getenv("OPENAI_API_KEY")
-		var model gocrew.LLMClient
-		if apiKey != "" {
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	var model gocrew.LLMClient
+	if apiKey != "" {
 		model = gocrew.NewOpenAI(apiKey, "gpt-4o")
-		}
+	}
 
 	agent := gocrew.NewAgent(gocrew.AgentConfig{
 		Role:      "System Auditor",
@@ -227,7 +227,7 @@ func handleKickoff(showUI bool) error {
 		slog.Error("Crew Execution Failed", slog.Any("error", err))
 		return err
 	}
-	
+
 	slog.Info("✨ Demo Output", slog.Any("result", result))
 	return nil
 }

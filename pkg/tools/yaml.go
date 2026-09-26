@@ -16,6 +16,8 @@ type YAMLReadTool struct {
 	Chroot string
 }
 
+var _ Tool = (*YAMLReadTool)(nil)
+
 func NewYAMLReadTool(chroot string) *YAMLReadTool {
 	return &YAMLReadTool{
 		BaseTool: BaseTool{
@@ -64,6 +66,11 @@ func (t *YAMLReadTool) ArgsSchema() []ArgSchema {
 		{Name: "file_path", Type: "string", Description: "Path to the YAML file to read", Required: true},
 	}
 }
-func (t *YAMLReadTool) CacheFunction(input map[string]interface{}) string { return "" }
-func (t *YAMLReadTool) Name() string                                      { return t.BaseTool.NameValue }
-func (t *YAMLReadTool) Description() string                               { return t.BaseTool.DescriptionValue }
+func (t *YAMLReadTool) CacheFunction(input map[string]interface{}) string {
+	if p, ok := input["file_path"].(string); ok && p != "" {
+		return "YAMLReadTool:" + p
+	}
+	return ""
+}
+func (t *YAMLReadTool) Name() string        { return t.BaseTool.NameValue }
+func (t *YAMLReadTool) Description() string { return t.BaseTool.DescriptionValue }

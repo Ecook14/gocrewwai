@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -50,11 +51,14 @@ func (b *BraveSearchTool) Execute(ctx context.Context, input map[string]interfac
 
 	url := fmt.Sprintf("https://api.search.brave.com/res/search?q=%s&count=%d",
 		strings.ReplaceAll(query, " ", "+"), count)
-	req, _ := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return "", fmt.Errorf("Brave search failed to create request: %w", err)
+	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("X-Subscription-Token", b.APIKey)
 
-	resp, err := HTTPClient.Do(req.WithContext(ctx))
+	resp, err := HTTPClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("Brave search failed: %w", err)
 	}
@@ -69,7 +73,9 @@ func (b *BraveSearchTool) Execute(ctx context.Context, input map[string]interfac
 		Results []braveResult `json:"results"`
 		Total   int           `json:"total"`
 	}
-	json.NewDecoder(resp.Body).Decode(&br)
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&br); err != nil {
+		return "", fmt.Errorf("Brave failed to decode results: %w", err)
+	}
 
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("Brave Search Results for: %s\n\n", query))
@@ -84,6 +90,6 @@ func (b *BraveSearchTool) Execute(ctx context.Context, input map[string]interfac
 	return sb.String(), nil
 }
 
-func (b *BraveSearchTool) RequiresReview() bool { return false }
+func (b *BraveSearchTool) RequiresReview() bool { return true } // Outbound search with agent-influenced query
 func (b *BraveSearchTool) Name() string         { return b.BaseTool.NameValue }
 func (b *BraveSearchTool) Description() string  { return b.BaseTool.DescriptionValue }

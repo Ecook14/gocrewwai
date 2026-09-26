@@ -37,5 +37,10 @@ crew_cache_*.json
 *.sqlite
 *.sqlite3
 
+# Built binaries ship via CI release artifacts, never the tree
+/gocrew-bin
+/crewai
+/my-crew
+
 node_modules/
 web/

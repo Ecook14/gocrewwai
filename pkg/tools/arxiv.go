@@ -87,4 +87,4 @@ func extractTag(content, tag string) string {
 	return strings.TrimSpace(content[start : start+end])
 }
 
-func (t *ArxivTool) RequiresReview() bool { return false }
+func (t *ArxivTool) RequiresReview() bool { return true } // Outbound fetch of agent-influenced URLs

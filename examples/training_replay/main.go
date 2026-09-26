@@ -42,7 +42,7 @@ func main() {
 	stateFile := "crew_checkpoint.json"
 	myCrew.StateFile = stateFile
 	fmt.Printf("\n📍 Saving state to %s and running...\n", stateFile)
-	
+
 	_, err = myCrew.Kickoff(context.Background())
 	if err != nil {
 		fmt.Printf("Kickoff Error: %v\n", err)

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 )
@@ -12,10 +13,27 @@ import (
 type AskHumanTool struct {
 	BaseTool
 	Enabled bool
+	// In/Out back the interactive prompt. Nil means os.Stdin/os.Stdout,
+	// so CLI behavior is unchanged; tests inject buffers.
+	In  io.Reader
+	Out io.Writer
 }
 
-func NewAskHumanTool(enabled bool) *AskHumanTool {
+// WithHumanInput sets a custom input stream for the prompt.
+func WithHumanInput(r io.Reader) func(*AskHumanTool) {
+	return func(t *AskHumanTool) { t.In = r }
+}
+
+// WithHumanOutput sets a custom output stream for the prompt.
+func WithHumanOutput(w io.Writer) func(*AskHumanTool) {
+	return func(t *AskHumanTool) { t.Out = w }
+}
+
+func NewAskHumanTool(enabled bool, opts ...func(*AskHumanTool)) *AskHumanTool {
 	t := &AskHumanTool{Enabled: enabled}
+	for _, opt := range opts {
+		opt(t)
+	}
 	t.NameValue = "AskHuman"
 	t.DescriptionValue = "Use this tool to ask a human for missing information, clarification, or approval before proceeding with a critical action. Input should be a clear question."
 	t.Schema = []ArgSchema{
@@ -29,6 +47,20 @@ func NewAskHumanTool(enabled bool) *AskHumanTool {
 	return t
 }
 
+func (t *AskHumanTool) humanIn() io.Reader {
+	if t.In != nil {
+		return t.In
+	}
+	return os.Stdin
+}
+
+func (t *AskHumanTool) humanOut() io.Writer {
+	if t.Out != nil {
+		return t.Out
+	}
+	return os.Stdout
+}
+
 func (t *AskHumanTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	if !t.Enabled {
 		return "", fmt.Errorf("Human-in-the-loop (HITL) is currently disabled")
@@ -39,10 +71,10 @@ func (t *AskHumanTool) Execute(ctx context.Context, input map[string]interface{}
 		prompt, _ = input["prompt"].(string)
 	}
 
-	fmt.Printf("\n🤔 AGENT IS ASKING: %s\n", prompt)
-	fmt.Print("👤 YOUR RESPONSE: ")
+	fmt.Fprintf(t.humanOut(), "\n🤔 AGENT IS ASKING: %s\n", prompt)
+	fmt.Fprint(t.humanOut(), "👤 YOUR RESPONSE: ")
 
-	reader := bufio.NewReader(os.Stdin)
+	reader := bufio.NewReader(t.humanIn())
 	response, err := reader.ReadString('\n')
 	if err != nil {
 		return "", fmt.Errorf("failed to read human input: %w", err)

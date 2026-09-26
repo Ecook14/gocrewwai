@@ -175,10 +175,37 @@ type Crew struct {
 	staticSyncDone bool
 }
 
+// publishEvent tags crew lifecycle events with the crew's session ID so
+// downstream subscribers can scope streams per session (DCR-04).
+func (c *Crew) publishEvent(e events.Event) {
+	if e.SessionID == "" {
+		e.SessionID = c.SessionID
+	}
+	events.GlobalBus.Publish(e)
+}
+
 // TrainingFeedback contains explicit HITL rating and instruction.
 type TrainingFeedback struct {
 	Rating  int    // Negative rating triggers learning loop
 	Comment string // Human feedback instruction
+}
+
+// resolveOrchestrator builds the hierarchical orchestrator from ManagerAgent,
+// converting a local *agents.Agent into a *agents.ManagerAgent when needed.
+// It returns nil when no custom manager is configured, letting callers fall
+// back to the default manager construction.
+func (c *Crew) resolveOrchestrator() *agents.ManagerAgent {
+	if c.ManagerAgent == nil {
+		return nil
+	}
+	if m, ok := c.ManagerAgent.(*agents.ManagerAgent); ok {
+		m.ManagedAgents = c.Agents
+		return m
+	}
+	if local, ok := c.ManagerAgent.(*agents.Agent); ok {
+		return &agents.ManagerAgent{Agent: *local, ManagedAgents: c.Agents}
+	}
+	return nil
 }
 
 // ProvideTrainingFeedback injects human evaluations directly into the specified task's agent memory loop.
@@ -193,7 +220,7 @@ func (c *Crew) ProvideTrainingFeedback(taskID string, feedback TrainingFeedback)
 			slog.Info("Feedback received", "task", task.Description, "rating", feedback.Rating)
 			// Agent capturing logic would be piped internally via entity memory here.
 			if feedback.Rating < 0 {
-				events.GlobalBus.Publish(events.Event{
+				c.publishEvent(events.Event{
 					Type:   events.AgentFeedbackReceived,
 					Source: "Crew",
 					Payload: map[string]interface{}{
@@ -214,7 +241,7 @@ func (c *Crew) Train(ctx context.Context, iterations int, inputs map[string]inte
 		return fmt.Errorf("iterations must be positive")
 	}
 
-	events.GlobalBus.Publish(events.Event{
+	c.publishEvent(events.Event{
 		Type:   events.CrewTrainStarted,
 		Source: "Crew",
 		Payload: map[string]interface{}{
@@ -231,7 +258,7 @@ func (c *Crew) Train(ctx context.Context, iterations int, inputs map[string]inte
 		// Run a normal kickoff but with training flags enabled internally
 		_, err := c.Kickoff(ctx)
 		if err != nil {
-			events.GlobalBus.Publish(events.Event{
+			c.publishEvent(events.Event{
 				Type:   events.CrewTrainFailed,
 				Source: "Crew",
 				Error:  err,
@@ -252,7 +279,7 @@ func (c *Crew) Train(ctx context.Context, iterations int, inputs map[string]inte
 		}
 	}
 
-	events.GlobalBus.Publish(events.Event{
+	c.publishEvent(events.Event{
 		Type:   events.CrewTrainCompleted,
 		Source: "Crew",
 	})
@@ -269,7 +296,7 @@ func (c *Crew) Kickoff(ctx context.Context) (interface{}, error) {
 	defer span.End()
 
 	// Publish system event
-	events.GlobalBus.Publish(events.Event{
+	c.publishEvent(events.Event{
 		Type:   events.CrewKickoffStarted,
 		Source: "Crew",
 		Payload: map[string]interface{}{
@@ -390,7 +417,7 @@ func (c *Crew) Kickoff(ctx context.Context) (interface{}, error) {
 	}
 
 	if err != nil {
-		events.GlobalBus.Publish(events.Event{
+		c.publishEvent(events.Event{
 			Type:   events.CrewKickoffFailed,
 			Source: "Crew",
 			Error:  err,
@@ -398,7 +425,7 @@ func (c *Crew) Kickoff(ctx context.Context) (interface{}, error) {
 		return nil, err
 	}
 
-	events.GlobalBus.Publish(events.Event{
+	c.publishEvent(events.Event{
 		Type:   events.CrewKickoffCompleted,
 		Source: "Crew",
 		Payload: map[string]interface{}{
@@ -574,15 +601,7 @@ func (c *Crew) executeHierarchical(ctx context.Context) (interface{}, error) {
 	}
 
 	// Construct or use the provided manager agent
-	var orchestrator *agents.ManagerAgent
-	if c.ManagerAgent != nil {
-		if m, ok := c.ManagerAgent.(*agents.ManagerAgent); ok {
-			orchestrator = m
-			orchestrator.ManagedAgents = c.Agents
-		} else if local, ok := c.ManagerAgent.(*agents.Agent); ok {
-			orchestrator = &agents.ManagerAgent{Agent: *local, ManagedAgents: c.Agents}
-		}
-	}
+	var orchestrator = c.resolveOrchestrator()
 
 	if orchestrator == nil {
 		model := c.ManagerLLM
@@ -856,15 +875,7 @@ func (c *Crew) executeConsensual(ctx context.Context) (string, error) {
 	}
 
 	// Consolidate into a manager synthesis prompt
-	var orchestrator *agents.ManagerAgent
-	if c.ManagerAgent != nil {
-		if m, ok := c.ManagerAgent.(*agents.ManagerAgent); ok {
-			orchestrator = m
-			orchestrator.ManagedAgents = c.Agents
-		} else if local, ok := c.ManagerAgent.(*agents.Agent); ok {
-			orchestrator = &agents.ManagerAgent{Agent: *local, ManagedAgents: c.Agents}
-		}
-	}
+	var orchestrator = c.resolveOrchestrator()
 
 	if orchestrator == nil {
 		model := c.ManagerLLM
@@ -1014,15 +1025,7 @@ func (c *Crew) executeGraph(ctx context.Context) (string, error) {
 func (c *Crew) executeReflective(ctx context.Context) (string, error) {
 	var finalResult string
 
-	var orchestrator *agents.ManagerAgent
-	if c.ManagerAgent != nil {
-		if m, ok := c.ManagerAgent.(*agents.ManagerAgent); ok {
-			orchestrator = m
-			orchestrator.ManagedAgents = c.Agents
-		} else if local, ok := c.ManagerAgent.(*agents.Agent); ok {
-			orchestrator = &agents.ManagerAgent{Agent: *local, ManagedAgents: c.Agents}
-		}
-	}
+	var orchestrator = c.resolveOrchestrator()
 
 	if orchestrator == nil {
 		model := c.ManagerLLM
@@ -1174,15 +1177,7 @@ func (c *Crew) runPlanningPhase(ctx context.Context) error {
 	}
 
 	// 1. Setup Manager
-	var orchestrator *agents.ManagerAgent
-	if c.ManagerAgent != nil {
-		if m, ok := c.ManagerAgent.(*agents.ManagerAgent); ok {
-			orchestrator = m
-			orchestrator.ManagedAgents = c.Agents
-		} else if local, ok := c.ManagerAgent.(*agents.Agent); ok {
-			orchestrator = &agents.ManagerAgent{Agent: *local, ManagedAgents: c.Agents}
-		}
-	}
+	var orchestrator = c.resolveOrchestrator()
 
 	if orchestrator == nil {
 		model := c.PlanningLLM

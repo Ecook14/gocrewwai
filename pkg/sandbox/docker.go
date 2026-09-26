@@ -7,7 +7,6 @@ import (
 	"io"
 	"time"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
@@ -75,10 +74,10 @@ func (p *DockerProvider) Execute(ctx context.Context, code string, env map[strin
 	if err != nil {
 		return "", fmt.Errorf("docker: failed to create container: %w", err)
 	}
-	defer p.cli.ContainerRemove(timeoutCtx, resp.ID, types.ContainerRemoveOptions{Force: true})
+	defer p.cli.ContainerRemove(timeoutCtx, resp.ID, container.RemoveOptions{Force: true})
 
 	// 4. Start container
-	if err := p.cli.ContainerStart(timeoutCtx, resp.ID, types.ContainerStartOptions{}); err != nil {
+	if err := p.cli.ContainerStart(timeoutCtx, resp.ID, container.StartOptions{}); err != nil {
 		return "", fmt.Errorf("docker: failed to start container: %w", err)
 	}
 
@@ -95,7 +94,7 @@ func (p *DockerProvider) Execute(ctx context.Context, code string, env map[strin
 	}
 
 	// 6. Capture logs
-	out, err := p.cli.ContainerLogs(timeoutCtx, resp.ID, types.ContainerLogsOptions{ShowStdout: true, ShowStderr: true})
+	out, err := p.cli.ContainerLogs(timeoutCtx, resp.ID, container.LogsOptions{ShowStdout: true, ShowStderr: true})
 	if err != nil {
 		return "", fmt.Errorf("docker: failed to get logs: %w", err)
 	}

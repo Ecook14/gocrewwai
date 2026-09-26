@@ -240,4 +240,12 @@ func cellValue(c cell, shared map[int]string) string {
 	return ""
 }
 
+// CacheFunction isolates cache entries per file path.
+func (t *ExcelReadTool) CacheFunction(input map[string]interface{}) string {
+	if p, ok := input["file_path"].(string); ok && p != "" {
+		return "ExcelReadTool:" + p
+	}
+	return ""
+}
+
 var _ Tool = (*ExcelReadTool)(nil)

@@ -80,10 +80,13 @@ const (
 // ============================================================
 
 // Event represents a system-wide lifecycle event.
+// SessionID scopes the event to a crew execution session; empty means
+// untagged (system-wide). SSE subscribers filter on it (DCR-04).
 type Event struct {
 	Type      EventType              `json:"type"`
 	Timestamp time.Time              `json:"timestamp"`
 	Source    string                 `json:"source,omitempty"` // e.g., Agent role, Task name
+	SessionID string                 `json:"session_id,omitempty"`
 	Payload   map[string]interface{} `json:"payload,omitempty"`
 	Error     error                  `json:"error,omitempty"`
 }

@@ -17,6 +17,13 @@ type ScraperTool struct {
 	BaseTool
 }
 
+const (
+	// maxScraperBodyBytes caps fetched HTML before text extraction.
+	maxScraperBodyBytes = 1 << 20 // 1MB
+	// maxScraperTextLen caps extracted text returned to the agent.
+	maxScraperTextLen = 15 * 1024
+)
+
 func NewScraperTool() *ScraperTool {
 	return &ScraperTool{
 		BaseTool: BaseTool{
@@ -61,7 +68,7 @@ func (t *ScraperTool) Execute(ctx context.Context, input map[string]interface{})
 		return "", fmt.Errorf("webpage returned status %d", resp.StatusCode)
 	}
 
-	bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20)) // 1MB limit
+	bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxScraperBodyBytes))
 	if err != nil {
 		return "", fmt.Errorf("failed to read body: %w", err)
 	}
@@ -71,8 +78,8 @@ func (t *ScraperTool) Execute(ctx context.Context, input map[string]interface{})
 	// Basic HTML-to-Text cleanup
 	body = stripHTMLText(body)
 
-	if len(body) > 15000 {
-		body = body[:15000] + "\n... [Content Truncated]"
+	if len(body) > maxScraperTextLen {
+		body = body[:maxScraperTextLen] + "\n... [Content Truncated]"
 	}
 
 	return strings.TrimSpace(body), nil

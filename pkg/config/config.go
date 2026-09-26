@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"sync"
@@ -147,15 +148,48 @@ var (
 	once     sync.Once
 )
 
+// parseDurationOrDefault parses a duration string, logging a warning and
+// returning def when parsing fails instead of silently using zero values.
+func parseDurationOrDefault(raw, field string, def time.Duration) time.Duration {
+	if raw == "" {
+		return def
+	}
+	if d, err := time.ParseDuration(raw); err == nil {
+		return d
+	} else {
+		slog.Warn("config: invalid duration, using default",
+			"field", field, "value", raw, "default", def.String(), "error", err)
+		return def
+	}
+}
+
 // Get returns the global configuration singleton.
 // It panics on first load if the config file cannot be read or parsed —
-// this is intentional: a running process with broken config is unsafe.
-// Use LoadConfigFile() for a non-panicking variant.
+// this is intentional for fail-fast startup: a running process with broken
+// config is unsafe. Use TryGet or LoadConfigFile for non-panicking variants.
 func Get() *Config {
 	once.Do(func() {
 		instance = loadConfig()
 	})
 	return instance
+}
+
+// TryGet returns the global configuration singleton without panicking.
+// It returns an error if the config cannot be loaded, allowing callers
+// (servers, CLIs) to log and exit gracefully instead of crashing.
+func TryGet() (*Config, error) {
+	var loadErr error
+	once.Do(func() {
+		var err error
+		instance, err = loadConfigE()
+		if err != nil {
+			loadErr = err
+		}
+	})
+	if loadErr != nil {
+		return nil, loadErr
+	}
+	return instance, nil
 }
 
 // LoadConfigFile reads and parses a config file without panicking.
@@ -167,7 +201,7 @@ func LoadConfigFile(path string) (*Config, error) {
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("cannot read config file %s: %w", path, err)
+		return nil, fmt.Errorf("cannot read configuration file: %w", err)
 	}
 	expanded := os.ExpandEnv(string(data))
 	cfg := &Config{
@@ -177,7 +211,8 @@ func LoadConfigFile(path string) (*Config, error) {
 		Providers:  make(map[string]Provider),
 	}
 	if err := json.Unmarshal([]byte(expanded), cfg); err != nil {
-		return nil, fmt.Errorf("failed to parse config JSON in %s: %w", path, err)
+		slog.Warn("config: failed to parse configuration file", "path", path, "error", err)
+		return nil, fmt.Errorf("failed to parse configuration file: %w", err)
 	}
 	// Double check API keys if expansion failed
 	for k, p := range cfg.Providers {
@@ -189,42 +224,12 @@ func LoadConfigFile(path string) (*Config, error) {
 			}
 		}
 	}
-	// Parse durations with safe defaults
-	if cfg.LLM.TimeoutStr != "" {
-		if d, err := time.ParseDuration(cfg.LLM.TimeoutStr); err == nil {
-			cfg.LLM.Timeout = d
-		} else {
-			cfg.LLM.Timeout = 30 * time.Second
-		}
-	}
-	if cfg.LLM.PricingTTLStr != "" {
-		if d, err := time.ParseDuration(cfg.LLM.PricingTTLStr); err == nil {
-			cfg.LLM.PricingTTL = d
-		} else {
-			cfg.LLM.PricingTTL = 1 * time.Hour
-		}
-	}
-	if cfg.Memory.ChromaTimeoutStr != "" {
-		if d, err := time.ParseDuration(cfg.Memory.ChromaTimeoutStr); err == nil {
-			cfg.Memory.ChromaTimeout = d
-		} else {
-			cfg.Memory.ChromaTimeout = 10 * time.Second
-		}
-	}
-	if cfg.Persistence.Sessions.CheckpointIntervalStr != "" {
-		if d, err := time.ParseDuration(cfg.Persistence.Sessions.CheckpointIntervalStr); err == nil {
-			cfg.Persistence.Sessions.CheckpointInterval = d
-		} else {
-			cfg.Persistence.Sessions.CheckpointInterval = 30 * time.Second
-		}
-	}
-	if cfg.Persistence.Cache.Redis.TTLStr != "" {
-		if d, err := time.ParseDuration(cfg.Persistence.Cache.Redis.TTLStr); err == nil {
-			cfg.Persistence.Cache.Redis.TTL = d
-		} else {
-			cfg.Persistence.Cache.Redis.TTL = 24 * time.Hour
-		}
-	}
+	// Parse durations with safe defaults; warnings emitted on invalid values.
+	cfg.LLM.Timeout = parseDurationOrDefault(cfg.LLM.TimeoutStr, "llm.timeout", 30*time.Second)
+	cfg.LLM.PricingTTL = parseDurationOrDefault(cfg.LLM.PricingTTLStr, "llm.pricing_ttl", 1*time.Hour)
+	cfg.Memory.ChromaTimeout = parseDurationOrDefault(cfg.Memory.ChromaTimeoutStr, "memory.chroma_timeout", 10*time.Second)
+	cfg.Persistence.Sessions.CheckpointInterval = parseDurationOrDefault(cfg.Persistence.Sessions.CheckpointIntervalStr, "persistence.sessions.checkpoint_interval", 30*time.Second)
+	cfg.Persistence.Cache.Redis.TTL = parseDurationOrDefault(cfg.Persistence.Cache.Redis.TTLStr, "persistence.cache.redis.ttl", 24*time.Hour)
 	llm.SetGlobalBudget(cfg.LLM.MaxBudgetUSD)
 	for name, model := range cfg.Models {
 		if model.PromptPrice > 0 || model.CompletionPrice > 0 {
@@ -238,17 +243,28 @@ func LoadConfigFile(path string) (*Config, error) {
 }
 
 func loadConfig() *Config {
+	cfg, err := loadConfigE()
+	if err != nil {
+		// Fail fast at startup but don't leak internal paths to end users;
+		// full path is logged at Warn level inside LoadConfigFile.
+		panic(fmt.Sprintf("config: %v", err))
+	}
+	return cfg
+}
+
+// loadConfigE is the error-returning core used by TryGet and loadConfig.
+func loadConfigE() (*Config, error) {
 	_ = godotenv.Load()
 	path := os.Getenv("CREW_CONFIG_PATH")
 	if path == "" {
 		path = "config.json"
 	}
-	var err error
-	instance, err = LoadConfigFile(path)
+	cfg, err := LoadConfigFile(path)
 	if err != nil {
-		panic(fmt.Sprintf("config: %v", err))
+		return nil, err
 	}
-	return instance
+	instance = cfg
+	return cfg, nil
 }
 
 // GetToolParam returns a tool-specific configuration parameter.

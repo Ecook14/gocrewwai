@@ -110,12 +110,15 @@ type e2bCommandResponse struct {
 }
 
 func (t *CodeInterpreterTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
-	lang, _ := input["language"].(string)
-	code, _ := input["code"].(string)
-
-	if code == "" {
-		return "", fmt.Errorf("'code' is required")
+	langRaw, langOK := input["language"].(string)
+	codeRaw, codeOK := input["code"].(string)
+	if !codeOK || codeRaw == "" {
+		return "", fmt.Errorf("'code' is required and must be a string")
 	}
+	if _, hasLang := input["language"]; hasLang && !langOK {
+		return "", fmt.Errorf("'language' must be a string")
+	}
+	lang, code := langRaw, codeRaw
 
 	// Sandbox-first: if E2B or Docker is configured, use the sandbox.
 	if t.E2BKey != "" {

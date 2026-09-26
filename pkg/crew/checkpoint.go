@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 )
 
@@ -14,6 +15,7 @@ type CheckpointManager struct {
 	BaseDir         string
 	AutoSaveEnabled bool
 	MaxCheckpoints  int // Maximum number of checkpoint files to keep
+	mu              sync.Mutex
 }
 
 // Checkpoint represents a point-in-time snapshot of execution state.
@@ -45,6 +47,9 @@ func NewCheckpointManager(baseDir string) *CheckpointManager {
 
 // Save writes a checkpoint to disk.
 func (cm *CheckpointManager) Save(ctx context.Context, cp *Checkpoint) error {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
 	cp.Timestamp = time.Now()
 	cp.Version++
 
@@ -79,11 +84,15 @@ func (cm *CheckpointManager) Close() error {
 
 // Delete removes a specific checkpoint by timestamp.
 func (cm *CheckpointManager) Delete(ctx context.Context, crewID string, timestamp int64) error {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
 	return os.Remove(filepath.Join(cm.BaseDir, fmt.Sprintf("checkpoint_%s_%d.json", crewID, timestamp)))
 }
 
 // LoadLatest reads the most recent checkpoint for a crew.
 func (cm *CheckpointManager) LoadLatest(ctx context.Context, crewID string) (*Checkpoint, error) {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
 	path := filepath.Join(cm.BaseDir, fmt.Sprintf("checkpoint_%s_latest.json", crewID))
 	return cm.loadFromFile(path)
 }

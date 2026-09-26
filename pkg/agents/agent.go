@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -27,6 +28,14 @@ import (
 )
 
 var _ core.Agent = (*Agent)(nil)
+
+// agentOut resolves the interactive-output stream, defaulting to stdout.
+func (a *Agent) agentOut() io.Writer {
+	if a.Stdout != nil {
+		return a.Stdout
+	}
+	return os.Stdout
+}
 
 var defaultLogger = slog.New(slog.NewTextHandler(os.Stdout, nil))
 
@@ -98,6 +107,10 @@ type Agent struct {
 	LLM                llm.Client   `json:"-"`
 	FunctionCallingLLM llm.Client   `json:"-"` // Separate LLM for tool calling
 	Tools              []tools.Tool `json:"-"`
+
+	// Stdout backs interactive prompts (MCP sampling approval). Nil means
+	// os.Stdout, so CLI behavior is unchanged; tests inject buffers.
+	Stdout io.Writer `json:"-"`
 
 	// A2A Support
 	A2AServer    *protocols.A2AServer      `json:"-"`
@@ -420,8 +433,8 @@ func New(cfg AgentConfig) *Agent {
 
 					if policy == "AskHuman" {
 						slog.Info("[🤖 MCP SAMPLING REQUEST] Server is requesting an LLM completion", slog.String("prompt", prompt))
-						fmt.Printf("MCP Server requests completion for: %s\n", prompt)
-						fmt.Print("Approve sampling? (y/n/feedback): ")
+						fmt.Fprintf(a.agentOut(), "MCP Server requests completion for: %s\n", prompt)
+						fmt.Fprint(a.agentOut(), "Approve sampling? (y/n/feedback): ")
 						// In a real CLI/UI we'd wait for input
 						// For now we assume approval if policy is Always or simulated
 					}

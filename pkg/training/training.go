@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -43,11 +44,26 @@ func NewStore(dir string) *Store {
 	return &Store{Dir: dir}
 }
 
+// cleanRole rejects roles that could escape the store directory.
+func cleanRole(role string) (string, error) {
+	if role == "" {
+		return "", fmt.Errorf("training: empty role")
+	}
+	if strings.ContainsAny(role, `/\`) || strings.Contains(role, "..") {
+		return "", fmt.Errorf("training: invalid role %q", role)
+	}
+	return role, nil
+}
+
 // SaveAgentData persists training results for an agent role.
 func (s *Store) SaveAgentData(role string, data *AgentTrainingData) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	role, err := cleanRole(role)
+	if err != nil {
+		return err
+	}
 	filename := filepath.Join(s.Dir, fmt.Sprintf("%s.json", role))
 	bytes, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
@@ -61,6 +77,10 @@ func (s *Store) LoadAgentData(role string) (*AgentTrainingData, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
+	role, err := cleanRole(role)
+	if err != nil {
+		return nil, err
+	}
 	filename := filepath.Join(s.Dir, fmt.Sprintf("%s.json", role))
 	bytes, err := os.ReadFile(filename)
 	if err != nil {

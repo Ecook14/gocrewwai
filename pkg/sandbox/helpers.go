@@ -97,8 +97,9 @@ func IsSandboxAvailable() bool {
 	return err == nil
 }
 
-func RequireSandbox() {
+func RequireSandbox() error {
 	if !IsSandboxAvailable() {
-		panic("Docker sandbox not available")
+		return fmt.Errorf("docker sandbox not available: pull %q or configure sandbox provider", "python:3.11-slim")
 	}
+	return nil
 }

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"os"
+	"sync"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -16,10 +18,26 @@ import (
 	"github.com/Ecook14/gocrewwai/pkg/memory"
 )
 
+var standaloneMesh = struct {
+	sync.Mutex
+	srvs []*grpc.Server
+}{}
+
+// StopMeshServers gracefully drains all standalone mesh servers.
+func StopMeshServers() {
+	standaloneMesh.Lock()
+	defer standaloneMesh.Unlock()
+	for _, s := range standaloneMesh.srvs {
+		s.GracefulStop()
+	}
+	standaloneMesh.srvs = nil
+}
+
 // StartMeshServer starts the gRPC mesh server on the given port with optional mTLS.
 // When certPEM and keyPEM are provided, the server enforces mTLS (client cert verification).
 // When only serverCert/serverKey are provided without clientCA, server-only TLS is used.
-// When nil certificates are provided, the server starts in plaintext mode with an audit warning.
+// With no certificates, the server mints an ephemeral self-signed cert unless
+// MESH_INSECURE=1 explicitly opts into plaintext (secure by default).
 func StartMeshServer(port int, agents []core.Agent, store memory.Store, embedder llm.Embedder, serverCertPEM, serverKeyPEM, clientCAPEM []byte) error {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
@@ -27,7 +45,8 @@ func StartMeshServer(port int, agents []core.Agent, store memory.Store, embedder
 	}
 
 	var gsrv *grpc.Server
-	if len(serverCertPEM) > 0 && len(serverKeyPEM) > 0 {
+	switch {
+	case len(serverCertPEM) > 0 && len(serverKeyPEM) > 0:
 		cert, err := tls.X509KeyPair(serverCertPEM, serverKeyPEM)
 		if err != nil {
 			return fmt.Errorf("mesh: failed to load server TLS key pair: %w", err)
@@ -47,9 +66,25 @@ func StartMeshServer(port int, agents []core.Agent, store memory.Store, embedder
 			tlsCfg.ClientAuth = tls.VerifyClientCertIfGiven
 		}
 		gsrv = grpc.NewServer(grpc.Creds(credentials.NewTLS(tlsCfg)))
-	} else {
-		slog.Warn("mesh: starting without TLS — mesh traffic is unencrypted", slog.Int("port", port))
+	case os.Getenv("MESH_INSECURE") == "1":
+		slog.Error("mesh: serving PLAINTEXT — explicitly requested via MESH_INSECURE=1",
+			slog.Int("port", port))
 		gsrv = grpc.NewServer()
+	default:
+		certPEM, keyPEM, fp, err := ephemeralServerCert()
+		if err != nil {
+			return err
+		}
+		cert, err := tls.X509KeyPair(certPEM, keyPEM)
+		if err != nil {
+			return fmt.Errorf("mesh: ephemeral keypair: %w", err)
+		}
+		slog.Warn("mesh: no operator certificate — TLS with ephemeral self-signed cert",
+			slog.Int("port", port), slog.String("fingerprint", fp))
+		gsrv = grpc.NewServer(grpc.Creds(credentials.NewTLS(&tls.Config{
+			Certificates: []tls.Certificate{cert},
+			MinVersion:   tls.VersionTLS12,
+		})))
 	}
 
 	srv := NewMeshServer()
@@ -61,6 +96,10 @@ func StartMeshServer(port int, agents []core.Agent, store memory.Store, embedder
 	srv.embedder = embedder
 
 	mesh.RegisterMeshServiceServer(gsrv, srv)
+
+	standaloneMesh.Lock()
+	standaloneMesh.srvs = append(standaloneMesh.srvs, gsrv)
+	standaloneMesh.Unlock()
 
 	fmt.Printf("\n%s AGENT MESH gRPC SERVER STARTING ON PORT %d\n", "🕸️", port)
 	return gsrv.Serve(lis)

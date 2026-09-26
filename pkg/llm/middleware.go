@@ -75,6 +75,7 @@ type MiddlewareClient struct {
 	logger      *slog.Logger
 	maxRetries  int
 	cache       Cache
+	breaker     *circuitBreaker
 }
 
 // WithCache enables response caching on the wrapped client. Cached responses are
@@ -104,53 +105,79 @@ func (mc *MiddlewareClient) Inner() Client {
 // ---------------------------------------------------------------------------
 
 func (mc *MiddlewareClient) Generate(ctx context.Context, messages []Message, options GenerateOptions) (string, error) {
+	allow, trial := mc.breakerAllow()
+	if !allow {
+		return "", ErrCircuitOpen
+	}
 	ctx, cancel := mc.applyTimeout(ctx)
 	defer cancel()
 	if err := mc.waitRateLimit(ctx); err != nil {
+		mc.breakerResult(trial, err)
 		return "", err
 	}
 
 	start := time.Now()
 	result, err := mc.inner.Generate(ctx, messages, options)
+	mc.breakerResult(trial, err)
 	mc.logCall("Generate", messages, options, result, err, time.Since(start))
 	return result, err
 }
 
 func (mc *MiddlewareClient) GenerateWithUsage(ctx context.Context, messages []Message, options GenerateOptions) (string, *Usage, error) {
+	allow, trial := mc.breakerAllow()
+	if !allow {
+		return "", nil, ErrCircuitOpen
+	}
 	ctx, cancel := mc.applyTimeout(ctx)
 	defer cancel()
 	if err := mc.waitRateLimit(ctx); err != nil {
+		mc.breakerResult(trial, err)
 		return "", nil, err
 	}
 
 	start := time.Now()
 	result, usage, err := mc.inner.GenerateWithUsage(ctx, messages, options)
+	mc.breakerResult(trial, err)
 	mc.logCallWithUsage("GenerateWithUsage", messages, options, result, usage, err, time.Since(start))
 	return result, usage, err
 }
 
 func (mc *MiddlewareClient) GenerateStructured(ctx context.Context, messages []Message, schema interface{}, options GenerateOptions) (interface{}, error) {
+	allow, trial := mc.breakerAllow()
+	if !allow {
+		return nil, ErrCircuitOpen
+	}
 	ctx, cancel := mc.applyTimeout(ctx)
 	defer cancel()
 	if err := mc.waitRateLimit(ctx); err != nil {
+		mc.breakerResult(trial, err)
 		return nil, err
 	}
 
 	start := time.Now()
 	result, err := mc.inner.GenerateStructured(ctx, messages, schema, options)
+	mc.breakerResult(trial, err)
 	mc.logCall("GenerateStructured", messages, options, fmt.Sprintf("%v", result), err, time.Since(start))
 	return result, err
 }
 
 func (mc *MiddlewareClient) StreamGenerate(ctx context.Context, messages []Message, options GenerateOptions) (<-chan string, error) {
+	// Only setup errors feed the breaker; mid-stream chunk errors travel
+	// the channel and cannot be attributed.
+	allow, trial := mc.breakerAllow()
+	if !allow {
+		return nil, ErrCircuitOpen
+	}
 	ctx, cancel := mc.applyTimeout(ctx)
 	defer cancel()
 	if err := mc.waitRateLimit(ctx); err != nil {
+		mc.breakerResult(trial, err)
 		return nil, err
 	}
 
 	start := time.Now()
 	ch, err := mc.inner.StreamGenerate(ctx, messages, options)
+	mc.breakerResult(trial, err)
 	if mc.logger != nil {
 		mc.logger.Info("LLM call",
 			slog.String("method", "StreamGenerate"),
@@ -165,6 +192,22 @@ func (mc *MiddlewareClient) StreamGenerate(ctx context.Context, messages []Messa
 // ---------------------------------------------------------------------------
 // Internal Helpers
 // ---------------------------------------------------------------------------
+
+// breakerAllow fast-fails when the circuit is open. Helpers are nil-safe
+// so clients without WithCircuitBreaker behave exactly as before.
+func (mc *MiddlewareClient) breakerAllow() (allow, trial bool) {
+	if mc.breaker == nil {
+		return true, false
+	}
+	return mc.breaker.beforeCall()
+}
+
+func (mc *MiddlewareClient) breakerResult(trial bool, err error) {
+	if mc.breaker == nil {
+		return
+	}
+	mc.breaker.afterCall(trial, err)
+}
 
 // applyTimeout returns a context with the configured timeout applied.
 // The caller is responsible for deferring the returned cancel function.

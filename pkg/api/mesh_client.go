@@ -5,12 +5,13 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
+	"sync"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/Ecook14/gocrewwai/pkg/api/mesh"
 	"github.com/Ecook14/gocrewwai/pkg/core"
@@ -148,10 +149,12 @@ func LoadClientTLSConfig(cfg MeshClientCredentialConfig) (*tls.Config, error) {
 // MeshServer implements the MeshService gRPC server.
 type MeshServer struct {
 	mesh.UnimplementedMeshServiceServer
+	mu       sync.Mutex
 	agents   map[string]core.Agent
 	store    memory.Store
 	embedder llm.Embedder
 	tlsCfg   *tls.Config
+	gsrv     *grpc.Server
 }
 
 func NewMeshServer() *MeshServer {
@@ -171,23 +174,19 @@ func (s *MeshServer) Start(port string, opts ...MeshServerOption) error {
 	}
 
 	credCfg := cfg.Credentials
-	if credCfg.EnableTLS {
-		if credCfg.CertFile == "" {
-			credCfg.CertFile = os.Getenv("MESH_TLS_CERT")
-		}
-		if credCfg.KeyFile == "" {
-			credCfg.KeyFile = os.Getenv("MESH_TLS_KEY")
-		}
-		if credCfg.ClientCAFile == "" {
-			credCfg.ClientCAFile = os.Getenv("MESH_TLS_CLIENT_CA")
-		}
-
-		var err error
-		s.tlsCfg, err = LoadTLSConfig(credCfg)
-		if err != nil {
-			return fmt.Errorf("mesh TLS configuration invalid: %w", err)
-		}
+	if credCfg == (MeshServerCredentialConfig{}) {
+		credCfg = DefaultMeshServerCredentials()
 	}
+	// Explicit per-call opt-out still forces plaintext.
+	if os.Getenv("MESH_INSECURE") == "1" && credCfg.CertFile == "" && credCfg.KeyFile == "" {
+		credCfg = MeshServerCredentialConfig{}
+	}
+
+	tlsCfg, mode, err := serverTLSCreds(credCfg.CertFile, credCfg.KeyFile, credCfg.ClientCAFile)
+	if err != nil {
+		return fmt.Errorf("mesh TLS configuration invalid: %w", err)
+	}
+	s.tlsCfg = tlsCfg
 
 	lis, err := net.Listen("tcp", ":"+port)
 	if err != nil {
@@ -195,19 +194,34 @@ func (s *MeshServer) Start(port string, opts ...MeshServerOption) error {
 	}
 
 	var gsrv *grpc.Server
-	if s.tlsCfg != nil {
-		gsrv = grpc.NewServer(grpc.Creds(credentials.NewTLS(s.tlsCfg)))
-	} else {
+	switch mode {
+	case "insecure":
+		slog.Error("mesh: serving PLAINTEXT — explicitly requested via MESH_INSECURE=1",
+			slog.String("port", port))
 		gsrv = grpc.NewServer()
+	case "file":
+		gsrv = grpc.NewServer(grpc.Creds(credentials.NewTLS(s.tlsCfg)))
+	default: // ephemeral self-signed
+		slog.Warn("mesh: no operator certificate — serving TLS with an ephemeral self-signed cert "+
+			"(encryption without identity trust; set MESH_TLS_CERT/MESH_TLS_KEY for mTLS)",
+			slog.String("port", port), slog.String("fingerprint", mode[len("ephemeral:"):]))
+		gsrv = grpc.NewServer(grpc.Creds(credentials.NewTLS(s.tlsCfg)))
 	}
+	s.mu.Lock()
+	s.gsrv = gsrv
+	s.mu.Unlock()
 
 	mesh.RegisterMeshServiceServer(gsrv, s)
-
-	if s.tlsCfg != nil {
-		return gsrv.Serve(lis)
-	}
-
 	return gsrv.Serve(lis)
+}
+
+// Stop gracefully drains the mesh server. Safe to call before Start.
+func (s *MeshServer) Stop() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.gsrv != nil {
+		s.gsrv.GracefulStop()
+	}
 }
 
 // MeshServerOption configures a MeshServer at start time.
@@ -287,9 +301,9 @@ func (s *MeshServer) SearchKnowledge(ctx context.Context, req *mesh.SearchReques
 }
 
 // ConnectMeshClient dials a remote MeshService and returns a gRPC client.
-// When the client credential configuration enables TLS, the connection uses
-// a tls.Config; otherwise it uses insecure credentials with an audit-logged
-// warning so that insecure mesh connections are never silent.
+// Transport follows the mesh.DialNode policy (secure by default): an explicit
+// per-call credential override still wins when provided; otherwise the shared
+// MESH_TLS_CA / MESH_INSECURE / loopback policy applies.
 func ConnectMeshClient(addr string, opts ...MeshClientOption) (mesh.MeshServiceClient, error) {
 	var cfg MeshClientConfig
 	for _, o := range opts {
@@ -319,8 +333,7 @@ func ConnectMeshClient(addr string, opts ...MeshClientOption) (mesh.MeshServiceC
 		}
 	}
 
-	// Insecure fallback — logged so it is never silent in production.
-	cc, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	cc, err := mesh.DialNode(addr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial mesh service at %s: %w", addr, err)
 	}

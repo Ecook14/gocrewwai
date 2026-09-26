@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/Ecook14/gocrewwai/pkg/api/mesh" // This will be generated from proto, placeholders for now
 	"github.com/Ecook14/gocrewwai/pkg/tools"
@@ -40,8 +39,8 @@ func (r *RemoteAgent) GetToolCount() int               { return 0 }
 func (r *RemoteAgent) Equip(tools ...tools.Tool)       {}
 
 func (r *RemoteAgent) Execute(ctx context.Context, input string, options map[string]interface{}) (interface{}, error) {
-	// 1. Dial remote instance
-	conn, err := grpc.Dial(r.Address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	// 1. Dial remote instance (TLS when MESH_TLS_CA is set, insecure otherwise)
+	conn, err := dialMesh(r.Address)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to remote agent at %s: %w", r.Address, err)
 	}
@@ -69,4 +68,10 @@ func (r *RemoteAgent) Execute(ctx context.Context, input string, options map[str
 	}
 
 	return resp.Output, nil
+}
+
+// dialMesh opens a gRPC connection under the shared mesh transport policy
+// (secure by default; see mesh.DialNode).
+func dialMesh(address string) (*grpc.ClientConn, error) {
+	return mesh.DialNode(address)
 }

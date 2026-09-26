@@ -44,7 +44,7 @@ func main() {
 	})
 
 	fmt.Println("🚀 Starting GOCREW Streaming Demo (Tokens should appear one by one):")
-	
+
 	dashboard.Start("8081")
 	fmt.Println("🖥️  Dashboard active at http://localhost:8081/web-ui - Watch the tokens stream!")
 

@@ -1,9 +1,11 @@
 package dashboard
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -24,10 +26,7 @@ import (
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		// Restrict to configured frontend origins. When
-		// DASHBOARD_ALLOWED_ORIGINS is set, only those origins
-		// are permitted. When unset, all origins are allowed
-		// for the dashboard dev server.
+		// Explicit allowlist wins when configured.
 		if v := os.Getenv("DASHBOARD_ALLOWED_ORIGINS"); v != "" {
 			origin := r.Header.Get("Origin")
 			for _, allowed := range strings.Split(v, ",") {
@@ -37,7 +36,19 @@ var upgrader = websocket.Upgrader{
 			}
 			return false
 		}
-		return true
+		// Default: same-origin only. Requests without an Origin header
+		// (curl, non-browser clients) and requests whose Origin host
+		// matches the server host (bundled UI, localhost dev) pass;
+		// cross-site browser requests are rejected (CSRF defense).
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			return true
+		}
+		u, err := url.Parse(origin)
+		if err != nil {
+			return false
+		}
+		return strings.EqualFold(u.Host, r.Host)
 	},
 }
 
@@ -88,9 +99,45 @@ func (s *WSServer) Start(port string) {
 	go s.publishMetrics()
 
 	slog.Info("🚀 Crew-GO Dashboard Server started", slog.String("port", port))
-	if err := http.ListenAndServe(":"+port, mux); err != nil {
+	// Timeouts prevent slowloris-style connection exhaustion.
+	srv := &http.Server{
+		Addr:         ":" + port,
+		Handler:      dashboardAuth(mux),
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		slog.Error("Dashboard server failed", slog.Any("error", err))
 	}
+}
+
+// dashboardAuth gates all mutating /api/* routes behind a bearer token
+// (DASHBOARD_AUTH_TOKEN, falling back to API_AUTH_TOKEN). The read-only /ws
+// telemetry stream and the static /web-ui/ assets stay public. With no token
+// configured the dashboard is open (dev default) and logs a loud warning.
+func dashboardAuth(next http.Handler) http.Handler {
+	token := os.Getenv("DASHBOARD_AUTH_TOKEN")
+	if token == "" {
+		token = os.Getenv("API_AUTH_TOKEN")
+	}
+	if token == "" {
+		slog.Warn("dashboard: no auth token configured — /api/* routes are unauthenticated (dev only)")
+		return next
+	}
+	expected := "Bearer " + token
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.URL.Path, "/api/") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		actual := r.Header.Get("Authorization")
+		if actual == "" || subtle.ConstantTimeCompare([]byte(actual), []byte(expected)) != 1 {
+			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (s *WSServer) handleConnections(w http.ResponseWriter, r *http.Request) {

@@ -42,10 +42,10 @@ func main() {
 		return
 	}
 
-	// 1. Load System Configuration
-	cfg := config.Get()
-	if cfg == nil {
-		log.Fatalf("❌ Failed to initialize configuration")
+	// 1. Load System Configuration (non-panicking: exit cleanly, no stack trace)
+	cfg, err := config.TryGet()
+	if err != nil {
+		log.Fatalf("❌ Failed to initialize configuration: %v", err)
 	}
 
 	// 1.1 Print Elite Banner
@@ -54,7 +54,7 @@ func main() {
   / ____/________ _      __   | |     / / /   |
  / /   / ___/ _ \ | /| / /   | | /| / / /| |
 / /___/ /  / __/ |/ |/ /    | |/ |/ / / ___ |
-\____/_/   \___/|__/|__/     |__/|__/ /_/  |_| v1.0.0 (Stable)
+\____/_/   \___/|__/|__/     |__/|__/ /_/  |_| v0.9.0 (Beta)
                                                `)
 	log.Printf("🛠️  Engine: Gocrewwai | Mode: Multi-Service Orchestrator")
 	log.Printf("📂 Config: %s", os.Getenv("CREW_CONFIG_PATH"))
@@ -171,6 +171,8 @@ func main() {
 	go func() {
 		<-quit
 		log.Println("Shutting down...")
+		meshServer.Stop()
+		api.StopMeshServers()
 		server.Shutdown()
 		shutdown()
 	}()

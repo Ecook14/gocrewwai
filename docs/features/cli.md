@@ -27,7 +27,7 @@ gocrew create my-awesome-project
 ```
 
 ### 2. Live Dashboard & Server
-Launch the backend REST API and the real-time **Glassmorphic Dashboard** to watch your agents' thought processes and handle **Human-in-the-Loop** approvals.
+Launch the backend REST API and the real-time **Dashboard (web/)** to watch your agents' thought processes and handle **Human-in-the-Loop** approvals.
 
 ```bash
 go run cmd/server/main.go --api-port 8080 --web

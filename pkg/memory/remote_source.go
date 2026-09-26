@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/Ecook14/gocrewwai/pkg/api/mesh" // Placeholder for generated code
 )
@@ -27,8 +26,8 @@ func NewRemoteKnowledgeSource(address, collection string, k int) *RemoteKnowledg
 }
 
 func (s *RemoteKnowledgeSource) Query(ctx context.Context, query string) (string, error) {
-	// 1. Dial remote mesh node
-	conn, err := grpc.Dial(s.Address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	// 1. Dial remote mesh node (TLS when MESH_TLS_CA is set, insecure otherwise)
+	conn, err := dialMeshNode(s.Address)
 	if err != nil {
 		return "", fmt.Errorf("failed to connect to remote RAG node at %s: %w", s.Address, err)
 	}
@@ -62,4 +61,10 @@ func (s *RemoteKnowledgeSource) Query(ctx context.Context, query string) (string
 	}
 
 	return builder.String(), nil
+}
+
+// dialMeshNode mirrors the mesh client credential policy without importing
+// pkg/api (which would create an import cycle: api imports memory).
+func dialMeshNode(address string) (*grpc.ClientConn, error) {
+	return mesh.DialNode(address)
 }

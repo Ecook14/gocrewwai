@@ -66,6 +66,9 @@ func (t *JSONParseTool) Execute(ctx context.Context, input map[string]interface{
 }
 
 func (t *JSONParseTool) CacheFunction(input map[string]interface{}) string {
+	if p, ok := input["file_path"].(string); ok && p != "" {
+		return "JSONParseTool:" + p
+	}
 	return ""
 }
 

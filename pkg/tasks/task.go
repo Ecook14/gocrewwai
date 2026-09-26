@@ -12,6 +12,7 @@ import (
 	"github.com/Ecook14/gocrewwai/pkg/i18n"
 	"github.com/Ecook14/gocrewwai/pkg/telemetry"
 	"github.com/Ecook14/gocrewwai/pkg/tools"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -72,6 +73,11 @@ type Task struct {
 	// Advanced Quality-of-Life Mappings
 	Context    []*Task `json:"-"` // Strict outputs to pipe into this task's prompt
 	HumanInput bool    `json:"-"` // Blocks CLI execution for mid-flight approval/feedback
+
+	// Stdin/Stdout back the HITL prompts. Nil means os.Stdin/os.Stdout,
+	// so CLI behavior is unchanged; tests inject buffers.
+	Stdin  io.Reader `json:"-"`
+	Stdout io.Writer `json:"-"`
 
 	// Guardrails validate task output before marking it as complete.
 	Guardrails []guardrails.Guardrail `json:"-"`
@@ -146,6 +152,67 @@ func New(cfg TaskConfig) *Task {
 }
 
 // Execute kicks off the Task lifecycle utilizing the bound Agent.
+// taskIn/taskOut resolve the HITL streams, defaulting to process stdio.
+func (t *Task) taskIn() io.Reader {
+	if t.Stdin != nil {
+		return t.Stdin
+	}
+	return os.Stdin
+}
+
+func (t *Task) taskOut() io.Writer {
+	if t.Stdout != nil {
+		return t.Stdout
+	}
+	return os.Stdout
+}
+
+// applyPreHumanFeedback runs the pre-execution HITL gate, folding any human
+// feedback into the task description.
+func (t *Task) applyPreHumanFeedback(baseDescription string) string {
+	slog.Info("[🤖 HITL PAUSE] Agent is about to execute task", slog.String("role", t.Agent.GetRole()), slog.String("description", baseDescription))
+	fmt.Fprint(t.taskOut(), "Please provide feedback or press Enter to approve as-is: ")
+
+	reader := bufio.NewReader(t.taskIn())
+	input, err := reader.ReadString('\n')
+	if err == nil {
+		input = strings.TrimSpace(input)
+		if input != "" {
+			baseDescription += fmt.Sprintf("\n\nHUMAN FEEDBACK OVERRIDE: %s", input)
+			fmt.Fprintln(t.taskOut(), "[✅ Feedback Injected]")
+		} else {
+			fmt.Fprintln(t.taskOut(), "[✅ Approved]")
+		}
+	}
+	return baseDescription
+}
+
+// applyPostHumanReview runs the post-execution HITL gate, allowing output override.
+func (t *Task) applyPostHumanReview(result interface{}) interface{} {
+	slog.Info("[🤖 HITL REVIEW] Agent finished task", slog.String("role", t.Agent.GetRole()), slog.Any("result", result))
+	fmt.Fprint(t.taskOut(), "Press Enter to approve, or type 'edit' to modify the output: ")
+
+	reader := bufio.NewReader(t.taskIn())
+	input, _ := reader.ReadString('\n')
+	input = strings.TrimSpace(input)
+
+	if input == "edit" {
+		fmt.Fprintln(t.taskOut(), "Please enter the new final output (type 'EOF' on a new line to finish):")
+		var newOutput strings.Builder
+		for {
+			line, _ := reader.ReadString('\n')
+			if strings.TrimSpace(line) == "EOF" {
+				break
+			}
+			newOutput.WriteString(line)
+		}
+		result = strings.TrimSpace(newOutput.String())
+		t.Output = result
+		fmt.Fprintln(t.taskOut(), "[✅ Output Manually Overridden]")
+	}
+	return result
+}
+
 func (t *Task) Execute(ctx context.Context) (interface{}, error) {
 	if t.Agent == nil {
 		return nil, crewErrors.ErrNoAgent
@@ -205,20 +272,7 @@ func (t *Task) Execute(ctx context.Context) (interface{}, error) {
 
 	// 3. Process Human-in-the-Loop (HITL) blocking
 	if t.HumanInput {
-		slog.Info("[🤖 HITL PAUSE] Agent is about to execute task", slog.String("role", t.Agent.GetRole()), slog.String("description", baseDescription))
-		fmt.Print("Please provide feedback or press Enter to approve as-is: ")
-
-		reader := bufio.NewReader(os.Stdin)
-		input, err := reader.ReadString('\n')
-		if err == nil {
-			input = strings.TrimSpace(input)
-			if input != "" {
-				baseDescription += fmt.Sprintf("\n\nHUMAN FEEDBACK OVERRIDE: %s", input)
-				fmt.Println("[✅ Feedback Injected]")
-			} else {
-				fmt.Println("[✅ Approved]")
-			}
-		}
+		baseDescription = t.applyPreHumanFeedback(baseDescription)
 	}
 
 	options := make(map[string]interface{})
@@ -330,27 +384,7 @@ func (t *Task) Execute(ctx context.Context) (interface{}, error) {
 
 	// 5. Post-Execution HITL: Review and Edit Result
 	if t.HumanInput {
-		slog.Info("[🤖 HITL REVIEW] Agent finished task", slog.String("role", t.Agent.GetRole()), slog.Any("result", result))
-		fmt.Print("Press Enter to approve, or type 'edit' to modify the output: ")
-
-		reader := bufio.NewReader(os.Stdin)
-		input, _ := reader.ReadString('\n')
-		input = strings.TrimSpace(input)
-
-		if input == "edit" {
-			fmt.Println("Please enter the new final output (type 'EOF' on a new line to finish):")
-			var newOutput strings.Builder
-			for {
-				line, _ := reader.ReadString('\n')
-				if strings.TrimSpace(line) == "EOF" {
-					break
-				}
-				newOutput.WriteString(line)
-			}
-			result = strings.TrimSpace(newOutput.String())
-			t.Output = result
-			fmt.Println("[✅ Output Manually Overridden]")
-		}
+		result = t.applyPostHumanReview(result)
 	}
 
 	// Publish system event

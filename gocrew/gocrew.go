@@ -12,7 +12,7 @@
 //	mem := gocrew.NewMemory(store, llmClient, nil)
 //	f := gocrew.NewFlow(nil)
 //
-// Gocrewwai v0.9.0 — 31 core packages, 57 built-in tools, 7 LLM providers,
+// Gocrewwai v0.9.0 — 30 core packages, 57 built-in tools, 7 LLM providers,
 // 12 memory store types, 6 orchestration modes, full OTEL observability,
 // MCP+A2A+WebMCP protocols, Docker+WASM sandboxing.
 package gocrew
@@ -33,6 +33,7 @@ import (
 	"github.com/Ecook14/gocrewwai/pkg/flow"
 	"github.com/Ecook14/gocrewwai/pkg/flows"
 	"github.com/Ecook14/gocrewwai/pkg/guardrails"
+	"github.com/Ecook14/gocrewwai/pkg/i18n"
 	"github.com/Ecook14/gocrewwai/pkg/knowledge"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/memory"
@@ -40,7 +41,6 @@ import (
 	"github.com/Ecook14/gocrewwai/pkg/tasks"
 	"github.com/Ecook14/gocrewwai/pkg/testing"
 	"github.com/Ecook14/gocrewwai/pkg/tools"
-	"github.com/Ecook14/gocrewwai/pkg/i18n"
 )
 
 // ============================================================
@@ -536,6 +536,11 @@ func NewCodeInterpreter(safe bool) *tools.CodeInterpreterTool {
 	return tools.NewCodeInterpreterTool(tools.WithSafeMode(safe))
 }
 
+// NewCodeInterpreterTool creates a code execution tool with default options.
+func NewCodeInterpreterTool() *tools.CodeInterpreterTool {
+	return tools.NewCodeInterpreterTool()
+}
+
 // NewFileReadTool creates a file reading tool.
 func NewFileReadTool(chroot ...string) tools.Tool {
 	path := ""
@@ -569,8 +574,8 @@ func NewDirectoryTool(root string, depth int, allowAbs bool) tools.Tool {
 }
 
 // NewAskHumanTool creates a tool for requesting human approval.
-func NewAskHumanTool(enabled bool) tools.Tool {
-	return tools.NewAskHumanTool(enabled)
+func NewAskHumanTool(enabled bool, opts ...func(*tools.AskHumanTool)) tools.Tool {
+	return tools.NewAskHumanTool(enabled, opts...)
 }
 
 // NewExaTool creates an Exa AI search tool.
@@ -631,6 +636,11 @@ func NewDockerSandbox(image string, safe bool) (Tool, error) {
 // NewRedisCache creates a Redis-backed LLM cache.
 func NewRedisCache(addr, password string, db int, ttl time.Duration) (*llm.RedisCache, error) {
 	return llm.NewRedisCache(addr, password, db, ttl)
+}
+
+// NewFileCache creates a file-backed LLM cache in dir.
+func NewFileCache(dir string) *llm.FileCache {
+	return llm.NewFileCache(dir)
 }
 
 // SandboxConfig holds Docker sandbox configuration.

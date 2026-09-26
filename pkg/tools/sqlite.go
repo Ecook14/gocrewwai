@@ -16,6 +16,8 @@ type SQLiteTool struct {
 	db     *sql.DB
 }
 
+var _ Tool = (*SQLiteTool)(nil)
+
 // NewSQLiteTool creates a new SQLite tool with the given database path.
 func NewSQLiteTool(dbPath string) (*SQLiteTool, error) {
 	if dbPath == "" {
@@ -56,7 +58,12 @@ func (t *SQLiteTool) Execute(ctx context.Context, input map[string]interface{}) 
 	return t.executeExec(ctx, query)
 }
 
-func (t *SQLiteTool) CacheFunction(input map[string]interface{}) string { return "" }
+func (t *SQLiteTool) CacheFunction(input map[string]interface{}) string {
+	if q, ok := input["query"].(string); ok && q != "" {
+		return "SQLiteTool:" + t.DBPath + ":" + q
+	}
+	return ""
+}
 
 func (t *SQLiteTool) executeSelect(ctx context.Context, query string) (string, error) {
 	rows, err := t.db.QueryContext(ctx, query)

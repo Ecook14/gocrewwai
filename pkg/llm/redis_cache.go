@@ -3,6 +3,7 @@ package llm
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -49,7 +50,7 @@ func (c *RedisCache) Get(key string) (string, bool) {
 	if err == redis.Nil {
 		return "", false
 	} else if err != nil {
-		fmt.Printf("Redis Get error: %v\n", err)
+		slog.Warn("llm cache: redis get failed", slog.String("error", err.Error()))
 		return "", false
 	}
 	return val, true

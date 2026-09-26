@@ -11,6 +11,9 @@ import (
 	"time"
 )
 
+// maxShellOutputSize caps captured shell output to avoid memory exhaustion.
+const maxShellOutputSize = 50 * 1024
+
 // ShellTool allows agents to execute shell commands on the host system.
 // This tool is inherently dangerous and always requires human review.
 // Only commands whose basename matches an entry in AllowedCommands are permitted.
@@ -126,6 +129,15 @@ func (t *ShellTool) Execute(ctx context.Context, input map[string]interface{}) (
 		}
 	}
 
+	// Shell metacharacters allow smuggling extra commands past the
+	// command-word whitelist (e.g. `echo hi; rm -rf /`, `$(...)`, backticks,
+	// pipes). The tool executes via `sh -c`, so any metachar is a bypass
+	// vector regardless of which command word matched. Reject them outright.
+	const shellMetachars = ";|&$`()<>\\\n"
+	if strings.ContainsAny(command, shellMetachars) {
+		return "", fmt.Errorf("command contains shell metacharacters; only a single simple command is permitted")
+	}
+
 	// Parse timeout
 	timeout := t.DefaultTimeout
 	if ts, ok := input["timeout"].(float64); ok && ts > 0 {
@@ -173,8 +185,8 @@ func (t *ShellTool) Execute(ctx context.Context, input map[string]interface{}) (
 
 	// Truncate very long output
 	output := result.String()
-	if len(output) > 50000 {
-		output = output[:50000] + "\n... [output truncated at 50KB]"
+	if len(output) > maxShellOutputSize {
+		output = output[:maxShellOutputSize] + "\n... [output truncated at 50KB]"
 	}
 
 	return output, nil
