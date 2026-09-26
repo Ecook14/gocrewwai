@@ -106,3 +106,8 @@ func (t *ExaTool) Execute(ctx context.Context, input map[string]interface{}) (st
 
 func (t *ExaTool) Name() string        { return t.BaseTool.NameValue }
 func (t *ExaTool) Description() string { return t.BaseTool.DescriptionValue }
+
+// RequiresReview gates outbound search on agent-influenced queries.
+func (t *ExaTool) RequiresReview() bool { return true }
+
+var _ Tool = (*ExaTool)(nil)

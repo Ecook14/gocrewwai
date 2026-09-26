@@ -159,3 +159,5 @@ func (j *JiraTool) listProjects(ctx context.Context) (string, error) {
 func (j *JiraTool) RequiresReview() bool { return true }
 func (j *JiraTool) Name() string         { return j.BaseTool.NameValue }
 func (j *JiraTool) Description() string  { return j.BaseTool.DescriptionValue }
+
+var _ Tool = (*JiraTool)(nil)

@@ -26,18 +26,20 @@ type MyState struct {
 
 func main() {
     // 1. Initialize Flow with Initial State and Persistence
-    flow := gocrew.NewTypedFlow(MyState{Topic: "AI Agents", IsDraft: true})
-    flow.SetPersistence(sqliteStore)
+    flow := gocrew.NewTypedFlow(MyState{Topic: "AI Agents", IsDraft: true}).WithPersistence(
+        "pr-review-1042",
+        gocrew.NewJSONFilePersistence("./db/checkpoints"),
+    )
 
     // 2. Add Processing Nodes
-    flow.AddNode("research", func(ctx context.Context, s *MyState) error {
+    flow.AddNode(func(ctx context.Context, s MyState) (MyState, error) {
         // Run a crew here and update state
         s.Result = "Research Completed"
-        return nil
+        return s, nil
     })
 
     // 3. Kickoff Flow
-    flow.Start(ctx)
+    out, err := flow.Kickoff(ctx)
 }
 ```
 
@@ -47,12 +49,12 @@ func main() {
 Flows automatically save their state after every node execution using LangGraph-style checkpointing. If a process crashes or is interrupted, you can resume precisely from the last successful node using a `ThreadID`.
 
 ```go
-// Intialize a Checkpointer backed by PostgreSQL or SQLite
-ckpt := gocrew.NewSQLiteCheckpointer("./db/checkpoints.db")
-flow.SetCheckpointer(ckpt)
-
-// Run the flow specifying a ThreadID
-flow.Start(ctx, gocrew.FlowConfig{ThreadID: "pr-review-1042"})
+// Back a typed flow with file persistence under a stable flow ID.
+flow := gocrew.NewTypedFlow(MyState{Topic: "AI Agents"}).WithPersistence(
+    "pr-review-1042",
+    gocrew.NewJSONFilePersistence("./db/checkpoints"),
+)
+out, err := flow.Kickoff(ctx)
 ```
 
 ### 👤 2. Human-in-the-Loop (HITL)

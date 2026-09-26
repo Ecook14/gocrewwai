@@ -53,16 +53,9 @@ To spin up a remote agent that can receive tasks over the network:
 // 1. Configure the Remote Agent Node
 specialist := gocrew.NewAgent(gocrew.AgentConfig{
     Role:    "Remote CyberSec Analyst",
-    A2APort: 9090, // Bind to port 9090
-    A2AAuth: gocrew.A2AAuthConfig{
-        RequireMTLS: true,
-        CertDir:     "/etc/gocrew/certs",
-        Token:       os.Getenv("A2A_BEARER_TOKEN"),
-    },
+    A2APort: 9090, // Serves A2A on port 9090 once the crew runs
+    A2AAuthToken: os.Getenv("A2A_BEARER_TOKEN"),
 })
-
-// 2. Start the listener (Blocks)
-go specialist.StartA2AListener()
 ```
 
 Once running, another agent on a completely different server can connect to it using the Remote API via the `POST /api/create/a2a` bridge.

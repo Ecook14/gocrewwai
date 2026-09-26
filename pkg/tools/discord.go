@@ -115,3 +115,5 @@ func (d *DiscordTool) editMessage(ctx context.Context, msgID, newMessage string)
 func (d *DiscordTool) RequiresReview() bool { return true }
 func (d *DiscordTool) Name() string         { return d.BaseTool.NameValue }
 func (d *DiscordTool) Description() string  { return d.BaseTool.DescriptionValue }
+
+var _ Tool = (*DiscordTool)(nil)

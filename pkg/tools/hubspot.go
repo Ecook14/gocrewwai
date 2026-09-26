@@ -165,3 +165,5 @@ func (h *HubSpotTool) createCompany(ctx context.Context, name string) (string, e
 func (h *HubSpotTool) RequiresReview() bool { return true }
 func (h *HubSpotTool) Name() string         { return h.BaseTool.NameValue }
 func (h *HubSpotTool) Description() string  { return h.BaseTool.DescriptionValue }
+
+var _ Tool = (*HubSpotTool)(nil)

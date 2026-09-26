@@ -126,3 +126,5 @@ func (t *TavilyTool) Execute(ctx context.Context, input map[string]interface{}) 
 func (t *TavilyTool) RequiresReview() bool { return true }
 func (t *TavilyTool) Name() string         { return t.BaseTool.NameValue }
 func (t *TavilyTool) Description() string  { return t.BaseTool.DescriptionValue }
+
+var _ Tool = (*TavilyTool)(nil)

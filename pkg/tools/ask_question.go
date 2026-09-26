@@ -50,3 +50,5 @@ func (t *AskQuestionTool) Execute(ctx context.Context, input map[string]interfac
 func (t *AskQuestionTool) RequiresReview() bool { return false }
 func (t *AskQuestionTool) Name() string         { return t.BaseTool.NameValue }
 func (t *AskQuestionTool) Description() string  { return t.BaseTool.DescriptionValue }
+
+var _ Tool = (*AskQuestionTool)(nil)

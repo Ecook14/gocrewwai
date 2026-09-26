@@ -93,3 +93,5 @@ func (b *BraveSearchTool) Execute(ctx context.Context, input map[string]interfac
 func (b *BraveSearchTool) RequiresReview() bool { return true } // Outbound search with agent-influenced query
 func (b *BraveSearchTool) Name() string         { return b.BaseTool.NameValue }
 func (b *BraveSearchTool) Description() string  { return b.BaseTool.DescriptionValue }
+
+var _ Tool = (*BraveSearchTool)(nil)

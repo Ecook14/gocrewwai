@@ -158,6 +158,11 @@ func (t *ElasticsearchTool) Execute(ctx context.Context, input map[string]interf
 func (t *ElasticsearchTool) Name() string        { return t.BaseTool.NameValue }
 func (t *ElasticsearchTool) Description() string { return t.BaseTool.DescriptionValue }
 
+// RequiresReview gates queries against an external cluster.
+func (t *ElasticsearchTool) RequiresReview() bool { return true }
+
+var _ Tool = (*ElasticsearchTool)(nil)
+
 func prettyJSON(data []byte) string {
 	var buf bytes.Buffer
 	if json.Indent(&buf, data, "", "  ") == nil {

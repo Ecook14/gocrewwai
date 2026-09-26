@@ -161,3 +161,5 @@ func (s *SupabaseTool) rpc(ctx context.Context, fn string, params map[string]int
 func (s *SupabaseTool) RequiresReview() bool { return true }
 func (s *SupabaseTool) Name() string         { return s.BaseTool.NameValue }
 func (s *SupabaseTool) Description() string  { return s.BaseTool.DescriptionValue }
+
+var _ Tool = (*SupabaseTool)(nil)

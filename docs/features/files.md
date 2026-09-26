@@ -26,13 +26,10 @@ Pass the file-related tools to your agent and define a task that requires file i
 
 ```go
 // 1. Establish a Security Chroot
-sandbox := gocrew.NewChroot("/var/data/gocrew/workspace")
+chroot := "/var/data/gocrew/workspace"
 
 // 2. Wrap file tools in the Chroot
-fileTool := gocrew.NewFileReadTool(gocrew.FileConfig{
-    Chroot: sandbox,
-    AllowWrite: true,
-})
+fileTool := gocrew.NewFileReadTool(chroot)
 
 agent := gocrew.NewAgent(gocrew.AgentConfig{
     Tools: []gocrew.Tool{fileTool, gocrew.NewPDFTool()},

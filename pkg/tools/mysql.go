@@ -114,3 +114,5 @@ func (t *MySQLTool) RequiresReview() bool { return true }
 func (t *MySQLTool) Name() string         { return t.BaseTool.NameValue }
 func (t *MySQLTool) Description() string  { return t.BaseTool.DescriptionValue }
 func (t *MySQLTool) Close() error         { return t.db.Close() }
+
+var _ Tool = (*MySQLTool)(nil)

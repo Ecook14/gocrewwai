@@ -78,3 +78,5 @@ func (t *NativeRAGTool) Execute(ctx context.Context, input map[string]interface{
 func (t *NativeRAGTool) RequiresReview() bool { return false }
 func (t *NativeRAGTool) Name() string         { return t.BaseTool.NameValue }
 func (t *NativeRAGTool) Description() string  { return t.BaseTool.DescriptionValue }
+
+var _ Tool = (*NativeRAGTool)(nil)

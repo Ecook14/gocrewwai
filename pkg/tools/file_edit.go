@@ -15,6 +15,8 @@ type FileEditTool struct {
 	Chroot string
 }
 
+var _ Tool = (*FileEditTool)(nil)
+
 func NewFileEditTool(chroot string) *FileEditTool {
 	return &FileEditTool{
 		BaseTool: BaseTool{
@@ -64,3 +66,6 @@ func (t *FileEditTool) Execute(ctx context.Context, input map[string]interface{}
 
 	return fmt.Sprintf("Successfully updated %s. Applied patch to block starting at byte %d.", filepath.Base(safePath), start), nil
 }
+
+// RequiresReview gates file modification — always human-approved.
+func (t *FileEditTool) RequiresReview() bool { return true }

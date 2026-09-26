@@ -15,7 +15,7 @@ While many AI tools remain in the Python ecosystem, we chose **Go** for its inhe
 
 1. **⚡ Massive Concurrency**: Go's native goroutines allow hundreds of agents to work, fetch data, and reason in true parallel without the bottlenecks of a Global Interpreter Lock (GIL).
 2. **🛡️ Rock-Solid Reliability**: Eliminate random `KeyError` crashes. Every LLM response is strictly unmarshaled into your Go structs with type-safe guarantees.
-3. **🧠 Elite Memory & State**: Built-in, vector-indexed memory (11 backends: SQLite, Redis, Chroma, Pinecone, Qdrant, Weaviate, InMemCosine, Conversation, Entity, ShortTerm, LongTerm) and durable flow persistence (Checkpoints/Time-Travel).
+3. **🧠 Elite Memory & State**: Built-in, vector-indexed memory (12 backends: SQLite, Redis, Chroma, Pinecone, Qdrant, Weaviate, InMemCosine, InMemEntity, Conversation, Entity, ShortTerm, LongTerm) and durable flow persistence (Checkpoints/Time-Travel).
 4. **Single-Binary Deployment**: Compile your entire orchestrator into a tiny, zero-dependency binary. Drop it in a container or on an edge device and it just works.
 
 ---
@@ -35,10 +35,10 @@ Agents can reflect on their own work using internal reflection loops or peer-rev
 Standardized, vendor-neutral tracing with built-in OTEL integration. Track every agent thought, tool execution, and token cost with high fidelity.
 
 ### 🌐 5. Model Context Protocol (MCP) & Discovery
-Seamlessly connect your agents to external tools and knowledge sources via the standardized MCP protocol. Native support for local and remote MCP servers with auto-discovery.
+Seamlessly connect your agents to external tools and knowledge sources via the standardized MCP protocol. Native support for local and remote MCP servers with peer health-checks.
 
 ### 🤖 6. Agent-to-Agent (A2A) Protocols
-Enable true decentralized swarm intelligence. Agents can discover each other on the network, negotiate tasks, and collaborate autonomously using standardized communication protocols.
+Enable true decentralized swarm intelligence. Agents negotiate tasks and collaborate autonomously using standardized communication protocols, with peer health-checks between known nodes.
 
 ### 🛡️ 7. Security-First Tooling
 - **Docker sandboxing**: Code execution runs in hardened containers (--network none, --cap-drop ALL, --read-only, --user 1000:1000, --pids-limit).
@@ -67,6 +67,7 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 
 	"github.com/Ecook14/gocrewwai/gocrew"
 )
@@ -109,7 +110,7 @@ func main() {
 	}
 
 	// If you configured OutputJSON on the task, extract it:
-	// summary := gocrew.GetOutput[SummaryResult](result)
+	// summary := gocrew.GetOutput[SummaryResult](task)
 }
 ```
 
@@ -168,7 +169,7 @@ gocrewwai/
 │   │   ├── agents/        # Agent definitions and lifecycle
 │   │   ├── crew/          # Crew orchestration + checkpoint stores (SQLite/Redis)
 │   │   ├── llm/           # LLM clients (OpenAI, Anthropic, Gemini, Groq, OpenRouter, Ollama, Failover) and caching
-│   │   ├── memory/        # Unified memory with vector search (11 backends: SQLite, Redis, Chroma, Pinecone, Qdrant, Weaviate, InMemCosine, Conversation, Entity, ShortTerm, LongTerm)
+│   │   ├── memory/        # Unified memory with vector search (12 backends: SQLite, Redis, Chroma, Pinecone, Qdrant, Weaviate, InMemCosine, InMemEntity, Conversation, Entity, ShortTerm, LongTerm)
 │   │   ├── tools/         # 57 built-in tools (search, browser, DB, code interp, SaaS integrations)
 │   │   ├── api/           # Gin REST API + gRPC mesh server
 │   │   ├── flow/          # Multi-crew orchestration flows

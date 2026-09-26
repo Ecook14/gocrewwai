@@ -64,3 +64,8 @@ func (t *WolframAlphaTool) Execute(ctx context.Context, input map[string]interfa
 
 func (t *WolframAlphaTool) Name() string        { return t.BaseTool.NameValue }
 func (t *WolframAlphaTool) Description() string { return t.BaseTool.DescriptionValue }
+
+// RequiresReview gates outbound queries carrying agent-influenced input.
+func (t *WolframAlphaTool) RequiresReview() bool { return true }
+
+var _ Tool = (*WolframAlphaTool)(nil)

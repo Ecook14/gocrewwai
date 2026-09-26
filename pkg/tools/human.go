@@ -82,3 +82,5 @@ func (t *AskHumanTool) Execute(ctx context.Context, input map[string]interface{}
 
 	return strings.TrimSpace(response), nil
 }
+
+var _ Tool = (*AskHumanTool)(nil)

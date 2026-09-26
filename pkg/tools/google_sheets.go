@@ -126,3 +126,5 @@ func (g *GoogleSheetsTool) clearRange(ctx context.Context, spreadsheetID, rangeN
 func (g *GoogleSheetsTool) RequiresReview() bool { return true }
 func (g *GoogleSheetsTool) Name() string         { return g.BaseTool.NameValue }
 func (g *GoogleSheetsTool) Description() string  { return g.BaseTool.DescriptionValue }
+
+var _ Tool = (*GoogleSheetsTool)(nil)

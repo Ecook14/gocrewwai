@@ -30,8 +30,8 @@ Using the `gocrew` SDK, you can register global event handlers or individual ste
 agent := gocrew.NewAgent(gocrew.AgentConfig{
     Role: "Event-Aware Researcher",
     // 1. Step Callback (Fires on every thought/action)
-    StepCallback: func(event *gocrew.StepEvent) {
-        fmt.Printf("Agent Thought: %s\n", event.Thought)
+    StepCallback: func(step map[string]interface{}) {
+        fmt.Printf("Agent Thought: %v\n", step["thought"])
     },
     // 2. Stream Callback (Fires for every new token)
     StepStreamCallback: func(token string) {

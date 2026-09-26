@@ -103,3 +103,5 @@ func (t *DirectoryTool) Execute(ctx context.Context, input map[string]interface{
 func (t *DirectoryTool) RequiresReview() bool { return false }
 func (t *DirectoryTool) Name() string         { return t.BaseTool.NameValue }
 func (t *DirectoryTool) Description() string  { return t.BaseTool.DescriptionValue }
+
+var _ Tool = (*DirectoryTool)(nil)

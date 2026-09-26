@@ -70,3 +70,5 @@ func (t *FileWriteTool) Name() string         { return t.BaseTool.NameValue }
 func (t *FileWriteTool) Description() string {
 	return "Writes or overwrites the contents of a local file at the given path. DANGEROUS: this tool overwrites files on disk. Input: {'file_path': 'string', 'content': 'string'}. Path is validated against the chroot directory — files outside the chroot cannot be written."
 }
+
+var _ Tool = (*FileWriteTool)(nil)

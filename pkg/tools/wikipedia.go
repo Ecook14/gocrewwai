@@ -59,3 +59,8 @@ func (t *WikipediaTool) Execute(ctx context.Context, input map[string]interface{
 
 func (t *WikipediaTool) Name() string        { return t.BaseTool.NameValue }
 func (t *WikipediaTool) Description() string { return t.BaseTool.DescriptionValue }
+
+// RequiresReview gates outbound fetch of agent-influenced topics.
+func (t *WikipediaTool) RequiresReview() bool { return true }
+
+var _ Tool = (*WikipediaTool)(nil)

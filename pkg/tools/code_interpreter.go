@@ -322,3 +322,5 @@ func (t *CodeInterpreterTool) runBash(ctx context.Context, code string) (string,
 func (t *CodeInterpreterTool) RequiresReview() bool {
 	return t.SafeMode
 }
+
+var _ Tool = (*CodeInterpreterTool)(nil)

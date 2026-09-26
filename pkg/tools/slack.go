@@ -53,3 +53,5 @@ func (t *SlackTool) Execute(ctx context.Context, input map[string]interface{}) (
 func (t *SlackTool) RequiresReview() bool { return true }
 func (t *SlackTool) Name() string         { return t.BaseTool.NameValue }
 func (t *SlackTool) Description() string  { return t.BaseTool.DescriptionValue }
+
+var _ Tool = (*SlackTool)(nil)

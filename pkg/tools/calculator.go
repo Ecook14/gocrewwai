@@ -73,3 +73,5 @@ func evaluateExpression(expr string) (float64, error) {
 		return 0, fmt.Errorf("unsupported operator: %s", op)
 	}
 }
+
+var _ Tool = (*CalculatorTool)(nil)

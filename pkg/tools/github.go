@@ -69,3 +69,5 @@ func (t *GitHubTool) Execute(ctx context.Context, input map[string]interface{}) 
 }
 
 func (t *GitHubTool) RequiresReview() bool { return true }
+
+var _ Tool = (*GitHubTool)(nil)

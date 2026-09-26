@@ -114,3 +114,5 @@ func (t *PostgresTool) RequiresReview() bool { return true } // SQL interaction 
 func (t *PostgresTool) Name() string         { return t.BaseTool.NameValue }
 func (t *PostgresTool) Description() string  { return t.BaseTool.DescriptionValue }
 func (t *PostgresTool) Close() error         { return t.db.Close() }
+
+var _ Tool = (*PostgresTool)(nil)

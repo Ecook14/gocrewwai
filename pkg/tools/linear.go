@@ -108,3 +108,5 @@ func (l *LinearTool) updateIssue(ctx context.Context, issueID string, updates ma
 func (l *LinearTool) RequiresReview() bool { return true }
 func (l *LinearTool) Name() string         { return l.BaseTool.NameValue }
 func (l *LinearTool) Description() string  { return l.BaseTool.DescriptionValue }
+
+var _ Tool = (*LinearTool)(nil)

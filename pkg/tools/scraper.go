@@ -182,3 +182,8 @@ func stripHTMLText(html string) string {
 
 func (t *ScraperTool) Name() string        { return t.BaseTool.NameValue }
 func (t *ScraperTool) Description() string { return t.BaseTool.DescriptionValue }
+
+// RequiresReview gates arbitrary URL fetching (SSRF vector).
+func (t *ScraperTool) RequiresReview() bool { return true }
+
+var _ Tool = (*ScraperTool)(nil)

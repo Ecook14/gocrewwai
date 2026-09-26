@@ -28,6 +28,7 @@ import (
 	"github.com/Ecook14/gocrewwai/pkg/agents"
 	"github.com/Ecook14/gocrewwai/pkg/core"
 	"github.com/Ecook14/gocrewwai/pkg/crew"
+	"github.com/Ecook14/gocrewwai/pkg/delegation"
 	"github.com/Ecook14/gocrewwai/pkg/events"
 	"github.com/Ecook14/gocrewwai/pkg/files"
 	"github.com/Ecook14/gocrewwai/pkg/flow"
@@ -60,6 +61,7 @@ type TaskConfig = tasks.TaskConfig
 // Crew Types
 type Crew = crew.Crew
 type CrewConfig = crew.CrewConfig
+type TrainingFeedback = crew.TrainingFeedback
 
 // LLM Types
 type LLMClient = llm.Client
@@ -122,6 +124,9 @@ type PersistentFlow = flow.PersistentFlow
 type TypedFlow[T any] = flow.TypedFlow[T]
 type TypedNode[T any] = flow.TypedNode[T]
 type HumanFeedbackConfig = flow.HumanFeedbackConfig
+type RouterNode = flow.RouterNode
+type Route = flow.Route
+type Predicate = flow.Predicate
 
 // Knowledge Types
 type KnowledgeConfig = knowledge.Config
@@ -621,6 +626,176 @@ func NewSlackTool(token string) *tools.SlackTool {
 // NewBrowserTool creates an automated browser navigation tool.
 func NewBrowserTool() tools.Tool {
 	return tools.NewBrowserTool()
+}
+
+// NewAskQuestionTool creates a tool that pauses for a human answer.
+func NewAskQuestionTool() *tools.AskQuestionTool {
+	return tools.NewAskQuestionTool()
+}
+
+// NewCodeSandboxTool creates an isolated code execution sandbox tool.
+func NewCodeSandboxTool() *tools.CodeSandboxTool {
+	return tools.NewCodeSandboxTool()
+}
+
+// NewDateTimeTool creates a date/time utility tool.
+func NewDateTimeTool() *tools.DateTimeTool {
+	return tools.NewDateTimeTool()
+}
+
+// NewDelegateWorkTool creates a delegation tool for the given coworkers.
+func NewDelegateWorkTool(coworkers []CoreAgent) *delegation.DelegateWorkTool {
+	return delegation.NewDelegateWorkTool(coworkers)
+}
+
+// NewElasticsearchTool creates an Elasticsearch query tool.
+func NewElasticsearchTool(baseURL string, opts ...func(*tools.ElasticsearchTool)) *tools.ElasticsearchTool {
+	return tools.NewElasticsearchTool(baseURL, opts...)
+}
+
+// NewFailoverClient creates an LLM client that falls back to secondary.
+func NewFailoverClient(primary, secondary llm.Client) *llm.FailoverClient {
+	return llm.NewFailoverClient(primary, secondary, nil)
+}
+
+// NewGoogleSheetsTool creates a Google Sheets integration tool.
+func NewGoogleSheetsTool(token string) *tools.GoogleSheetsTool {
+	return tools.NewGoogleSheetsTool(token)
+}
+
+// NewHubSpotTool creates a HubSpot CRM integration tool.
+func NewHubSpotTool(token string) *tools.HubSpotTool {
+	return tools.NewHubSpotTool(token)
+}
+
+// NewJiraTool creates a Jira integration tool.
+func NewJiraTool(baseURL, email, token string) *tools.JiraTool {
+	return tools.NewJiraTool(baseURL, email, token)
+}
+
+// NewJSONParseTool creates a JSON file parsing tool.
+func NewJSONParseTool(chroot string) *tools.JSONParseTool {
+	return tools.NewJSONParseTool(chroot)
+}
+
+// NewJSONTool creates a JSON utility tool.
+func NewJSONTool() *tools.JSONTool {
+	return tools.NewJSONTool()
+}
+
+// NewLinearTool creates a Linear integration tool.
+func NewLinearTool(token string) *tools.LinearTool {
+	return tools.NewLinearTool(token)
+}
+
+// NewMongoDBTool creates a MongoDB integration tool.
+func NewMongoDBTool(endpoint, apiKey, dataSource, database string) *tools.MongoDBTool {
+	return tools.NewMongoDBTool(endpoint, apiKey, dataSource, database)
+}
+
+// NewMySQLTool creates a MySQL integration tool.
+func NewMySQLTool(dsn string) (*tools.MySQLTool, error) {
+	return tools.NewMySQLTool(dsn)
+}
+
+// NewNotionTool creates a Notion integration tool.
+func NewNotionTool(token string) *tools.NotionTool {
+	return tools.NewNotionTool(token)
+}
+
+// NewPostgresTool creates a Postgres integration tool.
+func NewPostgresTool(connStr string) (*tools.PostgresTool, error) {
+	return tools.NewPostgresTool(connStr)
+}
+
+// NewRegexTool creates a regex utility tool.
+func NewRegexTool() *tools.RegexTool {
+	return tools.NewRegexTool()
+}
+
+// NewS3Tool creates an S3-compatible object storage tool.
+func NewS3Tool(endpoint, accessKey, secretKey, region string) *tools.S3Tool {
+	return tools.NewS3Tool(endpoint, accessKey, secretKey, region)
+}
+
+// NewScrapeWebsiteTool creates a simple website text scraping tool.
+func NewScrapeWebsiteTool() *tools.ScrapeWebsiteTool {
+	return tools.NewScrapeWebsiteTool()
+}
+
+// NewSendGridTool creates a SendGrid email tool.
+func NewSendGridTool(apiKey string) *tools.SendGridTool {
+	return tools.NewSendGridTool(apiKey)
+}
+
+// NewSQLiteTool creates a SQLite database tool.
+func NewSQLiteTool(dbPath string) (*tools.SQLiteTool, error) {
+	return tools.NewSQLiteTool(dbPath)
+}
+
+// NewSupabaseTool creates a Supabase integration tool.
+func NewSupabaseTool(url, apiKey, table string) *tools.SupabaseTool {
+	return tools.NewSupabaseTool(url, apiKey, table)
+}
+
+// NewTavilyTool creates a Tavily search tool.
+func NewTavilyTool(apiKey string) *tools.TavilyTool {
+	return tools.NewTavilyTool(apiKey)
+}
+
+// NewTwilioTool creates a Twilio SMS tool.
+func NewTwilioTool(accountSID, authToken string) *tools.TwilioTool {
+	return tools.NewTwilioTool(accountSID, authToken)
+}
+
+// NewWASMSandboxTool creates a WASM sandbox execution tool.
+func NewWASMSandboxTool(ctx context.Context) *tools.WASMSandboxTool {
+	return tools.NewWASMSandboxTool(ctx)
+}
+
+// NewBraveTool creates a Brave Search tool.
+func NewBraveTool(apiKey string) *tools.BraveSearchTool {
+	return tools.NewBraveSearchTool(apiKey)
+}
+
+// NewCSVTool creates a CSV file reading tool.
+func NewCSVTool(chroot string) *tools.CSVReadTool {
+	return tools.NewCSVReadTool(chroot)
+}
+
+// NewExcelTool creates an Excel file reading tool.
+func NewExcelTool(chroot string) *tools.ExcelReadTool {
+	return tools.NewExcelReadTool(chroot)
+}
+
+// NewHTMLTool creates an HTML file reading tool.
+func NewHTMLTool(chroot string) *tools.HTMLReadTool {
+	return tools.NewHTMLReadTool(chroot)
+}
+
+// NewXMLTool creates an XML file reading tool.
+func NewXMLTool(chroot string) *tools.XMLReadTool {
+	return tools.NewXMLReadTool(chroot)
+}
+
+// NewYamlTool creates a YAML file reading tool.
+func NewYamlTool(chroot string) *tools.YAMLReadTool {
+	return tools.NewYAMLReadTool(chroot)
+}
+
+// NewHTTPClientTool creates an HTTP client tool with SSRF protection.
+func NewHTTPClientTool(opts ...func(*tools.HTTPTool)) *tools.HTTPTool {
+	return tools.NewHTTPTool(opts...)
+}
+
+// NewRagTool creates a native RAG search tool.
+func NewRagTool(mem *memory.LongTermMemory, dir string) *tools.NativeRAGTool {
+	return tools.NewNativeRAGTool(mem, dir)
+}
+
+// NewPDFFile creates a PDF text extraction tool for the given scope.
+func NewPDFFile(source string) *tools.PDFReadTool {
+	return tools.NewPDFReadTool(source)
 }
 
 // NewDockerSandbox creates a Docker sandbox tool that executes code in an isolated container.

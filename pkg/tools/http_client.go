@@ -267,3 +267,5 @@ func (t *HTTPTool) isBlockedIP(ip net.IP) bool {
 	}
 	return false
 }
+
+var _ Tool = (*HTTPTool)(nil)

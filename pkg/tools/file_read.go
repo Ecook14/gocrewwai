@@ -52,3 +52,5 @@ func (t *FileReadTool) Execute(ctx context.Context, input map[string]interface{}
 func (t *FileReadTool) RequiresReview() bool { return false }
 func (t *FileReadTool) Name() string         { return t.BaseTool.NameValue }
 func (t *FileReadTool) Description() string  { return t.BaseTool.DescriptionValue }
+
+var _ Tool = (*FileReadTool)(nil)

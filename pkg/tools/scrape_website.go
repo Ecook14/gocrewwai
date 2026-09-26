@@ -162,3 +162,5 @@ func (t *ScrapeWebsiteTool) isBlockedIP(ip net.IP) bool {
 func (t *ScrapeWebsiteTool) RequiresReview() bool { return true }
 func (t *ScrapeWebsiteTool) Name() string         { return t.BaseTool.NameValue }
 func (t *ScrapeWebsiteTool) Description() string  { return t.BaseTool.DescriptionValue }
+
+var _ Tool = (*ScrapeWebsiteTool)(nil)

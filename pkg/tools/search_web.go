@@ -75,6 +75,11 @@ func (t *SearchWebTool) Execute(ctx context.Context, input map[string]interface{
 func (t *SearchWebTool) Name() string        { return t.BaseTool.NameValue }
 func (t *SearchWebTool) Description() string { return t.BaseTool.DescriptionValue }
 
+// RequiresReview gates outbound search on agent-influenced queries.
+func (t *SearchWebTool) RequiresReview() bool { return true }
+
+var _ Tool = (*SearchWebTool)(nil)
+
 // extractSearchResults does a simple extraction of result snippets from DuckDuckGo HTML.
 func extractSearchResults(html string, maxResults int) string {
 	var results []string

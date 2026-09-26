@@ -255,3 +255,7 @@ func (t *RegexTool) Execute(ctx context.Context, input map[string]interface{}) (
 func (t *RegexTool) RequiresReview() bool { return false }
 func (t *RegexTool) Name() string         { return t.BaseTool.NameValue }
 func (t *RegexTool) Description() string  { return t.BaseTool.DescriptionValue }
+
+var _ Tool = (*JSONTool)(nil)
+
+var _ Tool = (*RegexTool)(nil)

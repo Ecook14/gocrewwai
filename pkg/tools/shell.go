@@ -14,6 +14,8 @@ import (
 // maxShellOutputSize caps captured shell output to avoid memory exhaustion.
 const maxShellOutputSize = 50 * 1024
 
+var _ Tool = (*ShellTool)(nil)
+
 // ShellTool allows agents to execute shell commands on the host system.
 // This tool is inherently dangerous and always requires human review.
 // Only commands whose basename matches an entry in AllowedCommands are permitted.
@@ -194,3 +196,6 @@ func (t *ShellTool) Execute(ctx context.Context, input map[string]interface{}) (
 
 func (t *ShellTool) Name() string        { return t.BaseTool.NameValue }
 func (t *ShellTool) Description() string { return t.BaseTool.DescriptionValue }
+
+// RequiresReview gates host command execution — always human-approved.
+func (t *ShellTool) RequiresReview() bool { return true }

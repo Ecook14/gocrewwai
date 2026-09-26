@@ -113,3 +113,5 @@ func (t *MongoDBTool) RequiresReview() bool { return true }
 func (t *MongoDBTool) Name() string         { return t.BaseTool.NameValue }
 func (t *MongoDBTool) Description() string  { return t.BaseTool.DescriptionValue }
 func (t *MongoDBTool) Close() error         { return nil }
+
+var _ Tool = (*MongoDBTool)(nil)

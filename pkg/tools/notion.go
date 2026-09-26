@@ -169,3 +169,5 @@ func (n *NotionTool) queryDatabase(ctx context.Context, dbID string) (string, er
 func (n *NotionTool) RequiresReview() bool { return true }
 func (n *NotionTool) Name() string         { return n.BaseTool.NameValue }
 func (n *NotionTool) Description() string  { return n.BaseTool.DescriptionValue }
+
+var _ Tool = (*NotionTool)(nil)

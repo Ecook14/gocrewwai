@@ -140,20 +140,11 @@ func stripDockerErrors(out string) string {
 func (t *CodeSandboxTool) Name() string         { return t.BaseTool.NameValue }
 func (t *CodeSandboxTool) Description() string  { return t.BaseTool.DescriptionValue }
 func (t *CodeSandboxTool) RequiresReview() bool { return true }
-func (t *CodeSandboxTool) ArgsSchema() map[string]interface{} {
-	return map[string]interface{}{
-		"type": "object",
-		"properties": map[string]interface{}{
-			"language": map[string]interface{}{
-				"type":        "string",
-				"enum":        []string{"python", "javascript", "js"},
-				"description": "Programming language to execute.",
-			},
-			"code": map[string]interface{}{
-				"type":        "string",
-				"description": "Source code to execute.",
-			},
-		},
-		"required": []string{"language", "code"},
+func (t *CodeSandboxTool) ArgsSchema() []ArgSchema {
+	return []ArgSchema{
+		{Name: "language", Type: "string", Description: "Programming language to execute (python, javascript, js).", Required: true},
+		{Name: "code", Type: "string", Description: "Source code to execute.", Required: true},
 	}
 }
+
+var _ Tool = (*CodeSandboxTool)(nil)

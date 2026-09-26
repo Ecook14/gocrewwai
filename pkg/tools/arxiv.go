@@ -88,3 +88,5 @@ func extractTag(content, tag string) string {
 }
 
 func (t *ArxivTool) RequiresReview() bool { return true } // Outbound fetch of agent-influenced URLs
+
+var _ Tool = (*ArxivTool)(nil)

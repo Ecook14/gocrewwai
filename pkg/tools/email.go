@@ -82,3 +82,5 @@ func (t *EmailTool) Execute(ctx context.Context, input map[string]interface{}) (
 func (t *EmailTool) RequiresReview() bool { return true } // Emails should always be reviewed
 func (t *EmailTool) Name() string         { return t.BaseTool.NameValue }
 func (t *EmailTool) Description() string  { return t.BaseTool.DescriptionValue }
+
+var _ Tool = (*EmailTool)(nil)

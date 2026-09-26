@@ -102,3 +102,8 @@ func (t *SerperTool) Execute(ctx context.Context, input map[string]interface{}) 
 
 func (t *SerperTool) Name() string        { return t.BaseTool.NameValue }
 func (t *SerperTool) Description() string { return t.BaseTool.DescriptionValue }
+
+// RequiresReview gates outbound search on agent-influenced queries.
+func (t *SerperTool) RequiresReview() bool { return true }
+
+var _ Tool = (*SerperTool)(nil)

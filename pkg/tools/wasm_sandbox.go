@@ -81,3 +81,5 @@ func (t *WASMSandboxTool) Execute(ctx context.Context, input map[string]interfac
 }
 
 func (t *WASMSandboxTool) RequiresReview() bool { return true }
+
+var _ Tool = (*WASMSandboxTool)(nil)
