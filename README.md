@@ -15,7 +15,7 @@ While many AI tools remain in the Python ecosystem, Go gives Gocrewwai real prod
 
 1. **⚡ Concurrency**: Native goroutines enable true parallel agent execution without a GIL.
 2. **🛡️ Reliability**: Every LLM response is unmarshaled into strictly-typed Go structs — no runtime `KeyError` surprises.
-3. **🧠 Memory & State**: Vector-indexed memory (12 backends) with durable flow persistence (checkpoints / time-travel).
+3. **🧠 Memory & State**: Vector-indexed memory (11 backends) with durable flow persistence (checkpoints / time-travel).
 4. **Single-Binary Deployment**: Compile the full orchestrator into a zero-dependency binary.
 
 ---
