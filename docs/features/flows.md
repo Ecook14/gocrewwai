@@ -9,7 +9,7 @@ Flows in Gocrewwai represent the highest level of orchestration. They allow you 
 
 ---
 
-## 🏗️ The Typed Flow (Elite Style)
+## 🏗️ The Typed Flow 
 
 In Gocrewwai v0.9, flows are built using a revolutionary, typed approach that ensures the source of truth for your data is always consistent.
 
@@ -46,7 +46,7 @@ func main() {
 ## 🧠 Flow 2.0 Feature Highlights
 
 ### 💾 1. Durable Persistence (Checkpoints)
-Flows automatically save their state after every node execution using LangGraph-style checkpointing. If a process crashes or is interrupted, you can resume precisely from the last successful node using a `ThreadID`.
+Flows automatically save their state after every node execution using LangGraph-style checkpointing. If a process crashes or is interrupted, you can resume precisely from the last successful node using the flow ID.
 
 ```go
 // Back a typed flow with file persistence under a stable flow ID.

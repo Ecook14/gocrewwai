@@ -9,7 +9,7 @@ Planning is the pre-execution phase of a Gocrewwai crew where the engine intelli
 
 ---
 
-## 🏗️ Enabling Planning (Elite Style)
+## 🏗️ Enabling Planning 
 
 In Gocrewwai v0.9, planning transforms linear arrays of tasks into an optimized internal Directed Acyclic Graph (DAG). 
 

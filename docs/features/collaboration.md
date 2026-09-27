@@ -34,7 +34,7 @@ In Gocrewwai v0.9, agents can collaborate across the network using the A2A proto
 
 ---
 
-## 🚀 Implementing Collaborative Crews (Elite Style)
+## 🚀 Implementing Collaborative Crews 
 
 ### Standard Hierarchical Coordination
 ```go

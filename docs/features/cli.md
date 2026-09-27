@@ -20,7 +20,7 @@ go install github.com/Ecook14/gocrewwai/cmd/gocrew@latest
 ## 🚀 Key Commands
 
 ### 1. Project Scaffolding (`create`)
-Scaffold a complete, production-ready Gocrewwai project in seconds. This creates a standard folder structure with `src/`, `config/`, and `tools/` using the **Elite Style** configuration.
+Scaffold a complete, production-ready Gocrewwai project in seconds. This creates a standard folder structure with `src/`, `config/`, and `tools/` using the standard configuration.
 
 ```bash
 gocrew create my-awesome-project

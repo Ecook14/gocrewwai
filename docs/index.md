@@ -42,7 +42,7 @@ Explore the core components and features of the Gocrewwai framework through our 
 
 ---
 
-## 💎 Elite Performance Features
+## ⚡ Performance Features
 - **[Planning](./features/planning.md)**: Intelligent task decomposition.
 - **[Collaboration](./features/collaboration.md)**: Delegation and coworker communication.
 - **[Agent Delegation](./features/agent_delegation.md)**: Recursive delegation with loop protection.

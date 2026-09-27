@@ -11,34 +11,34 @@ High-performance, strictly-typed agentic orchestration for the Go ecosystem. Ins
 
 ## 🌟 Why Gocrewwai?
 
-While many AI tools remain in the Python ecosystem, we chose **Go** for its inherent production superpowers:
+While many AI tools remain in the Python ecosystem, Go gives Gocrewwai real production advantages:
 
-1. **⚡ Massive Concurrency**: Go's native goroutines allow hundreds of agents to work, fetch data, and reason in true parallel without the bottlenecks of a Global Interpreter Lock (GIL).
-2. **🛡️ Rock-Solid Reliability**: Eliminate random `KeyError` crashes. Every LLM response is strictly unmarshaled into your Go structs with type-safe guarantees.
-3. **🧠 Elite Memory & State**: Built-in, vector-indexed memory (12 backends: SQLite, Redis, Chroma, Pinecone, Qdrant, Weaviate, InMemCosine, InMemEntity, Conversation, Entity, ShortTerm, LongTerm) and durable flow persistence (Checkpoints/Time-Travel).
-4. **Single-Binary Deployment**: Compile your entire orchestrator into a tiny, zero-dependency binary. Drop it in a container or on an edge device and it just works.
+1. **⚡ Concurrency**: Native goroutines enable true parallel agent execution without a GIL.
+2. **🛡️ Reliability**: Every LLM response is unmarshaled into strictly-typed Go structs — no runtime `KeyError` surprises.
+3. **🧠 Memory & State**: Vector-indexed memory (12 backends) with durable flow persistence (checkpoints / time-travel).
+4. **Single-Binary Deployment**: Compile the full orchestrator into a zero-dependency binary.
 
 ---
 
-## 💎 Elite Features
+## ⚡ Core Features
 
 ### 🛡️ 1. Durable Flows & Checkpoints (LangGraph Parity)
-Gocrewwai provides robust persistence, allowing you to pause, resume, and "time-travel" through long-running agentic workflows. State is automatically checkpointed to SQLite or Redis after every node execution.
+Pause, resume, and time-travel through long-running workflows. State is checkpointed to SQLite or Redis after every node.
 
 ### 👤 2. Human-in-the-Loop (HITL)
-Native support for manual interrupts and approvals. Pause an agent's execution for review and approval through the CLI or the real-time Dashboard (web/).
+Manual interrupts and approvals via CLI or the real-time Dashboard.
 
-### 🛡️ 3. Recursive Self-Correction (CrewAI Parity)
-Agents can reflect on their own work using internal reflection loops or peer-review "Reflective Crews," ensuring 100% adherence to task requirements.
+### 🛡️ 3. Recursive Self-Correction
+Agents reflect on their own work via internal loops or peer-review crews.
 
 ### 📊 4. Native Observability (OpenTelemetry)
-Standardized, vendor-neutral tracing with built-in OTEL integration. Track every agent thought, tool execution, and token cost with high fidelity.
+Vendor-neutral tracing with built-in OTEL integration.
 
 ### 🌐 5. Model Context Protocol (MCP) & Discovery
-Seamlessly connect your agents to external tools and knowledge sources via the standardized MCP protocol. Native support for local and remote MCP servers with peer health-checks.
+Standard MCP protocol with local/remote server support and peer health-checks.
 
 ### 🤖 6. Agent-to-Agent (A2A) Protocols
-Enable true decentralized swarm intelligence. Agents negotiate tasks and collaborate autonomously using standardized communication protocols, with peer health-checks between known nodes.
+Decentralized swarm intelligence with peer health-checks.
 
 ### 🛡️ 7. Security-First Tooling
 - **Docker sandboxing**: Code execution runs in hardened containers (--network none, --cap-drop ALL, --read-only, --user 1000:1000, --pids-limit).
@@ -50,7 +50,7 @@ Enable true decentralized swarm intelligence. Agents negotiate tasks and collabo
 
 ---
 
-## 🚀 Quickstart (Elite Style)
+## 🚀 Quickstart
 
 Initialize your project and install the Gocrewwai SDK:
 
@@ -161,33 +161,44 @@ Dive deep into the Gocrewwai ecosystem with our world-class documentation guides
 
 ```
 gocrewwai/
+├── api/proto/           # Protocol buffers
+├── benchmarks/          # Benchmarks
 ├── cmd/
-│   ├── gocrew/        # CLI entrypoint (gocrew create/run/kickoff)
-│   └── server/        # API server with mesh + dashboard support
-├── gocrew/            # Ergonomic SDK facade (gocrew.NewAgent, gocrew.NewCrew, etc.)
-|   ├── pkg/
-│   │   ├── agents/        # Agent definitions and lifecycle
-│   │   ├── crew/          # Crew orchestration + checkpoint stores (SQLite/Redis)
-│   │   ├── llm/           # LLM clients (OpenAI, Anthropic, Gemini, Groq, OpenRouter, Ollama, Failover) and caching
-│   │   ├── memory/        # Unified memory with vector search (12 backends: SQLite, Redis, Chroma, Pinecone, Qdrant, Weaviate, InMemCosine, InMemEntity, Conversation, Entity, ShortTerm, LongTerm)
-│   │   ├── tools/         # 57 built-in tools (search, browser, DB, code interp, SaaS integrations)
-│   │   ├── api/           # Gin REST API + gRPC mesh server
-│   │   ├── flow/          # Multi-crew orchestration flows
-│   │   ├── knowledge/     # RAG knowledge sources (PDFs, URLs, text, directories, CSV, JSON)
-│   │   ├── events/        # Event bus for cross-component communication
-│   │   ├── guardrails/    # Input/output validation guardrails (10+ types: MaxToken, ContentFilter, Schema, PIIRedaction, Toxicity, LLMReview, Validator, HumanReview, JSONValid, Sanitizer)
-│   │   ├── protocols/     # MCP, A2A, WebMCP protocol implementations
-│   │   ├── sandbox/       # Docker and WASM code sandboxing
-│   │   ├── server/        # Production HTTP server with health/metrics/graceful shutdown
-│   │   ├── telemetry/     # Native OpenTelemetry tracing and metrics
-│   │   ├── config/        # YAML/JSON configuration loading
-│   │   ├── core/          # Core types, interfaces, and primitives
-│   │   ├── errors/        # Structured error types
-│   │   ├── files/         # File abstraction with provider backends
-│   │   ├── i18n/          # Internationalization and localization
-│   │   ├── training/      # Human-in-the-loop training data and advice
-│   │   ├── utils/         # Shared utilities and helpers
-│   │   └── ... (30 core packages total)
+│   ├── gocrew/          # CLI entrypoint
+│   └── server/          # HTTP API & dashboard server
+├── docs/                # Guides + feature docs
+├── examples/            # Demo crews
+├── gocrew/              # SDK facade (gocrew.NewAgent, NewCrew, ...)
+├── internal/            # Private impl (cli, delegation, guardrails)
+├── pkg/
+│   ├── agents/          # Agent definitions & reasoning loops
+│   ├── api/mesh/        # Gin REST + gRPC mesh
+│   ├── compat/          # Compatibility adapters
+│   ├── config/          # YAML/JSON config
+│   ├── core/            # Interfaces, primitives
+│   ├── crew/            # Orchestration engines
+│   ├── delegation/      # A2A internal delegation
+│   ├── dashboard/       # Dashboard APIs
+│   ├── errors/          # Structured errors
+│   ├── events/          # GlobalBus event system
+│   ├── files/           # File abstraction
+│   ├── flow / flows/    # Workflow persistence
+│   ├── guardrails/      # Validation hooks + HITL
+│   ├── i18n/            # Localization
+│   ├── knowledge/       # RAG ingestion
+│   ├── llm/             # Provider clients + caching
+│   ├── memory/          # Vector + entity memory
+│   ├── protocols/       # MCP, A2A, WebMCP
+│   ├── sandbox/         # Docker + WASM sandboxing
+│   ├── server/          # HTTP server, health, metrics
+│   ├── tasks/           # Task lifecycle
+│   ├── telemetry/       # OTEL tracing
+│   ├── testing/         # Test harnesses
+│   ├── tools/           # Built-in tool ecosystem
+│   ├── training/        # HITL training data
+│   └── utils/           # Shared helpers
+├── web/                 # React/Vite Dashboard
+└── web-ui/              # Static embeddable UI
 ```
 
 ---

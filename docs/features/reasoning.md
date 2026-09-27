@@ -25,7 +25,7 @@ The most advanced reasoning pattern in Gocrewwai. Using the `Reflective` process
 
 ---
 
-## 🚀 Implementing Advanced Reasoning (Elite Style)
+## 🚀 Implementing Advanced Reasoning 
 
 Using the `gocrew` SDK, you can enable these advanced patterns with simple declarative configuration:
 

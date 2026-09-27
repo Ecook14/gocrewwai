@@ -21,7 +21,7 @@ Gocrewwai allows agents to consume tools from any remote MCP server with zero co
 
 ---
 
-## 🚀 Connecting to an MCP Server (Elite Style)
+## 🚀 Connecting to an MCP Server 
 
 In Gocrewwai v0.9, MCP servers can be connected directly via the `AgentConfig` using a DSL-like string array:
 

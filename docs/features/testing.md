@@ -22,7 +22,7 @@ By leveraging the native **OpenTelemetry** integration, you can compare the reas
 
 ---
 
-## 🚀 Implementing Agent Tests (Elite Style)
+## 🚀 Implementing Agent Tests 
 
 Using the `gocrew` SDK, you can define and run evaluations with ease:
 

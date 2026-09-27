@@ -31,7 +31,7 @@ By enforcing strictly-typed JSON schemas for agent outputs, Gocrewwai eliminates
 
 ---
 
-## 🚀 Scaling Gocrewwai (Elite Style)
+## 🚀 Scaling Gocrewwai 
 
 ### 🏎️ Parallel Execution
 Leverage Go's goroutines to run hundreds of agents in parallel. Gocrewwai's engine is designed to handle high-concurrency workloads with minimal memory overhead.

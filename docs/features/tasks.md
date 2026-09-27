@@ -9,7 +9,7 @@ Tasks are the specific units of work that your agents must perform. In Gocrewwai
 
 ---
 
-## 🏗️ The Task Config (Elite Style)
+## 🏗️ The Task Config 
 
 In Gocrewwai v0.9, tasks are constructed using the `TaskConfig` struct, providing a clean, declarative interface.
 

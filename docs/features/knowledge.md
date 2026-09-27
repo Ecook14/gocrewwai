@@ -20,7 +20,7 @@ Gocrewwai allows you to import data from a wide range of sources via the `knowle
 || **Text** | `gocrew.NewFile("text", "raw string data")` | Imports raw string data. |
 || **Directory** | `gocrew.NewDirectoryTool("./docs")` | Batch processes all files within a local directory. |
 
-## 🚀 Adding Knowledge to a Crew (Elite Style)
+## 🚀 Adding Knowledge to a Crew 
 
 In Gocrewwai v0.9, knowledge is typically added at the **Crew** level, making it available to all participating agents:
 

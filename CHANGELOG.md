@@ -23,7 +23,7 @@ All notable changes to Gocrewwai will be documented in this file.
 ### ⚡ Resilience & deps
 
 - **LLM circuit breaker** — `WithCircuitBreaker(threshold, cooldown)` on `MiddlewareClient`, fail-fast `ErrCircuitOpen`
-- Dependency upgrades (go 1.25.0 held): mysql 1.10.1, websocket 1.5.3, lib/pq 1.12.3, sqlite3 1.14.52, grpc 1.84.0, go-openai 1.42.1, redis 9.22.0, docker v28, wazero 1.12, slack 0.29, pdf 2026-09
+- Dependency upgrades (go 1.25.0 held): mysql 1.10.1, websocket 1.5.3, lib/pq 1.12.3, sqlite3 1.14.52, grpc 1.84.0, go-openai 1.42.1, redis 9.21.0, docker v28, wazero 1.12, slack 0.29, pdf 2026-09 (redis 9.22.0 skipped: its packaging trips the go1.25 module loader; verified clean on go1.27)
 - SQLite `latest_pointers` table; file checkpoint locking; real CPU metric; HTML single-pass entities
 
 ### ✅ Quality

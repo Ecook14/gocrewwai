@@ -9,7 +9,7 @@ In Gocrewwai, delegation is a core mechanic that allows a lead agent to distribu
 
 ---
 
-## 🏗️ Enabling Delegation (Elite Style)
+## 🏗️ Enabling Delegation 
 
 In Gocrewwai v0.9, delegation is controlled by the `AllowDelegation` flag in your `AgentConfig`.
 

@@ -9,7 +9,7 @@ Tools are the interface between your agents and the outside world. Gocrewwai age
 
 ---
 
-## 🏗️ Built-in Tools (Elite Style)
+## 🏗️ Built-in Tools 
 
 Gocrewwai includes a rich set of production-ready tools available directly via the `gocrew` SDK.
 

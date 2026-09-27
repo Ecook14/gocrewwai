@@ -22,7 +22,7 @@ Gocrewwai's telemetry system is decentralized and vendor-neutral.
 
 ---
 
-## 🚀 Enabling Tracing (Elite Style)
+## 🚀 Enabling Tracing 
 
 Using the `gocrew` SDK, you can enable global tracing with a single line of code. Gocrewwai will automatically generate spans for every agent thought, tool execution, and LLM call:
 

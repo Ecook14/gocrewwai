@@ -1,6 +1,6 @@
 # Gocrewwai: Core Concepts ⚓🏆🚀
 
-Gocrewwai is a high-performance, asynchronous orchestration framework for AI agents, written in idiomatic Go. It is designed to be the "Elite Tier" alternative to Python-based agentic frameworks, providing superior speed, type safety, and production-ready architecture.
+Gocrewwai is a high-performance, asynchronous orchestration framework for AI agents, written in idiomatic Go. It is designed to be a performant alternative to Python-based agentic frameworks, providing superior speed, type safety, and production-ready architecture.
 
 ## ⚓ The Four Pillars of Gocrewwai
 

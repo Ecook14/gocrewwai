@@ -9,7 +9,7 @@ Gocrewwai features advanced, multi-modal file handling capabilities. Agents can 
 
 ---
 
-## 🏗️ Core File Operations (Elite Style)
+## 🏗️ Core File Operations 
 
 Gocrewwai provides specialized tools for common file operations, ensuring that agents can interact with your data safely and efficiently.
 

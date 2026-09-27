@@ -14,7 +14,7 @@ require (
 	github.com/ledongthuc/pdf v0.0.0-20260907135840-6c8c28e0e8a0
 	github.com/lib/pq v1.12.3
 	github.com/mattn/go-sqlite3 v1.14.52
-	github.com/redis/go-redis/v9 v9.22.0
+	github.com/redis/go-redis/v9 v9.21.0
 	github.com/sashabaranov/go-openai v1.42.1
 	github.com/slack-go/slack v0.29.0
 	github.com/tetratelabs/wazero v1.12.0

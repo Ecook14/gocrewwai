@@ -20,7 +20,7 @@ Gocrewwai training is integrated directly into the **Human-in-the-Loop** (HITL) 
 
 ---
 
-## 🚀 Implementing Training Mode (Elite Style)
+## 🚀 Implementing Training Mode 
 
 Using the `gocrew` SDK, you can enable training mode with a single boolean flag:
 

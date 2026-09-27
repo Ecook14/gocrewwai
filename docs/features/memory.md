@@ -22,12 +22,12 @@ This system stores processed insights and general knowledge in a persistent data
 ### 3. Entity Memory
 A specialized system for tracking and recalling specific details about actors (users, agents, companies) across long periods.
 
-### 4. Unified Memory (The Elite Tier)
+### 4. Unified Memory (Unified Memory)
 In Gocrewwai v0.9, we introduce **UnifiedMemory**, which orchestrates all three systems via a single `Remember/Recall/Forget` API. It automatically handles vector embedding, scoring, and context injection.
 
 ---
 
-## 🚀 Persistent Memory Stores (Elite Style)
+## 🚀 Persistent Memory Stores 
 
 Using the `gocrew` SDK, you can initialize and assign vector stores to your agents with simple declarative configuration.
 

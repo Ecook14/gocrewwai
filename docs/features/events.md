@@ -22,7 +22,7 @@ Gocrewwai categorizes events based on the level of orchestration:
 
 ---
 
-## 🚀 Hooking into Events (Elite Style)
+## 🚀 Hooking into Events 
 
 Using the `gocrew` SDK, you can register global event handlers or individual step callbacks:
 

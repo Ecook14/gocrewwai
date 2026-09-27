@@ -9,7 +9,7 @@ Gocrew agents are stateful, goal-oriented entities designed for reliable orchest
 
 ---
 
-## 🏗️ The Agent Config (Elite Style)
+## 🏗️ The Agent Config 
 
 In Gocrewwai v0.9, agents are constructed using the `AgentConfig` struct, providing a clean, declarative interface.
 

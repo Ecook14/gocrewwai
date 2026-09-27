@@ -9,7 +9,7 @@ A Crew is the core orchestration unit in Gocrewwai. It represents a collaborativ
 
 ---
 
-## 🏗️ The Crew Config (Elite Style)
+## 🏗️ The Crew Config 
 
 In Gocrewwai v0.9, crews are constructed using the `CrewConfig` struct, providing a clean, declarative interface.
 
@@ -41,7 +41,7 @@ result, err := myCrew.Kickoff(ctx)
 | **PlanningLLM** | `LLMClient` | LLM specifically for the planning phase. |
 | **StateFile** | `string` | Path for auto-checkpointing (Persistence). |
 | **TrainingDir** | `string` | Directory for training iteration feedback. |
-| **TestLLM** | `LLMClient` | Internal evaluation LLM for elite tier verification. |
+| **TestLLM** | `LLMClient` | Internal evaluation LLM for evaluation LLM verification. |
 | **TaskCooldown** | `Duration` | Delay between tasks to prevent bursty rate limits. |
 
 ### 🧠 The Planning Phase (`Planning: true`)
