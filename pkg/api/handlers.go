@@ -85,18 +85,23 @@ const (
 	idemOpFinish
 )
 
-func (s *Server) doIdem(op idemOp, key, owner, sessionID, status string) {
+// doIdem applies one ledger mutation under the lock and reports whether the
+// op was applied. For idemOpReserve that bool is the load-bearing result: it
+// is an atomic test-and-set, and false means another request already owns the
+// key, so the caller must abort rather than continue as if it had won.
+func (s *Server) doIdem(op idemOp, key, owner, sessionID, status string) bool {
 	if key == "" && op != idemOpFinish {
-		return
+		return false
 	}
 	s.idemMu.Lock()
 	defer s.idemMu.Unlock()
 	switch op {
 	case idemOpReserve:
-		if _, exists := s.idemKeys[key]; !exists {
-			s.idemKeys[key] = &idemEntry{sessionID: sessionID, owner: owner, createdAt: time.Now()}
-			s.idemBySession[sessionID] = key
+		if _, exists := s.idemKeys[key]; exists {
+			return false
 		}
+		s.idemKeys[key] = &idemEntry{sessionID: sessionID, owner: owner, createdAt: time.Now()}
+		s.idemBySession[sessionID] = key
 	case idemOpRelease:
 		if e, ok := s.idemKeys[key]; ok && !e.done {
 			delete(s.idemKeys, key)
@@ -122,14 +127,15 @@ func (s *Server) doIdem(op idemOp, key, owner, sessionID, status string) {
 			delete(s.idemBySession, sessionID)
 		}
 	}
+	return true
 }
 
 // reserveIdem atomically claims an Idempotency-Key for a session. The pair
 // must be reserved BEFORE the session is persisted so a concurrent request
 // with the same key but a different session_id cannot pass both the
 // checkIdem gate and the session-running map gate in the same window.
-func (s *Server) reserveIdem(key, owner, sessionID string) {
-	s.doIdem(idemOpReserve, key, owner, sessionID, "")
+func (s *Server) reserveIdem(key, owner, sessionID string) bool {
+	return s.doIdem(idemOpReserve, key, owner, sessionID, "")
 }
 
 // releaseIdem frees a reservation (used when the next gate rejects the request).
@@ -233,7 +239,18 @@ func (s *Server) handleKickoff(c *gin.Context) {
 		// Reserve the idempotency key BEFORE persisting the session so a
 		// concurrent request with the same key can't slip past both
 		// checkIdem (miss) and the session-running map (miss).
-		s.reserveIdem(idemKey, owner, payload.SessionID)
+		//
+		// reserveIdem is an atomic test-and-set: if it reports false, another
+		// in-flight request won the race between our checkIdem miss and this
+		// call, so we must return 409 rather than continue. Without this the
+		// loser proceeded and both sessions were persisted, which is exactly
+		// the duplicate-execution bug the gate exists to prevent.
+		if !s.reserveIdem(idemKey, owner, payload.SessionID) {
+			c.JSON(http.StatusConflict, gin.H{
+				"error": "duplicate request still running",
+			})
+			return
+		}
 	}
 
 	// Idempotency (DCR-04): a replayed kickoff for an already-running session
