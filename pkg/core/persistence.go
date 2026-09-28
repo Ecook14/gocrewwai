@@ -90,7 +90,7 @@ func (m *SessionManager) LoadLatestCheckpoint(sessionID string, target interface
 	if err == sql.ErrNoRows {
 		return fmt.Errorf("no checkpoint found for session: %s", sessionID)
 	} else if err != nil {
-		return err
+		return fmt.Errorf("failed to load checkpoint: %w", err)
 	}
 
 	return json.Unmarshal([]byte(blob), target)
@@ -100,16 +100,28 @@ func (m *SessionManager) LoadLatestCheckpoint(sessionID string, target interface
 func (m *SessionManager) ListSessions() ([]string, error) {
 	rows, err := m.db.Query("SELECT DISTINCT session_id FROM checkpoints")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to list sessions: %w", err)
 	}
 	defer rows.Close()
 
 	var sessions []string
 	for rows.Next() {
 		var s string
-		if err := rows.Scan(&s); err == nil {
-			sessions = append(sessions, s)
+		if err := rows.Scan(&s); err != nil {
+			return nil, fmt.Errorf("failed to scan session: %w", err)
 		}
+		sessions = append(sessions, s)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate sessions: %w", err)
 	}
 	return sessions, nil
+}
+
+// Close releases the underlying database handle.
+func (m *SessionManager) Close() error {
+	if m.db == nil {
+		return nil
+	}
+	return m.db.Close()
 }

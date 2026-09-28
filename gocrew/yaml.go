@@ -27,9 +27,17 @@ type YAMLConfig struct {
 
 // YAMLLLMConfig defines the default LLM for the crew.
 type YAMLLLMConfig struct {
-	Provider string `yaml:"provider"` // "openai", "anthropic", "gemini", "groq", "openrouter"
+	Provider string `yaml:"provider"` // "openai", "anthropic", "gemini", "groq", "openrouter", "ollama", "failover"
 	Model    string `yaml:"model"`
-	APIKey   string `yaml:"api_key"` // Can be env var like ${OPENAI_API_KEY}
+	APIKey   string `yaml:"api_key"`            // Can be env var like ${OPENAI_API_KEY}
+	BaseURL  string `yaml:"base_url,omitempty"` // Ollama host, e.g. http://localhost:11434
+	// Failover: when provider is "failover", primary/secondary are built
+	// recursively from these nested configs.
+	FailoverPrimary   *YAMLLLMConfig `yaml:"failover_primary,omitempty"`
+	FailoverSecondary *YAMLLLMConfig `yaml:"failover_secondary,omitempty"`
+	Temperature       float32        `yaml:"temperature,omitempty"`
+	MaxTokens         int            `yaml:"max_tokens,omitempty"`
+	Stop              []string       `yaml:"stop,omitempty"`
 }
 
 // YAMLAgent defines an agent in YAML.
@@ -209,20 +217,51 @@ func buildCrewFromYAML(cfg *YAMLConfig) (*Crew, error) {
 func buildLLM(cfg *YAMLLLMConfig) (llm.Client, error) {
 	apiKey := resolveEnvVar(cfg.APIKey)
 
+	var client llm.Client
 	switch strings.ToLower(cfg.Provider) {
 	case "openai":
-		return NewOpenAI(apiKey, cfg.Model), nil
+		client = NewOpenAI(apiKey, cfg.Model)
 	case "anthropic", "claude":
-		return NewAnthropic(apiKey, cfg.Model), nil
+		client = NewAnthropic(apiKey, cfg.Model)
 	case "gemini", "google":
-		return NewGemini(apiKey, cfg.Model), nil
+		client = NewGemini(apiKey, cfg.Model)
 	case "groq":
-		return NewGroq(apiKey, cfg.Model), nil
+		client = NewGroq(apiKey, cfg.Model)
 	case "openrouter":
-		return NewOpenRouter(apiKey, cfg.Model), nil
+		client = NewOpenRouter(apiKey, cfg.Model)
+	case "ollama":
+		baseURL := resolveEnvVar(cfg.BaseURL)
+		if baseURL != "" {
+			client = NewOllama(cfg.Model, baseURL)
+		} else {
+			client = NewOllama(cfg.Model)
+		}
+	case "failover":
+		if cfg.FailoverPrimary == nil || cfg.FailoverSecondary == nil {
+			return nil, fmt.Errorf("provider \"failover\" requires failover_primary + failover_secondary configs")
+		}
+		primary, err := buildLLM(cfg.FailoverPrimary)
+		if err != nil {
+			return nil, fmt.Errorf("failover primary: %w", err)
+		}
+		secondary, err := buildLLM(cfg.FailoverSecondary)
+		if err != nil {
+			return nil, fmt.Errorf("failover secondary: %w", err)
+		}
+		client = NewFailoverClient(primary, secondary)
 	default:
 		return nil, fmt.Errorf("unsupported LLM provider: %s", cfg.Provider)
 	}
+
+	if cfg.Temperature != 0 || cfg.MaxTokens != 0 || len(cfg.Stop) > 0 {
+		client = llm.WithDefaults(client, llm.GenerateOptions{
+			Model:       cfg.Model,
+			Temperature: cfg.Temperature,
+			MaxTokens:   cfg.MaxTokens,
+			Stop:        cfg.Stop,
+		})
+	}
+	return client, nil
 }
 
 // resolveEnvVar replaces ${VAR_NAME} patterns with environment variable values.

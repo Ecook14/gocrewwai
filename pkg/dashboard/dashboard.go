@@ -7,10 +7,12 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
 	"github.com/Ecook14/gocrewwai/pkg/agents"
+	"github.com/Ecook14/gocrewwai/pkg/auth"
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/memory"
 	"github.com/Ecook14/gocrewwai/pkg/protocols"
@@ -18,6 +20,7 @@ import (
 	"github.com/Ecook14/gocrewwai/pkg/tasks"
 	"github.com/Ecook14/gocrewwai/pkg/telemetry"
 	"github.com/Ecook14/gocrewwai/pkg/tools"
+	"github.com/Ecook14/gocrewwai/pkg/utils"
 	"github.com/Ecook14/gocrewwai/web-ui"
 	"github.com/gorilla/websocket"
 	"runtime"
@@ -107,7 +110,22 @@ func (s *WSServer) Start(port string) {
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
-	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+	// TLS when DASHBOARD_TLS_CERT/KEY (or TLS_CERT_FILE/TLS_KEY_FILE) are set.
+	certFile := os.Getenv("DASHBOARD_TLS_CERT")
+	if certFile == "" {
+		certFile = os.Getenv("TLS_CERT_FILE")
+	}
+	keyFile := os.Getenv("DASHBOARD_TLS_KEY")
+	if keyFile == "" {
+		keyFile = os.Getenv("TLS_KEY_FILE")
+	}
+	var err error
+	if certFile != "" && keyFile != "" {
+		err = srv.ListenAndServeTLS(certFile, keyFile)
+	} else {
+		err = srv.ListenAndServe()
+	}
+	if err != nil && err != http.ErrServerClosed {
 		slog.Error("Dashboard server failed", slog.Any("error", err))
 	}
 }
@@ -116,27 +134,49 @@ func (s *WSServer) Start(port string) {
 // (DASHBOARD_AUTH_TOKEN, falling back to API_AUTH_TOKEN). The read-only /ws
 // telemetry stream and the static /web-ui/ assets stay public. With no token
 // configured the dashboard is open (dev default) and logs a loud warning.
+//
+// RBAC-lite: DASHBOARD_READ_TOKEN (optional) grants GET-only access; mutating
+// methods (POST/PUT/PATCH/DELETE) require the admin token and return 403
+// for read-only bearers.
 func dashboardAuth(next http.Handler) http.Handler {
 	token := os.Getenv("DASHBOARD_AUTH_TOKEN")
 	if token == "" {
 		token = os.Getenv("API_AUTH_TOKEN")
 	}
+	readToken := os.Getenv("DASHBOARD_READ_TOKEN")
 	if token == "" {
 		slog.Warn("dashboard: no auth token configured — /api/* routes are unauthenticated (dev only)")
 		return next
 	}
 	expected := "Bearer " + token
+	readExpected := "Bearer " + readToken
+	jwtValidator := auth.ValidatorFromEnv()
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasPrefix(r.URL.Path, "/api/") {
 			next.ServeHTTP(w, r)
 			return
 		}
 		actual := r.Header.Get("Authorization")
-		if actual == "" || subtle.ConstantTimeCompare([]byte(actual), []byte(expected)) != 1 {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+		if actual != "" && subtle.ConstantTimeCompare([]byte(actual), []byte(expected)) == 1 {
+			next.ServeHTTP(w, r)
 			return
 		}
-		next.ServeHTTP(w, r)
+		// JWT alternative when JWT_SECRET is set (full admin, like the token).
+		if strings.HasPrefix(actual, "Bearer ") && jwtValidator != nil {
+			if _, err := jwtValidator.Validate(strings.TrimPrefix(actual, "Bearer ")); err == nil {
+				next.ServeHTTP(w, r)
+				return
+			}
+		}
+		if readToken != "" && actual != "" && subtle.ConstantTimeCompare([]byte(actual), []byte(readExpected)) == 1 {
+			if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions {
+				next.ServeHTTP(w, r)
+				return
+			}
+			http.Error(w, `{"error":"forbidden: read-only token"}`, http.StatusForbidden)
+			return
+		}
+		http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 	})
 }
 
@@ -296,7 +336,17 @@ func (s *WSServer) handleCreateAgent(w http.ResponseWriter, r *http.Request) {
 		case "SQLite (Local)":
 			dbPath := "memory.db"
 			if connStr != "" {
-				dbPath = connStr
+				// Constrain SQLite files to the dashboard data dir:
+				// basename only, no traversal, no absolute paths.
+				if len(connStr) == 0 || len(connStr) > 128 || filepath.IsAbs(connStr) || strings.Contains(connStr, "..") || strings.ContainsAny(connStr, `/\`) || filepath.Clean(connStr) != connStr {
+					http.Error(w, `{"error":"invalid sqlite path: basename only"}`, http.StatusBadRequest)
+					return
+				}
+				dataDir := os.Getenv("DASHBOARD_DATA_DIR")
+				if dataDir == "" {
+					dataDir = "."
+				}
+				dbPath = filepath.Join(dataDir, connStr)
 			}
 			if store, err := memory.NewSQLiteStore(dbPath); err == nil {
 				agent.Memory = store
@@ -368,6 +418,13 @@ func (s *WSServer) handleCreateMCP(w http.ResponseWriter, r *http.Request) {
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// NewMCPClient takes an HTTP URL (not a shell command), but registration
+	// still SSRF-gates it: no metadata/link-local/private targets.
+	if _, err := utils.ValidateURL(req.Command); err != nil {
+		http.Error(w, `{"error":"blocked MCP server URL"}`, http.StatusBadRequest)
 		return
 	}
 

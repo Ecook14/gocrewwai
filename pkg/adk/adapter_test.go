@@ -145,6 +145,15 @@ func TestToolsToADK(t *testing.T) {
 	}
 }
 
+type runnableADKTool struct {
+	mockADKTool
+	run func(ctx context.Context, args map[string]any) (string, error)
+}
+
+func (m *runnableADKTool) Run(ctx context.Context, args map[string]any) (string, error) {
+	return m.run(ctx, args)
+}
+
 func TestADKToolToGoc(t *testing.T) {
 	adkTool := &mockADKTool{name: "adk-tool", desc: "ADK tool"}
 	gocTool := ADKToolToGoc(adkTool)
@@ -154,8 +163,23 @@ func TestADKToolToGoc(t *testing.T) {
 	if got := gocTool.Description(); got != "ADK tool" {
 		t.Errorf("ADKToolToGoc().Description() = %q, want %q", got, "ADK tool")
 	}
-	if _, err := gocTool.Execute(context.Background(), map[string]interface{}{"input": "test"}); err != nil {
+	// Tools without Run fail closed (no fake output).
+	if _, err := gocTool.Execute(context.Background(), map[string]interface{}{"input": "test"}); err == nil {
+		t.Fatal("Execute() expected error for non-runnable tool")
+	}
+	// Tools with Run delegate.
+	runnable := &runnableADKTool{
+		mockADKTool: mockADKTool{name: "adk-tool", desc: "ADK tool"},
+		run: func(ctx context.Context, args map[string]any) (string, error) {
+			return fmt.Sprintf("ran with %v", args["input"]), nil
+		},
+	}
+	out, err := ADKToolToGoc(runnable).Execute(context.Background(), map[string]interface{}{"input": "test"})
+	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
+	}
+	if out != "ran with test" {
+		t.Errorf("Execute() = %q, want %q", out, "ran with test")
 	}
 }
 

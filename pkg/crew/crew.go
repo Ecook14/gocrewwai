@@ -19,6 +19,7 @@ import (
 	"github.com/Ecook14/gocrewwai/pkg/tasks"
 	"github.com/Ecook14/gocrewwai/pkg/telemetry"
 	"github.com/Ecook14/gocrewwai/pkg/training"
+	"github.com/Ecook14/gocrewwai/pkg/webhook"
 	"go.opentelemetry.io/otel/attribute"
 	"os"
 	"time"
@@ -63,6 +64,8 @@ type CrewConfig struct {
 	TrainingDir      string     // Directory for training iteration data
 	TestLLM          llm.Client // Internal evaluation LLM for elite tier verification
 	TaskCooldown     time.Duration
+	WebhookURL       string // Signed HTTPS notification on kickoff completion/failure
+	WebhookSecret    string // HMAC secret for X-Gocrew-Signature (empty = unsigned)
 }
 
 func WithProcess(p ProcessType) CrewOption {
@@ -125,6 +128,8 @@ func New(cfg CrewConfig) *Crew {
 		TrainingDir:      cfg.TrainingDir,
 		TaskCooldown:     cfg.TaskCooldown,
 		TestLLM:          cfg.TestLLM,
+		WebhookURL:       cfg.WebhookURL,
+		WebhookSecret:    cfg.WebhookSecret,
 		UsageMetrics:     make(map[string]int),
 	}
 }
@@ -172,7 +177,34 @@ type Crew struct {
 	UsageMetrics map[string]int
 	TrainingMode bool // Internal flag when executing c.Train()
 
+	// Webhook notifies a signed HTTPS endpoint on kickoff completion/failure.
+	// Empty WebhookURL disables delivery. Wired from CrewConfig.
+	WebhookURL    string
+	WebhookSecret string
+
 	staticSyncDone bool
+}
+
+// fireWebhook delivers a signed lifecycle event when WebhookURL is set.
+// Delivery failures are logged, never fatal to the crew run.
+func (c *Crew) fireWebhook(ctx context.Context, event, status string, result interface{}, runErr error) {
+	if c.WebhookURL == "" {
+		return
+	}
+	n, err := webhook.NewNotifier(c.WebhookURL, c.WebhookSecret)
+	if err != nil {
+		slog.Warn("crew webhook misconfigured", slog.String("error", err.Error()))
+		return
+	}
+	p := webhook.Payload{Event: event, SessionID: c.SessionID, Status: status, Result: result}
+	if runErr != nil {
+		p.Error = runErr.Error()
+	}
+	dCtx, cancel := context.WithTimeout(ctx, webhook.DefaultTimeout)
+	defer cancel()
+	if err := n.Notify(dCtx, p); err != nil {
+		slog.Warn("crew webhook delivery failed", slog.String("event", event), slog.String("error", err.Error()))
+	}
 }
 
 // publishEvent tags crew lifecycle events with the crew's session ID so
@@ -422,6 +454,7 @@ func (c *Crew) Kickoff(ctx context.Context) (interface{}, error) {
 			Source: "Crew",
 			Error:  err,
 		})
+		c.fireWebhook(ctx, "kickoff.failed", "failed", nil, err)
 		return nil, err
 	}
 
@@ -432,6 +465,7 @@ func (c *Crew) Kickoff(ctx context.Context) (interface{}, error) {
 			"result": result,
 		},
 	})
+	c.fireWebhook(ctx, "kickoff.completed", "completed", result, nil)
 	return result, nil
 }
 
@@ -665,29 +699,29 @@ func (c *Crew) executeHierarchical(ctx context.Context) (interface{}, error) {
 
 				assignedAgent, err := orchestrator.DelegateTask(ctx, task.Description)
 				if err != nil {
-					if task.Agent == nil {
+					if task.GetAgent() == nil {
 						errCh <- fmt.Errorf("task delegation failed and no default agent assigned: %w", err)
 						return
 					}
-					assignedAgent = task.Agent
+					assignedAgent = task.GetAgent()
 				}
-				task.Agent = assignedAgent
+				task.SetAgent(assignedAgent)
 
 				if c.Verbose {
 					defaultLogger.Info("Manager Delegating Task",
 						slog.Int("index", index+1),
-						slog.String("assignee", strings.Clone(task.Agent.GetRole())))
+						slog.String("assignee", strings.Clone(task.GetAgent().GetRole())))
 				}
 
-				if local, ok := task.Agent.(*agents.Agent); ok && local.StepCallback != nil {
+				if local, ok := task.GetAgent().(*agents.Agent); ok && local.StepCallback != nil {
 					local.StepCallback(map[string]interface{}{"status": "delegated_by_manager"})
 				}
 
 				res, err := task.Execute(ctx)
 				if err != nil {
-					task.Failed = true
-					task.Error = err
-					task.Processed = true
+					task.SetFailed(true)
+					task.SetError(err)
+					task.SetProcessed(true)
 					taskErr := crewErrors.NewTaskError(index+1, task.Description, err)
 					errCh <- taskErr
 					if c.OnTaskError != nil {
@@ -697,8 +731,8 @@ func (c *Crew) executeHierarchical(ctx context.Context) (interface{}, error) {
 					return
 				}
 
-				task.Processed = true
-				task.Output = res // Store output on the task object natively
+				task.SetProcessed(true)
+				task.SetOutput(res) // Store output on the task object natively
 
 				// Populate finalResults safely using a local scoped lock if needed,
 				// but since indices are unique per goroutine in this round, direct assignment is safe.

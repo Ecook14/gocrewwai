@@ -17,6 +17,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -105,6 +106,13 @@ type Task struct {
 	CycleCount int `json:"-"`
 
 	I18N *i18n.I18N `json:"-"`
+
+	// mu guards execution-state fields (Processed, Failed, Error, Output,
+	// Agent, CycleCount) which are written from worker goroutines
+	// (hierarchical fan-out) and read from HTTP/dashboard goroutines.
+	// Config fields (Description, ExpectedOutput, Tools, ...) are immutable
+	// after kickoff and need no lock.
+	mu sync.RWMutex `json:"-"`
 }
 
 // NewTask creates a new Task using positional arguments (legacy style).
@@ -207,14 +215,14 @@ func (t *Task) applyPostHumanReview(result interface{}) interface{} {
 			newOutput.WriteString(line)
 		}
 		result = strings.TrimSpace(newOutput.String())
-		t.Output = result
+		t.SetOutput(result)
 		fmt.Fprintln(t.taskOut(), "[✅ Output Manually Overridden]")
 	}
 	return result
 }
 
 func (t *Task) Execute(ctx context.Context) (interface{}, error) {
-	if t.Agent == nil {
+	if t.GetAgent() == nil {
 		return nil, crewErrors.ErrNoAgent
 	}
 
@@ -260,8 +268,8 @@ func (t *Task) Execute(ctx context.Context) (interface{}, error) {
 	if len(t.Context) > 0 {
 		contextText := ""
 		for i, ctxTask := range t.Context {
-			if ctxTask.Processed && ctxTask.Output != nil {
-				contextText += fmt.Sprintf("--- Context Source %d ---\n%v\n", i+1, ctxTask.Output)
+			if proc, _, out, _ := ctxTask.Snapshot(); proc && out != nil {
+				contextText += fmt.Sprintf("--- Context Source %d ---\n%v\n", i+1, out)
 			}
 		}
 		baseDescription = t.I18N.Process(t.I18N.Slice("task_with_context"), map[string]string{
@@ -350,8 +358,8 @@ func (t *Task) Execute(ctx context.Context) (interface{}, error) {
 		}
 	}
 
-	t.Processed = true
-	t.Output = result
+	t.SetProcessed(true)
+	t.SetOutput(result)
 
 	// 5. Auto-save output to file if specified
 	if t.OutputFile != "" {
@@ -431,8 +439,75 @@ func GetOutput[T any](t *Task) (*T, error) {
 	return nil, fmt.Errorf("task output is of type %T, expected *%T", t.Output, new(T))
 }
 
-func (t *Task) GetDescription() string    { return t.Description }
-func (t *Task) GetAgentRole() string      { return t.AgentRole }
-func (t *Task) SetOutput(out interface{}) { t.Output = out }
-func (t *Task) SetError(err error)        { t.Error = err }
-func (t *Task) SetProcessed(p bool)       { t.Processed = p }
+func (t *Task) GetDescription() string { return t.Description }
+func (t *Task) GetAgentRole() string   { return t.AgentRole }
+
+// Locked execution-state accessors (race-safe for worker + reader goroutines).
+
+func (t *Task) SetOutput(out interface{}) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.Output = out
+}
+
+func (t *Task) GetOutput() interface{} {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.Output
+}
+
+func (t *Task) SetError(err error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.Error = err
+}
+
+func (t *Task) GetError() error {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.Error
+}
+
+func (t *Task) SetProcessed(p bool) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.Processed = p
+}
+
+func (t *Task) IsProcessed() bool {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.Processed
+}
+
+func (t *Task) SetFailed(f bool) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.Failed = f
+}
+
+func (t *Task) IsFailed() bool {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.Failed
+}
+
+func (t *Task) SetAgent(a core.Agent) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.Agent = a
+}
+
+func (t *Task) GetAgent() core.Agent {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.Agent
+}
+
+// Snapshot returns a copy of the execution state for cross-goroutine readers
+// (dashboard, API) without holding the lock.
+func (t *Task) Snapshot() (processed, failed bool, output interface{}, err error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.Processed, t.Failed, t.Output, t.Error
+}

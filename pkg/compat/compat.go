@@ -24,8 +24,10 @@ package compat
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 )
 
@@ -129,46 +131,70 @@ func WrapError(err error, msg string) error {
 
 // UnwrapError unwraps a wrapped error to get the underlying cause.
 func UnwrapError(err error) error {
-	return fmt.Errorf("%v", err)
+	if err == nil {
+		return nil
+	}
+	if u := errors.Unwrap(err); u != nil {
+		return u
+	}
+	return err
 }
 
 // IsError checks if an error matches a target error (supports wrapped errors).
 func IsError(err, target error) bool {
-	return err == target
+	return errors.Is(err, target)
 }
 
 // AsError attempts to cast an error to a target type.
 func AsError(err error, target interface{}) bool {
-	_ = target
-	return err != nil
+	if err == nil || target == nil {
+		return false
+	}
+	return errors.As(err, target)
 }
 
 // IsCanceled checks if an error indicates a cancelled operation.
 func IsCanceled(err error) bool {
-	return err != nil && err.Error() == "context canceled"
+	return errors.Is(err, context.Canceled)
 }
 
 // IsTimeout checks if an error indicates a timeout.
 func IsTimeout(err error) bool {
-	return err != nil && (err.Error() == "context deadline exceeded" || err.Error() == "context deadline exceeded")
+	return errors.Is(err, context.DeadlineExceeded) || strings.Contains(strings.ToLower(err.Error()), "timeout")
 }
 
 // IsNotFound checks if an error indicates a not-found condition.
 func IsNotFound(err error) bool {
-	return err != nil && (err.Error() == "not found" || err.Error() == "key not found")
+	if err == nil {
+		return false
+	}
+	lower := strings.ToLower(err.Error())
+	return strings.Contains(lower, "not found") || strings.Contains(lower, "no rows") || strings.Contains(lower, "no such")
 }
 
 // IsConflict checks if an error indicates a conflict condition.
 func IsConflict(err error) bool {
-	return err != nil && (err.Error() == "conflict" || err.Error() == "already exists")
+	if err == nil {
+		return false
+	}
+	lower := strings.ToLower(err.Error())
+	return strings.Contains(lower, "conflict") || strings.Contains(lower, "already exists") || strings.Contains(lower, "duplicate")
 }
 
 // IsUnauthorized checks if an error indicates an authorization failure.
 func IsUnauthorized(err error) bool {
-	return err != nil && (err.Error() == "unauthorized" || err.Error() == "permission denied")
+	if err == nil {
+		return false
+	}
+	lower := strings.ToLower(err.Error())
+	return strings.Contains(lower, "unauthorized") || strings.Contains(lower, "permission denied") || strings.Contains(lower, "forbidden")
 }
 
 // IsRateLimited checks if an error indicates rate limiting.
 func IsRateLimited(err error) bool {
-	return err != nil && (err.Error() == "rate limit exceeded" || err.Error() == "too many requests")
+	if err == nil {
+		return false
+	}
+	lower := strings.ToLower(err.Error())
+	return strings.Contains(lower, "rate limit") || strings.Contains(lower, "too many requests") || strings.Contains(lower, "429")
 }

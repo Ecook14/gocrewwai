@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Ecook14/gocrewwai/pkg/core"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -452,7 +453,45 @@ func (s *SQLiteCheckpointStore) GetDB() *sql.DB {
 
 // SyncToCoreSessionManager registers this store as the core session manager's
 // persistence backend, enabling crew.SessionID-based checkpoint resume.
+// It bridges the latest SQLite checkpoint for each crew into the core
+// SessionManager so LoadLatestCheckpoint can resume without a separate DB.
 func (s *SQLiteCheckpointStore) SyncToCoreSessionManager() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.db == nil {
+		return fmt.Errorf("sqlite checkpoint store: nil database")
+	}
+	rows, err := s.db.Query(`SELECT crew_id, state_data FROM checkpoints WHERE timestamp > 0 ORDER BY timestamp DESC`)
+	if err != nil {
+		return fmt.Errorf("sqlite checkpoint store: list checkpoints: %w", err)
+	}
+	defer rows.Close()
+	synced := 0
+	for rows.Next() {
+		var crewID, blob string
+		if err := rows.Scan(&crewID, &blob); err != nil {
+			continue
+		}
+		var state map[string]any
+		if err := json.Unmarshal([]byte(blob), &state); err != nil {
+			continue
+		}
+		mgr, err := core.GetSessionManager()
+		if err != nil {
+			// No global manager configured — nothing to sync into yet.
+			return nil
+		}
+		if err := mgr.SaveCheckpoint(crewID, state); err != nil {
+			continue
+		}
+		synced++
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("sqlite checkpoint store: iterate checkpoints: %w", err)
+	}
+	if s.logger != nil {
+		s.logger.Info("synced sqlite checkpoints to core session manager", "count", synced)
+	}
 	return nil
 }
 

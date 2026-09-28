@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/Ecook14/gocrewwai/pkg/utils"
 )
 
 // defaultHTTPClient is used for all outbound HTTP calls in this package.
@@ -99,12 +101,15 @@ func (f *baseFile) MimeType() string { return f.mimeType }
 
 func (f *baseFile) Data() ([]byte, error) {
 	if strings.HasPrefix(f.source, "http://") || strings.HasPrefix(f.source, "https://") {
+		if _, err := utils.ValidateURL(f.source); err != nil {
+			return nil, fmt.Errorf("blocked file URL: %w", err)
+		}
 		resp, err := defaultHTTPClient.Get(f.source)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch URL %s: %w", f.source, err)
 		}
 		defer resp.Body.Close()
-		return io.ReadAll(resp.Body)
+		return io.ReadAll(io.LimitReader(resp.Body, utils.MaxURLBytes+1))
 	}
 	return os.ReadFile(f.source)
 }
@@ -119,10 +124,14 @@ func (f *baseFile) Base64() (string, error) {
 
 func (f *baseFile) SizeBytes() (int64, error) {
 	if strings.HasPrefix(f.source, "http://") || strings.HasPrefix(f.source, "https://") {
+		if _, err := utils.ValidateURL(f.source); err != nil {
+			return 0, fmt.Errorf("blocked file URL: %w", err)
+		}
 		resp, err := defaultHTTPClient.Head(f.source)
 		if err != nil {
 			return 0, err
 		}
+		defer resp.Body.Close()
 		return resp.ContentLength, nil
 	}
 	info, err := os.Stat(f.source)

@@ -8,12 +8,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Ecook14/gocrewwai/pkg/kv"
 	"github.com/redis/go-redis/v9"
 )
 
-// RedisCheckpointStore persists checkpoints to Redis with TTL support.
+// RedisCheckpointStore persists checkpoints to a Redis-protocol backend
+// (Redis, Dragonfly, or Valkey) with TTL support.
 type RedisCheckpointStore struct {
-	client *redis.Client
+	client redis.UniversalClient
 	prefix string
 	ttl    time.Duration
 	mu     sync.Mutex
@@ -34,16 +36,12 @@ func NewRedisCheckpointStore(cfg RedisCheckpointConfig) (*RedisCheckpointStore, 
 		cfg.Prefix = "crew_checkpoint:"
 	}
 
-	client := redis.NewClient(&redis.Options{
-		Addr:     cfg.Addr,
+	client, err := kv.Dial(context.Background(), kv.Config{
+		Addrs:    []string{cfg.Addr},
 		Password: cfg.Password,
 		DB:       cfg.DB,
 	})
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	if err := client.Ping(ctx).Err(); err != nil {
+	if err != nil {
 		return nil, fmt.Errorf("failed to connect to redis for checkpoints: %w", err)
 	}
 

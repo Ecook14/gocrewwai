@@ -2,6 +2,7 @@ package flow
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -43,22 +44,34 @@ func (f *TypedFlow[T]) AddNode(n TypedNode[T]) {
 	f.nodes = append(f.nodes, n)
 }
 
-// Kickoff executes the flow top-to-bottom.
+// typedStateKey is the envelope key under which a TypedFlow persists T.
+const typedStateKey = "__typed_state"
+
+// Kickoff executes the flow top-to-bottom, resuming persisted state when available.
 func (f *TypedFlow[T]) Kickoff(ctx context.Context) (T, error) {
 	slog.Info("🌊 Starting Typed Flow Execution", slog.Int("nodes", len(f.nodes)))
 
-	// 1. Try Load State if persistence enabled
+	// 1. Restore persisted state if available
 	if f.persistence != nil && f.flowID != "" {
 		saved, err := f.persistence.LoadState(ctx, f.flowID)
-		if err == nil && saved != nil {
-			// Note: Generic unmarshaling of State map to T would require reflection.
-			// Simplified: We assume for now TypedFlow manages its own T or starts fresh.
-			// In production, we'd use a more sophisticated JSON unmarshaler for T.
-			slog.Info("📍 Resumed Typed Flow state (simulated recovery)")
+		if err != nil {
+			return f.state, fmt.Errorf("typed flow: failed to load state: %w", err)
+		}
+		if saved != nil {
+			if err := restoreTypedState(saved, &f.state); err != nil {
+				return f.state, fmt.Errorf("typed flow: failed to restore state: %w", err)
+			}
+			slog.Info("📍 Resumed Typed Flow state from persistence")
 		}
 	}
 
 	for i, node := range f.nodes {
+		select {
+		case <-ctx.Done():
+			return f.state, ctx.Err()
+		default:
+		}
+
 		f.mu.RLock()
 		current := f.state
 		f.mu.RUnlock()
@@ -75,14 +88,39 @@ func (f *TypedFlow[T]) Kickoff(ctx context.Context) (T, error) {
 
 		// 2. Auto-Persist if enabled
 		if f.persistence != nil && f.flowID != "" {
-			// Convert T to map[string]interface{} for standard persistence
-			// Simplified representation
-			stateMap := make(State)
-			stateMap["__typed_state"] = f.state
-			_ = f.persistence.SaveState(ctx, f.flowID, stateMap)
+			if err := saveTypedState(ctx, f.persistence, f.flowID, f.state); err != nil {
+				return f.state, fmt.Errorf("typed flow: state persistence failed at node %d: %w", i, err)
+			}
 		}
 	}
 
 	slog.Info("🏁 Typed Flow Complete")
 	return f.state, nil
+}
+
+// saveTypedState round-trips T through JSON into the untyped State envelope.
+func saveTypedState[T any](ctx context.Context, p FlowPersistence, flowID string, state T) error {
+	data, err := json.Marshal(state)
+	if err != nil {
+		return fmt.Errorf("failed to marshal typed state: %w", err)
+	}
+	stateMap := make(State)
+	stateMap[typedStateKey] = json.RawMessage(data)
+	return p.SaveState(ctx, flowID, stateMap)
+}
+
+// restoreTypedState extracts T from the untyped State envelope.
+func restoreTypedState[T any](saved State, target *T) error {
+	raw, ok := saved[typedStateKey]
+	if !ok {
+		return fmt.Errorf("no %q in persisted state", typedStateKey)
+	}
+	data, err := json.Marshal(raw)
+	if err != nil {
+		return fmt.Errorf("failed to re-encode persisted state: %w", err)
+	}
+	if err := json.Unmarshal(data, target); err != nil {
+		return fmt.Errorf("failed to decode persisted state: %w", err)
+	}
+	return nil
 }

@@ -101,8 +101,15 @@ type Handler func(Event)
 // Bus manages event registration and distribution.
 type Bus struct {
 	mu          sync.RWMutex
-	handlers    []Handler
+	handlers    []scopedHandler
 	subscribers []chan Event
+	nextID      uint64
+}
+
+// scopedHandler pairs a handler with a stable ID for reliable removal.
+type scopedHandler struct {
+	id uint64
+	fn Handler
 }
 
 // GlobalBus is the singleton event bus for Gocrewwai.
@@ -134,7 +141,8 @@ func (b *Bus) Unsubscribe(ch chan Event) {
 func (b *Bus) On(handler Handler) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	b.handlers = append(b.handlers, handler)
+	b.nextID++
+	b.handlers = append(b.handlers, scopedHandler{id: b.nextID, fn: handler})
 }
 
 // Publish broadcasts an event to all subscribers and handlers.
@@ -144,15 +152,20 @@ func (b *Bus) Publish(e Event) {
 	}
 
 	b.mu.RLock()
-	defer b.mu.RUnlock()
+	handlers := make([]Handler, len(b.handlers))
+	for i, h := range b.handlers {
+		handlers[i] = h.fn
+	}
+	subs := append([]chan Event(nil), b.subscribers...)
+	b.mu.RUnlock()
 
 	// Notify handlers
-	for _, h := range b.handlers {
+	for _, h := range handlers {
 		go h(e) // Run in goroutine to prevent blocking execution
 	}
 
 	// Notify channel subscribers
-	for _, sub := range b.subscribers {
+	for _, sub := range subs {
 		select {
 		case sub <- e:
 		default: // Skip if channel is full
@@ -161,9 +174,12 @@ func (b *Bus) Publish(e Event) {
 }
 
 // ScopedHandlers returns a context manager-like closure to temporarily listen for events.
+// The returned cleanup function removes exactly the registered handler.
 func (b *Bus) ScopedHandlers(handler Handler) func() {
 	b.mu.Lock()
-	b.handlers = append(b.handlers, handler)
+	b.nextID++
+	id := b.nextID
+	b.handlers = append(b.handlers, scopedHandler{id: id, fn: handler})
 	b.mu.Unlock()
 
 	// Return a cleanup function
@@ -171,11 +187,10 @@ func (b *Bus) ScopedHandlers(handler Handler) func() {
 		b.mu.Lock()
 		defer b.mu.Unlock()
 		for i, h := range b.handlers {
-			// Note: This comparison is tricky in Go for functions,
-			// but works if we use a unique pointer/wrapper if necessary.
-			// For now, simpler to just use it for temporary lifetime.
-			_ = i
-			_ = h
+			if h.id == id {
+				b.handlers = append(b.handlers[:i], b.handlers[i+1:]...)
+				return
+			}
 		}
 	}
 }

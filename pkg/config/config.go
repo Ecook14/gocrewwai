@@ -164,12 +164,24 @@ func parseDurationOrDefault(raw, field string, def time.Duration) time.Duration 
 }
 
 // Get returns the global configuration singleton.
-// It panics on first load if the config file cannot be read or parsed —
-// this is intentional for fail-fast startup: a running process with broken
-// config is unsafe. Use TryGet or LoadConfigFile for non-panicking variants.
+// Fail-soft: if the config file cannot be read or parsed, a loud warning is
+// logged and an empty default Config is returned instead of panicking, so a
+// broken config file can never crash a running process. Callers that need to
+// distinguish "no config" from "bad config" should use TryGet or
+// LoadConfigFile.
 func Get() *Config {
 	once.Do(func() {
-		instance = loadConfig()
+		cfg, err := loadConfigE()
+		if err != nil {
+			slog.Warn("config: falling back to empty defaults", "error", err)
+			cfg = &Config{
+				Tools:      make(map[string]interface{}),
+				Models:     make(map[string]ModelConfig),
+				MCPServers: make(map[string]MCPServer),
+				Providers:  make(map[string]Provider),
+			}
+		}
+		instance = cfg
 	})
 	return instance
 }
@@ -242,17 +254,7 @@ func LoadConfigFile(path string) (*Config, error) {
 	return cfg, nil
 }
 
-func loadConfig() *Config {
-	cfg, err := loadConfigE()
-	if err != nil {
-		// Fail fast at startup but don't leak internal paths to end users;
-		// full path is logged at Warn level inside LoadConfigFile.
-		panic(fmt.Sprintf("config: %v", err))
-	}
-	return cfg
-}
-
-// loadConfigE is the error-returning core used by TryGet and loadConfig.
+// loadConfigE is the error-returning core used by TryGet and Get.
 func loadConfigE() (*Config, error) {
 	_ = godotenv.Load()
 	path := os.Getenv("CREW_CONFIG_PATH")

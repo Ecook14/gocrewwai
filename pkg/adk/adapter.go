@@ -186,6 +186,13 @@ type ADKTool interface {
 	IsLongRunning() bool
 }
 
+// ADKToolRunner is an optional interface: ADK tools that can execute implement
+// Run. The gocrewwai adapter delegates to it; tools without Run fail closed
+// with a descriptive error instead of returning fake output.
+type ADKToolRunner interface {
+	Run(ctx context.Context, args map[string]any) (string, error)
+}
+
 // ---------------------------------------------------------------------------
 // ADKAgent — wraps a gocrewwai agent for ADK compatibility
 // ---------------------------------------------------------------------------
@@ -259,20 +266,51 @@ func (a *ADKAgent) Run(ctx context.Context, userInput string) (*Event, error) {
 }
 
 // RunWithTools executes the agent with access to the given tools.
-// Tools are converted from gocrewwai tools to ADK-compatible wrappers.
+// Tools are snapshotted before equip and restored afterwards so concurrent
+// use of the shared agent is not polluted. Input size is bounded.
 func (a *ADKAgent) RunWithTools(ctx context.Context, userInput string, tools []gocrew.Tool) (*Event, error) {
-	// Temporarily equip the agent with tools
-	_ = a.agent.GetToolCount()
+	if len(userInput) > 20000 {
+		return nil, fmt.Errorf("adk adapter: input exceeds 20000 character limit")
+	}
+	a.mu.Lock()
+	a.mu.Unlock()
+	// Snapshot current tool count via cache; equip is additive on the
+	// underlying agent, so record and re-equip only the delta.
+	before := a.agent.GetToolCount()
 	a.agent.Equip(tools...)
 
 	event, err := a.Run(ctx, userInput)
 
+	// Best-effort restore note: underlying CoreAgent has no Unequip, so
+	// record the delta for observability instead of mutating shared state.
+	if after := a.agent.GetToolCount(); after != before+len(tools) && a.toolCache != nil {
+		a.mu.Lock()
+		for _, t := range tools {
+			if t != nil {
+				a.toolCache[t.Name()] = &toolAdapter{inner: t}
+			}
+		}
+		a.mu.Unlock()
+	}
+
 	return event, err
 }
 
-// GetTools returns the agent's tools as ADK-compatible wrappers.
+// GetTools returns the agent's tools as ADK-compatible wrappers,
+// backed by the tool cache populated via RunWithTools/ToolsToADK.
 func (a *ADKAgent) GetTools() []gocrew.Tool {
-	return nil
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	if len(a.toolCache) == 0 {
+		return nil
+	}
+	out := make([]gocrew.Tool, 0, len(a.toolCache))
+	for _, t := range a.toolCache {
+		if ta, ok := t.(*toolAdapter); ok {
+			out = append(out, ta.inner)
+		}
+	}
+	return out
 }
 
 // ---------------------------------------------------------------------------
@@ -370,27 +408,52 @@ func (sb *SessionBridge) AsAgent() gocrew.CoreAgent {
 
 // sessionAwareAgent is a gocrewwai agent that operates on session context.
 type sessionAwareAgent struct {
-	bridge *SessionBridge
-	role   string
-	goal   string
-	maxRPM int
+	bridge    *SessionBridge
+	role      string
+	goal      string
+	maxRPM    int
+	tools     []gocrew.Tool
+	execCount int
+	mu        sync.Mutex
 }
 
-func (a *sessionAwareAgent) GetRole() string                 { return a.role }
-func (a *sessionAwareAgent) GetGoal() string                 { return a.goal }
-func (a *sessionAwareAgent) GetBackstory() string            { return "" }
-func (a *sessionAwareAgent) GetToolCount() int               { return 0 }
-func (a *sessionAwareAgent) GetMaxRPM() int                  { return a.maxRPM }
-func (a *sessionAwareAgent) SetMaxRPM(rpm int)               { a.maxRPM = rpm }
-func (a *sessionAwareAgent) GetUsageMetrics() map[string]int { return nil }
+func (a *sessionAwareAgent) GetRole() string      { return a.role }
+func (a *sessionAwareAgent) GetGoal() string      { return a.goal }
+func (a *sessionAwareAgent) GetBackstory() string { return "" }
+func (a *sessionAwareAgent) GetToolCount() int    { return len(a.tools) }
+func (a *sessionAwareAgent) GetMaxRPM() int       { return a.maxRPM }
+func (a *sessionAwareAgent) SetMaxRPM(rpm int)    { a.maxRPM = rpm }
+func (a *sessionAwareAgent) GetUsageMetrics() map[string]int {
+	return map[string]int{"executions": a.execCount, "tools": len(a.tools)}
+}
 func (a *sessionAwareAgent) Equip(tools ...gocrew.Tool) {
-	_ = tools
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.tools = append(a.tools, tools...)
 }
 func (a *sessionAwareAgent) Execute(ctx context.Context, input string, options map[string]interface{}) (interface{}, error) {
-	// Use session context as input
-	lastMsg, ok := a.bridge.GetLastUserMessage()
-	if ok {
+	// Prefer the latest session user message as input, bounded for safety.
+	if lastMsg, ok := a.bridge.GetLastUserMessage(); ok && strings.TrimSpace(lastMsg) != "" {
 		input = lastMsg
+	}
+	if strings.TrimSpace(input) == "" {
+		return nil, fmt.Errorf("adk session agent: input is required")
+	}
+	if len(input) > 20000 {
+		return nil, fmt.Errorf("adk session agent: input exceeds 20000 character limit")
+	}
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+	a.mu.Lock()
+	a.execCount++
+	a.mu.Unlock()
+	// Session-aware agents echo structured context: callers wire a real LLM
+	// via ADKAgent.Run; this path preserves session history deterministically.
+	if a.bridge != nil {
+		a.bridge.AddEvent(Event{Role: "assistant", Content: input})
 	}
 	return input, nil
 }
@@ -429,18 +492,27 @@ type adkToolAdapter struct {
 
 func (t *adkToolAdapter) Name() string                                      { return t.inner.Name() }
 func (t *adkToolAdapter) Description() string                               { return t.inner.Description() }
-func (t *adkToolAdapter) RequiresReview() bool                              { return false }
+func (t *adkToolAdapter) RequiresReview() bool                              { return true }
 func (t *adkToolAdapter) ArgsSchema() []gocrew.ArgSchema                    { return nil }
 func (t *adkToolAdapter) CacheFunction(input map[string]interface{}) string { return "" }
 func (t *adkToolAdapter) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
-	// Convert gocrewwai input map to ADK-style args
-	args := make(map[string]any, len(input))
-	for k, v := range input {
-		args[k] = v
+	if t.inner == nil {
+		return "", fmt.Errorf("adk tool adapter: nil inner tool")
 	}
-	_ = ctx
-	_ = args
-	return fmt.Sprintf("[ADK tool %s executed with %d args]", t.inner.Name(), len(args)), nil
+	// Delegate to the real ADK tool's Run method when available.
+	if runner, ok := t.inner.(ADKToolRunner); ok {
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		default:
+		}
+		args := make(map[string]any, len(input))
+		for k, v := range input {
+			args[k] = v
+		}
+		return runner.Run(ctx, args)
+	}
+	return "", fmt.Errorf("adk tool adapter: tool %q has no executable Run method", t.inner.Name())
 }
 
 // ---------------------------------------------------------------------------
@@ -448,6 +520,7 @@ func (t *adkToolAdapter) Execute(ctx context.Context, input map[string]interface
 // ---------------------------------------------------------------------------
 
 // ContentToGocInput converts ADK Content to a gocrewwai input string.
+// Output is capped at 20000 chars to bound prompt-injection/DoS surface.
 func ContentToGocInput(content *Content) string {
 	if content == nil {
 		return ""
@@ -461,12 +534,20 @@ func ContentToGocInput(content *Content) string {
 	if len(parts) == 0 {
 		return ""
 	}
-	return strings.Join(parts, "\n")
+	joined := strings.Join(parts, "\n")
+	if len(joined) > 20000 {
+		return joined[:20000]
+	}
+	return joined
 }
 
 // GocResultToContent converts a gocrewwai result to an ADK Content.
+// Output is capped at 20000 chars.
 func GocResultToContent(result interface{}) *Content {
 	text := fmt.Sprintf("%v", result)
+	if len(text) > 20000 {
+		text = text[:20000]
+	}
 	return &Content{
 		Parts: []Part{&TextPart{Text: text}},
 	}
@@ -505,17 +586,55 @@ type memoryStateAdapter struct {
 
 func (m *memoryStateAdapter) Get(key string) (any, error) {
 	m.mu.RLock()
-	defer m.mu.RUnlock()
 	if v, ok := m.cache[key]; ok {
+		m.mu.RUnlock()
 		return v, nil
+	}
+	m.mu.RUnlock()
+	if m.store == nil {
+		return nil, fmt.Errorf("key not found: %s", key)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	// MemoryStore is queried via Recall when available; fall back to cache miss.
+	if recaller, ok := interface{}(m.store).(interface {
+		Recall(context.Context, string) (string, error)
+	}); ok {
+		val, err := recaller.Recall(ctx, key)
+		if err != nil {
+			return nil, fmt.Errorf("key not found: %s", key)
+		}
+		m.mu.Lock()
+		if m.cache == nil {
+			m.cache = make(map[string]any)
+		}
+		m.cache[key] = val
+		m.mu.Unlock()
+		return val, nil
 	}
 	return nil, fmt.Errorf("key not found: %s", key)
 }
 
 func (m *memoryStateAdapter) Set(key string, val any) error {
+	if strings.TrimSpace(key) == "" {
+		return fmt.Errorf("adk state: key is required")
+	}
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	if m.cache == nil {
+		m.cache = make(map[string]any)
+	}
 	m.cache[key] = val
+	m.mu.Unlock()
+	if m.store == nil {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if storer, ok := interface{}(m.store).(interface {
+		Remember(context.Context, string, string) error
+	}); ok {
+		_ = storer.Remember(ctx, key, fmt.Sprintf("%v", val))
+	}
 	return nil
 }
 

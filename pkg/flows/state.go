@@ -3,7 +3,7 @@ package flows
 import (
 	"context"
 	"encoding/json"
-	//"fmt"
+	"sync"
 )
 
 // State defines the strictly-typed object that tracks the flow's progress.
@@ -28,7 +28,7 @@ func (s *BaseState) FromJSON(data []byte) error {
 }
 
 func (s *BaseState) Clone() State {
-	newData := make(map[string]interface{})
+	newData := make(map[string]interface{}, len(s.Data))
 	for k, v := range s.Data {
 		newData[k] = v
 	}
@@ -73,11 +73,19 @@ type FlowNode struct {
 }
 
 // Flow is the top-level orchestration unit for complex multi-crew workflows.
+//
+// Role split vs pkg/flow: pkg/flow is the canonical event-driven sequential
+// flow (CrewAI Flow-like: nodes, listeners, Emit/Start/Kickoff). pkg/flows is
+// the graph/DAG engine (router/parallel/map/reduce nodes + checkpoints) for
+// complex branching workflows. Do not mutate Nodes/Initial while Run/Resume
+// is in flight; State is guarded by mu.
 type Flow struct {
 	ID      string
 	Nodes   map[string]*FlowNode
 	Initial string
 	State   State
+
+	mu sync.RWMutex
 }
 
 func NewFlow(id string, initial string, state State) *Flow {
@@ -90,5 +98,27 @@ func NewFlow(id string, initial string, state State) *Flow {
 }
 
 func (f *Flow) AddNode(node *FlowNode) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.Nodes[node.ID] = node
+}
+
+// getNode returns the node pointer under read lock; callers must not mutate it.
+func (f *Flow) getNode(id string) (*FlowNode, bool) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	n, ok := f.Nodes[id]
+	return n, ok
+}
+
+func (f *Flow) getState() State {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	return f.State
+}
+
+func (f *Flow) setState(s State) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.State = s
 }

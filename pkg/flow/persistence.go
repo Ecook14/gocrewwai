@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -31,28 +33,83 @@ type JSONFilePersistence struct {
 
 // NewJSONFilePersistence creates a file-based persistence backend.
 func NewJSONFilePersistence(dir string) *JSONFilePersistence {
-	os.MkdirAll(dir, 0755)
+	os.MkdirAll(dir, 0700)
 	return &JSONFilePersistence{Dir: dir}
+}
+
+// cleanFlowID rejects IDs that could escape the storage dir.
+func cleanFlowID(flowID string) (string, error) {
+	if flowID == "" || len(flowID) > 128 {
+		return "", fmt.Errorf("flow: invalid flow ID %q", flowID)
+	}
+	if strings.ContainsAny(flowID, `/\`) || strings.Contains(flowID, "..") {
+		return "", fmt.Errorf("flow: invalid flow ID %q", flowID)
+	}
+	if filepath.Clean(flowID) != flowID {
+		return "", fmt.Errorf("flow: invalid flow ID %q", flowID)
+	}
+	return flowID, nil
+}
+
+// atomicWriteFile writes via temp-file + rename so crashes never leave partial state.
+func atomicWriteFile(path string, data []byte, perm os.FileMode) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".tmp-state-*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName)
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Chmod(tmpName, perm); err != nil {
+		return err
+	}
+	return os.Rename(tmpName, path)
 }
 
 func (p *JSONFilePersistence) SaveState(ctx context.Context, flowID string, state State) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
+	id, err := cleanFlowID(flowID)
+	if err != nil {
+		return err
+	}
 	data, err := json.MarshalIndent(state, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal flow state: %w", err)
 	}
 
-	path := fmt.Sprintf("%s/%s.json", p.Dir, flowID)
-	return os.WriteFile(path, data, 0644)
+	path := filepath.Join(p.Dir, id+".json")
+	return atomicWriteFile(path, data, 0600)
 }
 
 func (p *JSONFilePersistence) LoadState(ctx context.Context, flowID string) (State, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	path := fmt.Sprintf("%s/%s.json", p.Dir, flowID)
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
+	id, err := cleanFlowID(flowID)
+	if err != nil {
+		return nil, err
+	}
+	path := filepath.Join(p.Dir, id+".json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -69,7 +126,11 @@ func (p *JSONFilePersistence) LoadState(ctx context.Context, flowID string) (Sta
 }
 
 func (p *JSONFilePersistence) DeleteState(ctx context.Context, flowID string) error {
-	path := fmt.Sprintf("%s/%s.json", p.Dir, flowID)
+	id, err := cleanFlowID(flowID)
+	if err != nil {
+		return err
+	}
+	path := filepath.Join(p.Dir, id+".json")
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		return err
 	}
