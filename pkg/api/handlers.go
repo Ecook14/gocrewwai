@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -21,7 +23,37 @@ import (
 
 // kickoffSem bounds concurrent async crew executions to prevent goroutine
 // exhaustion under load. Acquired before spawning the background worker.
-var kickoffSem = make(chan struct{}, 10)
+//
+// kickoffSemMu serializes mutation of the channel variable so tests
+// (which patch kickoffSem to induce saturation) cannot race with the
+// in-flight kickoff goroutine reading the global. The mutex is the *only*
+// lock protecting the variable identity; the channel itself is goroutine-safe.
+var (
+	kickoffSem   = make(chan struct{}, 10)
+	kickoffSemMu sync.RWMutex
+)
+
+// acquireSem takes a slot, returning the exact channel it was taken from.
+// The caller MUST pass that channel to releaseSem. Returning it is what makes
+// the acquire/release pair correct when the global is reassigned in between:
+// releasing via a re-read of the global would return the token to a different
+// channel, permanently draining the one that was actually acquired from.
+func acquireSem() (chan struct{}, bool) {
+	kickoffSemMu.RLock()
+	sem := kickoffSem
+	kickoffSemMu.RUnlock()
+	select {
+	case sem <- struct{}{}:
+		return sem, true
+	default:
+		return nil, false
+	}
+}
+
+// releaseSem returns a slot to the same channel acquireSem took it from.
+func releaseSem(sem chan struct{}) {
+	<-sem
+}
 
 // checkIdem returns the ledger entry for an Idempotency-Key. Entries are
 // owner-scoped: a key presented by a different token is treated as unseen
@@ -36,23 +68,106 @@ func (s *Server) checkIdem(key, owner string) (*idemEntry, bool) {
 	return e, true
 }
 
+// newLLMClient builds the provider client for a kickoff agent. It is a
+// package-level var so tests can substitute a stub and avoid real provider
+// calls; production always uses the OpenAI client.
+var newLLMClient = func(apiKey string) llm.Client { return llm.NewOpenAIClient(apiKey) }
+
+// idemOp is the single internal mutation primitive for the idempotency
+// ledger. Public methods (next 4) are thin wrappers so call sites stay
+// readable; the lock contract lives in one place.
+type idemOp int
+
+const (
+	idemOpReserve idemOp = iota
+	idemOpRelease
+	idemOpFinalize
+	idemOpFinish
+)
+
+func (s *Server) doIdem(op idemOp, key, owner, sessionID, status string) {
+	if key == "" && op != idemOpFinish {
+		return
+	}
+	s.idemMu.Lock()
+	defer s.idemMu.Unlock()
+	switch op {
+	case idemOpReserve:
+		if _, exists := s.idemKeys[key]; !exists {
+			s.idemKeys[key] = &idemEntry{sessionID: sessionID, owner: owner, createdAt: time.Now()}
+			s.idemBySession[sessionID] = key
+		}
+	case idemOpRelease:
+		if e, ok := s.idemKeys[key]; ok && !e.done {
+			delete(s.idemKeys, key)
+			delete(s.idemBySession, e.sessionID)
+		}
+	case idemOpFinalize:
+		// Preserve original createdAt so TTL eviction still bounds ledger age.
+		e, ok := s.idemKeys[key]
+		owner := ""
+		createdAt := time.Now()
+		if ok {
+			owner = e.owner
+			createdAt = e.createdAt
+		}
+		s.idemKeys[key] = &idemEntry{sessionID: sessionID, owner: owner, createdAt: createdAt}
+		s.idemBySession[sessionID] = key
+	case idemOpFinish:
+		if key, ok := s.idemBySession[sessionID]; ok {
+			if e, ok := s.idemKeys[key]; ok {
+				e.done = true
+				e.status = status
+			}
+			delete(s.idemBySession, sessionID)
+		}
+	}
+}
+
+// reserveIdem atomically claims an Idempotency-Key for a session. The pair
+// must be reserved BEFORE the session is persisted so a concurrent request
+// with the same key but a different session_id cannot pass both the
+// checkIdem gate and the session-running map gate in the same window.
+func (s *Server) reserveIdem(key, owner, sessionID string) {
+	s.doIdem(idemOpReserve, key, owner, sessionID, "")
+}
+
+// releaseIdem frees a reservation (used when the next gate rejects the request).
+func (s *Server) releaseIdem(key string) { s.doIdem(idemOpRelease, key, "", "", "") }
+
+// finalizeIdem marks the reservation complete (kickoff launched) without
+// rolling back. Preserves the original createdAt so the TTL eviction sweep
+// still bounds how long the ledger can hold a zombie entry.
+func (s *Server) finalizeIdem(key, sessionID string) {
+	s.doIdem(idemOpFinalize, key, "", sessionID, "")
+}
+
+// finishIdem marks the entry as completed/failed after the crew settles.
+func (s *Server) finishIdem(sessionID, status string) {
+	s.doIdem(idemOpFinish, "", "", sessionID, status)
+}
+
+// storeIdem (legacy public path used by tests) — TTL-evicts to make room
+// before refusing, matching the original TestIdempotencyLedger contract.
 func (s *Server) storeIdem(key, owner, sessionID string) {
 	s.idemMu.Lock()
 	defer s.idemMu.Unlock()
-	s.idemKeys[key] = &idemEntry{sessionID: sessionID, owner: owner}
-	s.idemBySession[sessionID] = key
-}
-
-func (s *Server) finishIdem(sessionID, status string) {
-	s.idemMu.Lock()
-	defer s.idemMu.Unlock()
-	if key, ok := s.idemBySession[sessionID]; ok {
-		if e, ok := s.idemKeys[key]; ok {
-			e.done = true
-			e.status = status
+	if _, exists := s.idemKeys[key]; !exists && len(s.idemKeys) >= maxIdemKeys {
+		now := time.Now()
+		for k, e := range s.idemKeys {
+			if now.Sub(e.createdAt) > idemEntryTTL {
+				delete(s.idemKeys, k)
+			}
+			if len(s.idemKeys) < maxIdemKeys {
+				break
+			}
 		}
-		delete(s.idemBySession, sessionID)
+		if len(s.idemKeys) >= maxIdemKeys {
+			return
+		}
 	}
+	s.idemKeys[key] = &idemEntry{sessionID: sessionID, owner: owner, createdAt: time.Now()}
+	s.idemBySession[sessionID] = key
 }
 
 // handleKickoff accepts a full crew execution request and starts execution.
@@ -60,21 +175,30 @@ func (s *Server) finishIdem(sessionID, status string) {
 // the session, and dispatches execution to the Crew engine.
 func (s *Server) handleKickoff(c *gin.Context) {
 	var payload struct {
-		SessionID          string   `json:"session_id"`
-		AgentRole          string   `json:"agent_role"`
-		AgentGoal          string   `json:"agent_goal"`
-		AgentBackstory     string   `json:"agent_backstory"`
-		AgentModel         string   `json:"agent_model"`
-		AgentSystemPrompt  string   `json:"agent_system_prompt"`
-		TaskDescription    string   `json:"task_description"`
-		TaskExpectedOutput string   `json:"task_expected_output"`
-		TaskTools          []string `json:"task_tools"`
-		CrewProcess        string   `json:"crew_process"`
-		MaxIterations      int      `json:"max_iterations"`
+		SessionID          string   `json:"session_id" binding:"omitempty,max=128"`
+		AgentRole          string   `json:"agent_role" binding:"required,max=256"`
+		AgentGoal          string   `json:"agent_goal" binding:"max=2000"`
+		AgentBackstory     string   `json:"agent_backstory" binding:"max=4000"`
+		AgentModel         string   `json:"agent_model" binding:"max=128"`
+		AgentSystemPrompt  string   `json:"agent_system_prompt" binding:"max=4000"`
+		TaskDescription    string   `json:"task_description" binding:"required,max=20000"`
+		TaskExpectedOutput string   `json:"task_expected_output" binding:"max=20000"`
+		TaskTools          []string `json:"task_tools" binding:"max=32,dive,max=128"`
+		CrewProcess        string   `json:"crew_process" binding:"max=32"`
+		MaxIterations      int      `json:"max_iterations" binding:"min=0,max=1000"`
 	}
 
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// CrewAI-compatible process names only; anything else is rejected rather
+	// than silently defaulting.
+	switch payload.CrewProcess {
+	case "", "sequential", "hierarchical", "consensual", "graph", "reflective", "state_machine", "state-machine":
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported crew_process"})
 		return
 	}
 
@@ -106,6 +230,10 @@ func (s *Server) handleKickoff(c *gin.Context) {
 			})
 			return
 		}
+		// Reserve the idempotency key BEFORE persisting the session so a
+		// concurrent request with the same key can't slip past both
+		// checkIdem (miss) and the session-running map (miss).
+		s.reserveIdem(idemKey, owner, payload.SessionID)
 	}
 
 	// Idempotency (DCR-04): a replayed kickoff for an already-running session
@@ -113,6 +241,7 @@ func (s *Server) handleKickoff(c *gin.Context) {
 	s.mu.RLock()
 	if st, ok := s.sessions[payload.SessionID]; ok && st.Status == "running" {
 		s.mu.RUnlock()
+		s.releaseIdem(idemKey)
 		c.JSON(http.StatusConflict, gin.H{
 			"error":      "session already running",
 			"session_id": payload.SessionID,
@@ -138,10 +267,19 @@ func (s *Server) handleKickoff(c *gin.Context) {
 	// nor an existing LLM client is available, because an agent without an LLM
 	// cannot execute.
 	var llmClient llm.Client
-	if payload.AgentModel != "" {
-		if tc := llm.NewOpenAIClient(""); tc != nil {
-			llmClient = tc
+	if payload.AgentModel != "" && newLLMClient != nil {
+		// Reject empty / unconfigured API key. Constructing an OpenAI client
+		// with "" lets unauthenticated kickoffs execute against an empty
+		// bearer (noisy DoS surface, log-leak surface).
+		apiKey := os.Getenv("OPENAI_API_KEY")
+		if apiKey == "" {
+			c.JSON(http.StatusServiceUnavailable, gin.H{
+				"error":   "api_provider_unconfigured",
+				"message": "agent_model requires a configured OPENAI_API_KEY",
+			})
+			return
 		}
+		llmClient = newLLMClient(apiKey)
 	}
 
 	agentOpts := []agents.AgentOption{
@@ -172,29 +310,39 @@ func (s *Server) handleKickoff(c *gin.Context) {
 
 	// Persist the session as "running" via the checkpoint backend.
 	if err := s.persistSessionStart(payload.SessionID, owner); err != nil {
+		// Release the idempotency reservation so a retry (with the same
+		// key, different session_id) isn't blocked by a zombie entry.
+		s.releaseIdem(idemKey)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": fmt.Sprintf("failed to persist session: %v", err),
 		})
 		return
 	}
 
-	// Record the idempotency key now that the session durably exists.
 	if idemKey != "" {
-		s.storeIdem(idemKey, owner, payload.SessionID)
+		// Reservation was made before persistSessionStart; release on failure paths.
+		s.finalizeIdem(idemKey, payload.SessionID)
 	}
 
 	// Dispatch execution asynchronously so the HTTP response returns immediately.
 	// Bounded by kickoffSem and propagates the request context (detached from
 	// cancellation so the crew survives client disconnect, but keeps values).
-	select {
-	case kickoffSem <- struct{}{}:
-	default:
+	sem, acquired := acquireSem()
+	if !acquired {
+		// Semaphore saturated: release the idempotency reservation so a
+		// retry with the same key (after the queue drains) isn't blocked.
+		s.releaseIdem(idemKey)
 		c.JSON(http.StatusTooManyRequests, gin.H{"error": "server busy: too many concurrent crew executions"})
 		return
 	}
 	bgCtx := context.WithoutCancel(c.Request.Context())
+	// Track the goroutine on the server's WaitGroup so Shutdown waits for
+	// in-flight kickoffs (prevents leaked goroutines racing the test cleanup
+	// chain or causing post-shutdown writes).
+	s.kickoffWG.Add(1)
 	go func() {
-		defer func() { <-kickoffSem }()
+		defer releaseSem(sem)
+		defer s.kickoffWG.Done()
 		if _, err := crw.Kickoff(bgCtx); err != nil {
 			s.persistSessionFailure(payload.SessionID, err.Error())
 			s.finishIdem(payload.SessionID, "failed")
@@ -211,8 +359,11 @@ func (s *Server) handleKickoff(c *gin.Context) {
 }
 
 // persistSessionStart records that a session has been created and is running.
-// It writes a checkpoint via the SQLite backend when available, otherwise
-// falls back to the in-memory session tracker.
+// It writes a checkpoint via the SQLite/Redis backend when available,
+// otherwise falls back to the in-memory session tracker. The checkpoint
+// write is mandatory when a store is configured: a failure here is
+// returned to the caller so the kickoff rejects rather than running
+// against an unrecoverable session.
 func (s *Server) persistSessionStart(sessionID, owner string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -238,6 +389,11 @@ func (s *Server) persistSessionStart(sessionID, owner string) error {
 				Success:   false,
 				Error:     err.Error(),
 			})
+			// Surface the error: a session whose checkpoint didn't durably
+			// persist is not recoverable (no record of agent/task state).
+			// Rolling back the in-memory insert keeps the maps consistent.
+			delete(s.sessions, sessionID)
+			return fmt.Errorf("checkpoint save failed: %w", err)
 		}
 	}
 

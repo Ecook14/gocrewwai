@@ -6,12 +6,14 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/Ecook14/gocrewwai/gocrew"
 	"github.com/Ecook14/gocrewwai/pkg/core"
 	"github.com/Ecook14/gocrewwai/pkg/dashboard"
+	"github.com/Ecook14/gocrewwai/pkg/memory"
 	"github.com/Ecook14/gocrewwai/pkg/telemetry"
 )
 
@@ -26,6 +28,7 @@ func printHelp() {
 	fmt.Println("  gocrew replay -t [task_id]    - Replay from a specific task")
 	fmt.Println("  gocrew reset-memories [type]  - Reset memories (long, short, all)")
 	fmt.Println("  gocrew chat                   - Start interactive chat with crew")
+	fmt.Println("  gocrew deploy [--out DIR]     - Build release binaries into DIR")
 	fmt.Println("  gocrew version                - Show gocrew version")
 	fmt.Println("  gocrew kickoff [--ui]         - Execute the demo crew")
 }
@@ -59,6 +62,8 @@ func Run(args []string) error {
 		return handleChat()
 	case "reset-memories":
 		return handleResetMemories(args[2:])
+	case "deploy":
+		return handleDeploy(args[2:])
 	case "kickoff":
 		ui := false
 		for _, arg := range args {
@@ -129,12 +134,16 @@ func handleTrain(args []string) error {
 	iterations := 5
 	for i, arg := range args {
 		if (arg == "-n" || arg == "--n_iterations") && i+1 < len(args) {
-			fmt.Sscanf(args[i+1], "%d", &iterations)
+			var n int
+			if _, err := fmt.Sscanf(args[i+1], "%d", &n); err != nil || n <= 0 || n > 100 {
+				return fmt.Errorf("invalid iterations %q: must be 1-100", args[i+1])
+			}
+			iterations = n
 		}
 	}
-	slog.Info("🏋️ Starting Training Session", slog.Int("iterations", iterations))
-	fmt.Printf("Training initiated for %d iterations. Feedback loop active.\n", iterations)
-	return nil
+	slog.Info("Starting Training Session", slog.Int("iterations", iterations))
+	// Execute against the project crew: the project owns its config/agents.
+	return runProject([]string{"train", "-n", fmt.Sprintf("%d", iterations)})
 }
 
 func handleTest(args []string) error {
@@ -142,24 +151,67 @@ func handleTest(args []string) error {
 	model := "gpt-4o-mini"
 	for i, arg := range args {
 		if (arg == "-n" || arg == "--n_iterations") && i+1 < len(args) {
-			fmt.Sscanf(args[i+1], "%d", &iterations)
+			var n int
+			if _, err := fmt.Sscanf(args[i+1], "%d", &n); err != nil || n <= 0 || n > 100 {
+				return fmt.Errorf("invalid iterations %q: must be 1-100", args[i+1])
+			}
+			iterations = n
 		}
 		if (arg == "-m" || arg == "--model") && i+1 < len(args) {
+			if strings.TrimSpace(args[i+1]) == "" || len(args[i+1]) > 64 {
+				return fmt.Errorf("invalid model %q", args[i+1])
+			}
 			model = args[i+1]
 		}
 	}
-	slog.Info("🧪 Starting Performance Test", slog.Int("iterations", iterations), slog.String("model", model))
-	fmt.Printf("Testing initiated for %d iterations using %s as evaluator.\n", iterations, model)
-	return nil
+	slog.Info("Starting Performance Test", slog.Int("iterations", iterations), slog.String("model", model))
+	return runProject([]string{"test", "-n", fmt.Sprintf("%d", iterations), "-m", model})
 }
 
 func handleResetMemories(args []string) error {
 	target := "all"
-	if len(args) > 0 {
-		target = args[0]
+	store := ""
+	conn := ""
+	for i, arg := range args {
+		switch arg {
+		case "--store":
+			if i+1 < len(args) {
+				store = args[i+1]
+			}
+		case "--conn":
+			if i+1 < len(args) {
+				conn = args[i+1]
+			}
+		default:
+			if !strings.HasPrefix(arg, "-") && target == "all" && store == "" {
+				target = arg
+			}
+		}
 	}
-	slog.Info("🧹 Resetting Memories", slog.String("type", target))
-	fmt.Printf("Memory reset successful for: %s\n", target)
+	if target != "all" && target != "long" && target != "short" {
+		return fmt.Errorf("invalid memory type %q: must be all|long|short", target)
+	}
+	_ = target // reserved for scoped reset once stores expose scopes
+	if store == "" {
+		return fmt.Errorf("usage: gocrew reset-memories [all|long|short] --store sqlite --conn <path>")
+	}
+	if store != "sqlite" {
+		return fmt.Errorf("unsupported store %q: only sqlite reset is supported", store)
+	}
+	if conn == "" || len(conn) > 256 || filepath.IsAbs(conn) || strings.Contains(conn, "..") || strings.ContainsAny(conn, `/\`) {
+		return fmt.Errorf("invalid --conn %q: sqlite basename only", conn)
+	}
+	slog.Info("Resetting Memories", slog.String("store", store), slog.String("conn", conn))
+	st, err := memory.NewSQLiteStore(conn)
+	if err != nil {
+		return fmt.Errorf("failed to open sqlite store: %w", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := st.Reset(ctx); err != nil {
+		return fmt.Errorf("memory reset failed: %w", err)
+	}
+	fmt.Printf("Memory reset successful for sqlite store: %s\n", conn)
 	return nil
 }
 
@@ -173,16 +225,104 @@ func handleReplay(args []string) error {
 	if taskID == "" {
 		return fmt.Errorf("usage: gocrew replay -t [task_id]")
 	}
-	slog.Info("🔄 Initiating Replay", slog.String("task_id", taskID))
-	fmt.Printf("Replaying execution starting from task: %s\n", taskID)
-	return nil
+	if len(taskID) > 128 || strings.ContainsAny(taskID, "/\\..") {
+		return fmt.Errorf("invalid task_id %q", taskID)
+	}
+	slog.Info("Initiating Replay", slog.String("task_id", taskID))
+	// Execute against the project crew, which owns checkpoints/state.
+	return runProject([]string{"replay", "-t", taskID})
 }
 
 func handleChat() error {
-	slog.Info("💬 Entering Interactive Chat Mode")
-	fmt.Println("Gocrewwai Interactive Chat (type 'exit' to quit)")
-	fmt.Println("Architect: Hello! I'm ready to collaborate. What's on your mind?")
+	slog.Info("Entering project chat mode")
+	// The project owns its agents/config; delegate the interactive loop.
+	return runProject([]string{"chat"})
+}
+
+// handleDeploy builds release binaries (gocrew CLI + server) into --out DIR
+// (default ./dist). It validates the tree looks like gocrewwai (go.mod +
+// cmd/) and fails closed otherwise. Webhook triggers for managed hosting
+// remain roadmap; binary + Dockerfile artifacts are the deploy unit.
+func handleDeploy(args []string) error {
+	out := "./dist"
+	for i, arg := range args {
+		if arg == "--out" && i+1 < len(args) {
+			out = args[i+1]
+		}
+		if strings.HasPrefix(arg, "--out=") {
+			out = strings.TrimPrefix(arg, "--out=")
+		}
+	}
+	if out == "" || len(out) > 256 || strings.Contains(out, "..") {
+		return fmt.Errorf("invalid --out %q", out)
+	}
+	for _, need := range []string{"go.mod", "cmd/gocrew", "cmd/server", "Dockerfile"} {
+		if _, err := os.Stat(need); err != nil {
+			return fmt.Errorf("deploy must run from the gocrewwai repo root: missing %s", need)
+		}
+	}
+	if err := os.MkdirAll(out, 0755); err != nil {
+		return fmt.Errorf("failed to create out dir: %w", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	targets := map[string]string{
+		"./cmd/gocrew": "gocrew",
+		"./cmd/server": "gocrewwai-server",
+	}
+	for pkg, bin := range targets {
+		dest := filepath.Join(out, bin)
+		cmd := exec.CommandContext(ctx, "go", "build", "-o", dest, pkg)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		slog.Info("building deploy artifact", slog.String("pkg", pkg), slog.String("out", dest))
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("build %s failed: %w", pkg, err)
+		}
+	}
+	fmt.Printf("deploy artifacts ready in %s/ (gocrew, gocrewwai-server) + Dockerfile\n", out)
 	return nil
+}
+
+// runProject executes `go run main.go <args>` in the current directory with a
+// bounded context and a secrets-stripped environment. Fails closed when there
+// is no gocrew project here.
+func runProject(args []string) error {
+	if _, err := os.Stat("main.go"); err != nil {
+		return fmt.Errorf("not a gocrew project directory: main.go not found")
+	}
+	for _, a := range args {
+		if a == "" || len(a) > 512 {
+			return fmt.Errorf("invalid project arg %q", a)
+		}
+	}
+	runArgs := append([]string{"run", "main.go"}, args...)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "go", runArgs...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	var safeEnv []string
+	for _, e := range os.Environ() {
+		if strings.HasPrefix(e, "PATH=") ||
+			strings.HasPrefix(e, "GOPATH=") ||
+			strings.HasPrefix(e, "GOROOT=") ||
+			strings.HasPrefix(e, "GOPROXY=") ||
+			strings.HasPrefix(e, "GOSUMDB=") ||
+			strings.HasPrefix(e, "GOFLAGS=") ||
+			strings.HasPrefix(e, "GOMODCACHE=") ||
+			strings.HasPrefix(e, "OPENAI_API_KEY=") ||
+			strings.HasPrefix(e, "ANTHROPIC_API_KEY=") ||
+			strings.HasPrefix(e, "GEMINI_API_KEY=") ||
+			strings.HasPrefix(e, "GROQ_API_KEY=") ||
+			strings.HasPrefix(e, "OPENROUTER_API_KEY=") ||
+			strings.HasPrefix(e, "CREW_CONFIG_PATH=") {
+			safeEnv = append(safeEnv, e)
+		}
+	}
+	cmd.Env = safeEnv
+	return cmd.Run()
 }
 
 // handleKickoff initializes a basic sample crew using the SDK.

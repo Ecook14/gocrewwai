@@ -28,6 +28,7 @@ package server
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -42,6 +43,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Ecook14/gocrewwai/pkg/auth"
 	"github.com/Ecook14/gocrewwai/pkg/telemetry"
 )
 
@@ -55,6 +57,8 @@ type Server struct {
 	rateLimit       int
 	rateLimitWin    time.Duration
 	rateLimiters    map[string]*tokenBucket
+	tlsCertFile     string
+	tlsKeyFile      string
 	mux             *http.ServeMux
 	httpServer      *http.Server
 	ready           atomic.Bool
@@ -69,17 +73,33 @@ type tokenBucket struct {
 	mu         sync.Mutex
 	tokens     int
 	lastRefill time.Time
+	lastSeen   time.Time
 	rate       int
 	window     time.Duration
 }
 
 func newTokenBucket(rate int, window time.Duration) *tokenBucket {
+	now := time.Now()
 	return &tokenBucket{
 		tokens:     rate,
-		lastRefill: time.Now(),
+		lastRefill: now,
+		lastSeen:   now,
 		rate:       rate,
 		window:     window,
 	}
+}
+
+// maxRateLimiters bounds the per-IP limiter table (DoS guard under IP rotation).
+// limiterIdleTTL evicts buckets idle longer than this.
+const (
+	maxRateLimiters = 10000
+	limiterIdleTTL  = 10 * time.Minute
+)
+
+func (tb *tokenBucket) lastSeenLocked() {
+	tb.mu.Lock()
+	defer tb.mu.Unlock()
+	tb.lastSeen = time.Now()
 }
 
 func (tb *tokenBucket) Allow() bool {
@@ -129,6 +149,13 @@ func WithAPIKeys(keys []string) Option {
 	return func(s *Server) { s.apiKeys = keys }
 }
 
+// WithTLSFiles enables HTTPS with the given cert/key pair. Files may also be
+// supplied via TLS_CERT_FILE / TLS_KEY_FILE environment variables, which take
+// effect when no explicit option is set.
+func WithTLSFiles(certFile, keyFile string) Option {
+	return func(s *Server) { s.tlsCertFile, s.tlsKeyFile = certFile, keyFile }
+}
+
 // WithRateLimit sets rate limiting: rate requests per window.
 // When rate <= 0, rate limiting is disabled.
 func WithRateLimit(rate int, window time.Duration) Option {
@@ -157,8 +184,37 @@ func New(opts ...Option) *Server {
 	for _, opt := range opts {
 		opt(s)
 	}
+	if s.tlsCertFile == "" {
+		s.tlsCertFile = os.Getenv("TLS_CERT_FILE")
+	}
+	if s.tlsKeyFile == "" {
+		s.tlsKeyFile = os.Getenv("TLS_KEY_FILE")
+	}
 	s.registerRoutes()
+	s.startLimiterSweeper()
 	return s
+}
+
+// startLimiterSweeper evicts idle rate-limiter buckets so the table cannot
+// grow without bound under source-IP rotation.
+func (s *Server) startLimiterSweeper() {
+	go func() {
+		ticker := time.NewTicker(limiterIdleTTL)
+		defer ticker.Stop()
+		for range ticker.C {
+			cutoff := time.Now().Add(-limiterIdleTTL)
+			s.mu.Lock()
+			for ip, tb := range s.rateLimiters {
+				tb.mu.Lock()
+				idle := tb.lastSeen.Before(cutoff)
+				tb.mu.Unlock()
+				if idle {
+					delete(s.rateLimiters, ip)
+				}
+			}
+			s.mu.Unlock()
+		}
+	}()
 }
 
 // RegisterHealthCheck registers a health check with the given name.
@@ -184,6 +240,8 @@ func (s *Server) OnShutdown(fn func()) {
 }
 
 // Start starts the server in a goroutine. Use Shutdown to stop it.
+// TLS is enabled when TLS_CERT_FILE + TLS_KEY_FILE are set (or via
+// WithTLSFiles); otherwise plain HTTP serves loopback-safe dev traffic.
 func (s *Server) Start() error {
 	handler := s.buildHandler()
 	httpServer := &http.Server{
@@ -194,6 +252,9 @@ func (s *Server) Start() error {
 		IdleTimeout:  60 * time.Second,
 	}
 	s.httpServer = httpServer
+	if s.tlsCertFile != "" && s.tlsKeyFile != "" {
+		return httpServer.ListenAndServeTLS(s.tlsCertFile, s.tlsKeyFile)
+	}
 	return httpServer.ListenAndServe()
 }
 
@@ -404,31 +465,53 @@ func (s *Server) copyPprofRoutes(mux *http.ServeMux) {
 	})
 }
 
-// validateAPIKey checks if the request has a valid API key.
+// validateAPIKey checks if the request has a valid API key using
+// constant-time comparison to avoid timing side-channels. When JWT_SECRET is
+// set, a valid `Authorization: Bearer <jwt>` (HS256) is also accepted.
 func (s *Server) validateAPIKey(r *http.Request) bool {
 	key := r.Header.Get("X-API-Key")
-	if key == "" {
-		return false
+	if key != "" {
+		for _, k := range s.apiKeys {
+			if len(k) != len(key) {
+				continue
+			}
+			if subtle.ConstantTimeCompare([]byte(k), []byte(key)) == 1 {
+				return true
+			}
+		}
 	}
-	for _, k := range s.apiKeys {
-		if k == key {
-			return true
+	if h := r.Header.Get("Authorization"); strings.HasPrefix(h, "Bearer ") {
+		if v := auth.ValidatorFromEnv(); v != nil {
+			if _, err := v.Validate(strings.TrimPrefix(h, "Bearer ")); err == nil {
+				return true
+			}
 		}
 	}
 	return false
 }
 
 // rateLimitMiddleware wraps handler with per-IP rate limiting.
+// Idle buckets are evicted by startLimiterSweeper (started in New) so the
+// map cannot grow without bound under IP rotation.
 func (s *Server) rateLimitMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip := s.getClientIP(r)
+		s.mu.Lock()
 		tb, ok := s.rateLimiters[ip]
 		if !ok {
+			if len(s.rateLimiters) >= maxRateLimiters {
+				s.mu.Unlock()
+				s.logger.Warn("rate limiter table full", "ip", ip)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusTooManyRequests)
+				json.NewEncoder(w).Encode(map[string]string{"error": "server busy"})
+				return
+			}
 			tb = newTokenBucket(s.rateLimit, s.rateLimitWin)
-			s.mu.Lock()
 			s.rateLimiters[ip] = tb
-			s.mu.Unlock()
 		}
+		tb.lastSeenLocked()
+		s.mu.Unlock()
 
 		if !tb.Allow() {
 			s.logger.Warn("rate limit exceeded", "ip", ip, "path", r.URL.Path)
@@ -446,15 +529,19 @@ func (s *Server) rateLimitMiddleware(next http.Handler) http.Handler {
 }
 
 // getClientIP extracts the client IP from the request.
+// X-Forwarded-For / X-Real-IP are only honored when TRUST_PROXY_HEADERS=1,
+// otherwise RemoteAddr is authoritative (prevents IP spoofing for rate limiting).
 func (s *Server) getClientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		ips := strings.Split(xff, ",")
-		if len(ips) > 0 {
-			return strings.TrimSpace(ips[0])
+	if os.Getenv("TRUST_PROXY_HEADERS") == "1" {
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			ips := strings.Split(xff, ",")
+			if len(ips) > 0 {
+				return strings.TrimSpace(ips[0])
+			}
 		}
-	}
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return xri
+		if xri := r.Header.Get("X-Real-IP"); xri != "" {
+			return strings.TrimSpace(xri)
+		}
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {

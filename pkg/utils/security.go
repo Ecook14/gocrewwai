@@ -3,6 +3,9 @@ package utils
 import (
 	"errors"
 	"fmt"
+	"net"
+	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -84,4 +87,100 @@ func ValidatePath(path string, chroot string) (string, error) {
 // outside the root.
 func FileWriteSanitize(cleanedPath, chroot string) (string, error) {
 	return ValidatePath(cleanedPath, chroot)
+}
+
+// ValidatePathResolved is the symlink-hardened variant. It first runs
+// ValidatePath, then resolves symlinks on the existing prefix via
+// filepath.EvalSymlinks and re-checks containment. Callers opening files that
+// may be symlinks must use this (or O_NOFOLLOW) — plain ValidatePath does not
+// follow symlinks by design.
+func ValidatePathResolved(path, chroot string) (string, error) {
+	absPath, err := ValidatePath(path, chroot)
+	if err != nil {
+		return "", err
+	}
+	absChroot, err := filepath.Abs(chroot)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve chroot directory: %w", err)
+	}
+	absChroot = filepath.Clean(absChroot)
+	// Resolve the longest existing prefix so non-existent leaf files still validate.
+	target := absPath
+	for {
+		if _, statErr := os.Lstat(target); statErr == nil {
+			break
+		}
+		parent := filepath.Dir(target)
+		if parent == target {
+			break
+		}
+		target = parent
+		if len(target) < len(absChroot) {
+			break
+		}
+	}
+	resolved, err := filepath.EvalSymlinks(target)
+	if err != nil {
+		// If nothing exists yet, fall back to the lexical check.
+		return absPath, nil
+	}
+	resolved = filepath.Clean(resolved)
+	if resolved != absChroot && !strings.HasPrefix(resolved, absChroot+string(filepath.Separator)) {
+		return "", fmt.Errorf("security violation: symlink target %s escapes allowed directory %s", path, chroot)
+	}
+	return absPath, nil
+}
+
+// MaxURLBytes bounds outbound fetch sizes for callers.
+const MaxURLBytes = 10 << 20 // 10MB
+
+// ValidateURL rejects SSRF targets: non-http(s) schemes, embedded credentials,
+// localhost/loopback, link-local metadata endpoints, and private-network IPs
+// resolved via DNS. Returns the parsed URL on success.
+//
+// Test/dev exception: when GOCREW_ALLOW_PRIVATE_URLS=1, loopback and private
+// IPs are permitted (for httptest servers). Never set in production.
+func ValidateURL(raw string) (*url.URL, error) {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || u == nil || u.Host == "" {
+		return nil, fmt.Errorf("invalid URL: %s", raw)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return nil, fmt.Errorf("unsupported URL scheme %q", u.Scheme)
+	}
+	if u.User != nil {
+		return nil, errors.New("URL must not contain credentials")
+	}
+	host := u.Hostname()
+	if host == "" {
+		return nil, fmt.Errorf("invalid URL host: %s", raw)
+	}
+	allowPrivate := os.Getenv("GOCREW_ALLOW_PRIVATE_URLS") == "1"
+	lower := strings.ToLower(host)
+	if lower == "localhost" || lower == "metadata.google.internal" {
+		if !allowPrivate {
+			return nil, fmt.Errorf("blocked URL host %q", host)
+		}
+		return u, nil
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsPrivate() || ip.IsUnspecified() {
+			if !allowPrivate {
+				return nil, fmt.Errorf("blocked private/link-local IP %q", host)
+			}
+		}
+		return u, nil
+	}
+	ips, err := net.LookupIP(host)
+	if err != nil || len(ips) == 0 {
+		return nil, fmt.Errorf("unable to resolve URL host %q", host)
+	}
+	for _, ip := range ips {
+		if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsPrivate() || ip.IsUnspecified() {
+			if !allowPrivate {
+				return nil, fmt.Errorf("blocked URL host %q resolves to private address", host)
+			}
+		}
+	}
+	return u, nil
 }

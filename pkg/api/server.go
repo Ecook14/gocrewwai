@@ -1,10 +1,12 @@
 package api
 
 import (
+	"context"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -14,6 +16,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 
+	"github.com/Ecook14/gocrewwai/pkg/auth"
 	"github.com/Ecook14/gocrewwai/pkg/crew"
 	"github.com/Ecook14/gocrewwai/pkg/telemetry"
 )
@@ -33,6 +36,9 @@ func newRateLimiter(limit int, window time.Duration) *rateLimiter {
 	return &rateLimiter{hits: make(map[string][]time.Time), limit: limit, window: window}
 }
 
+// maxRateLimiterIPs bounds the per-IP table (DoS guard under IP rotation).
+const maxRateLimiterIPs = 10000
+
 func (rl *rateLimiter) allow(ip string) bool {
 	if rl.disabled || rl.limit <= 0 {
 		return true
@@ -50,6 +56,28 @@ func (rl *rateLimiter) allow(ip string) bool {
 	if len(fresh) >= rl.limit {
 		rl.hits[ip] = fresh
 		return false
+	}
+	if len(fresh) == 0 && len(rl.hits) >= maxRateLimiterIPs {
+		// Table full of idle entries: sweep once, then admit if room.
+		for k, v := range rl.hits {
+			keep := v[:0]
+			for _, t := range v {
+				if now.Sub(t) < rl.window {
+					keep = append(keep, t)
+				}
+			}
+			if len(keep) == 0 {
+				delete(rl.hits, k)
+			} else {
+				rl.hits[k] = keep
+			}
+			if len(rl.hits) < maxRateLimiterIPs {
+				break
+			}
+		}
+		if len(rl.hits) >= maxRateLimiterIPs {
+			return false
+		}
 	}
 	rl.hits[ip] = append(fresh, now)
 	return true
@@ -84,6 +112,13 @@ type Server struct {
 	idemMu        sync.Mutex
 	idemKeys      map[string]*idemEntry
 	idemBySession map[string]string
+	// startupErr fails Run() when construction detected a fatal misconfig
+	// (e.g. insecure default token without ALLOW_INSECURE_DEV=1).
+	startupErr error
+	// kickoffWG tracks in-flight kickoff goroutines so Shutdown waits for
+	// them — prevents racing goroutines from writing to global state after
+	// a test or shutdown sequence completes.
+	kickoffWG sync.WaitGroup
 }
 
 // idemEntry tracks one Idempotency-Key from acceptance to completion.
@@ -92,7 +127,15 @@ type idemEntry struct {
 	owner     string
 	done      bool
 	status    string
+	createdAt time.Time
 }
+
+// maxIdemKeys bounds the idempotency ledger (DoS guard); entries older than
+// idemEntryTTL are evicted opportunistically on store.
+const (
+	maxIdemKeys  = 10000
+	idemEntryTTL = 24 * time.Hour
+)
 
 // ServerOption configures a Server.
 type ServerOption func(*Server)
@@ -119,8 +162,13 @@ func NewServer(opts ...ServerOption) *Server {
 	})
 
 	authTokens := resolveAuthTokens()
+	var startupErr error
 	if len(authTokens) == 1 && authTokens[0] == "gocrewwai-insecure-default-change-me" {
-		// Insecure default retained for dev; documented as requiring change.
+		if os.Getenv("ALLOW_INSECURE_DEV") != "1" {
+			startupErr = fmt.Errorf("api: refusing to serve with the insecure default token — set API_AUTH_TOKEN(S) or ALLOW_INSECURE_DEV=1 for local dev")
+		} else {
+			slog.Warn("api: running with insecure default token (ALLOW_INSECURE_DEV=1, dev only)")
+		}
 	}
 
 	r.Use(cors.New(cors.Config{
@@ -144,6 +192,7 @@ func NewServer(opts ...ServerOption) *Server {
 		shutdown:      make(chan struct{}),
 		idemKeys:      make(map[string]*idemEntry),
 		idemBySession: make(map[string]string),
+		startupErr:    startupErr,
 	}
 
 	for _, opt := range opts {
@@ -177,7 +226,11 @@ func (s *Server) handleHealth(c *gin.Context) {
 }
 
 // Run starts the server on the given address. It blocks until shutdown.
+// It refuses to serve when construction failed (see startupErr).
 func (s *Server) Run(addr string) error {
+	if s.startupErr != nil {
+		return s.startupErr
+	}
 	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()
@@ -196,10 +249,38 @@ func (s *Server) Run(addr string) error {
 	return srv.ListenAndServe()
 }
 
-// Shutdown initiates a graceful shutdown of the server.
+// Shutdown initiates a graceful shutdown of the server: closes the shutdown
+// channel, then waits for all in-flight kickoff goroutines tracked via
+// kickoffWG. Because kickoffs are detached from the request context via
+// context.WithoutCancel, Shutdown is the only reliable way to wait for them
+// to finish. Bounded by kickoffShutdownTimeout so a stuck LLM call cannot
+// hang Shutdown forever.
 func (s *Server) Shutdown() {
 	close(s.shutdown)
+	done := make(chan struct{})
+	go func() {
+		s.kickoffWG.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(kickoffShutdownTimeout):
+		// Best-effort: kickoffs still running are detached and will exit on
+		// their own when the LLM call returns or the process dies.
+	}
 	s.wg.Wait()
+}
+
+// kickoffShutdownTimeout caps how long Shutdown waits for in-flight kickoffs.
+const kickoffShutdownTimeout = 10 * time.Second
+
+// ShutdownWithContext is the context-aware variant: in-flight kickoff
+// goroutines that already detached via context.WithoutCancel are NOT
+// killed here (those honor bgCtx, which doesn't carry this cancel). This
+// method exists for symmetry and explicit lifecycle intent.
+func (s *Server) ShutdownWithContext(_ context.Context) error {
+	s.Shutdown()
+	return nil
 }
 
 // resolveAuthTokens builds the accepted API token set. API_AUTH_TOKENS
@@ -249,6 +330,17 @@ func authenticationMiddleware(authTokens []string) gin.HandlerFunc {
 				c.Set("token_fp", tokenFingerprint(tok))
 				c.Next()
 				return
+			}
+		}
+		// JWT alternative: when JWT_SECRET is set, a valid HS256 bearer
+		// authenticates with the subject as owner (same tenant isolation).
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			if v := auth.ValidatorFromEnv(); v != nil {
+				if claims, err := v.Validate(strings.TrimPrefix(authHeader, "Bearer ")); err == nil {
+					c.Set("token_fp", auth.SubjectFingerprint(claims.Subject))
+					c.Next()
+					return
+				}
 			}
 		}
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{

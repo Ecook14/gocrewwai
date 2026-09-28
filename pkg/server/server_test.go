@@ -725,6 +725,7 @@ func TestGetClientIP_FromRemoteAddr(t *testing.T) {
 }
 
 func TestGetClientIP_FromXForwardedFor(t *testing.T) {
+	t.Setenv("TRUST_PROXY_HEADERS", "1")
 	s := New()
 	req := httptest.NewRequest("GET", "/", nil)
 	req.RemoteAddr = "10.0.0.1:12345"
@@ -736,7 +737,20 @@ func TestGetClientIP_FromXForwardedFor(t *testing.T) {
 	}
 }
 
+func TestGetClientIP_IgnoresProxyHeadersByDefault(t *testing.T) {
+	os.Unsetenv("TRUST_PROXY_HEADERS")
+	s := New()
+	req := httptest.NewRequest("GET", "/", nil)
+	req.RemoteAddr = "10.0.0.1:12345"
+	req.Header.Set("X-Forwarded-For", "203.0.113.5")
+
+	if ip := s.getClientIP(req); ip != "10.0.0.1" {
+		t.Errorf("getClientIP with untrusted XFF = %q, want %q", ip, "10.0.0.1")
+	}
+}
+
 func TestGetClientIP_FromXRealIP(t *testing.T) {
+	t.Setenv("TRUST_PROXY_HEADERS", "1")
 	s := New()
 	req := httptest.NewRequest("GET", "/", nil)
 	req.RemoteAddr = "10.0.0.1:12345"
