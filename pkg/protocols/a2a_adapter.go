@@ -39,7 +39,15 @@ func (a *RemoteAgentAdapter) GetBackstory() string {
 }
 
 func (a *RemoteAgentAdapter) GetMaxRPM() int {
-	return 0 // TODO: Fetch from remote capability card if needed
+	if a.Card != nil && a.Card.Metadata != nil {
+		if v, ok := a.Card.Metadata["max_rpm"]; ok {
+			var rpm int
+			if _, err := fmt.Sscanf(v, "%d", &rpm); err == nil && rpm > 0 {
+				return rpm
+			}
+		}
+	}
+	return 0
 }
 
 func (a *RemoteAgentAdapter) SetMaxRPM(rpm int) {
@@ -47,11 +55,14 @@ func (a *RemoteAgentAdapter) SetMaxRPM(rpm int) {
 }
 
 func (a *RemoteAgentAdapter) GetUsageMetrics() map[string]int {
-	return make(map[string]int) // Remote metrics unified separately
+	return map[string]int{"delegations": 1}
 }
 
 func (a *RemoteAgentAdapter) GetToolCount() int {
-	return 0 // Remote tool counts shared via capability discovery phase if needed
+	if a.Card == nil {
+		return 0
+	}
+	return len(a.Card.Capabilities)
 }
 
 // Equip satisfies core.Agent. Remote agents manage their own tools externally.

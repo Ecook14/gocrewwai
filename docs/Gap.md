@@ -17,7 +17,7 @@
 | | State Machine | ✅ | ❌ | ❌ | ✅ | ✅ |
 | | Reflective | ✅ | ❌ | ❌ | ❌ | ❌ |
 | | Dynamic re-planning | ✅ | ❌ | ❌ | ✅ | ❌ |
-|| **Tool Ecosystem** | Built-in tools | **57** | ~20 | **100+** | 20+ | **400+** |
+|| **Tool Ecosystem** | Built-in tools | **51** | ~20 | **100+** | 20+ | **400+** |
 | | Custom tool creation | ✅ | ✅ | ✅ | ✅ | ✅ |
 | | MCP bridge | ✅ | ❌ | ❌ | ❌ | ✅ |
 | | Tool caching | ✅ | ✅ | ✅ | ❌ | ❌ |
@@ -61,14 +61,15 @@
 ## 🔴 Critical Gaps (We MUST Fix)
 
 ### 1. Tool Ecosystem Size
-> **LangChain: 100+ tools/integrations, n8n: 400+. We have 57.**
+> **LangChain: 100+ tools/integrations, n8n: 400+. We have 52 verified constructors.**
 
-Gap narrowed from 40 → 57 tools. Most critical SaaS tools now implemented. Still missing:
+Still missing:
 - **Cloud**: AWS Lambda, SQS, SNS, GCP, Azure Functions
-- **Data**: BigQuery, Snowflake, Elasticsearch (present), Airtable, Salesforce
+- **Data**: BigQuery, Snowflake, Airtable, Salesforce, Redis-tool
 - **Comms**: Telegram, Teams, WhatsApp
 - **Code**: GitLab CI, Bitbucket PRs, HuggingFace
 - **Productivity**: Asana, Trello, Monday, ClickUp
+- Note: `pkg/tools` registry `CreateTool` wires 22 names; the rest are direct constructors.
 
 ### 2. Local LLM Support (Ollama/vLLM) — ✅ IMPLEMENTED
 `pkg/llm/ollama.go` provides full Ollama support: Generate, GenerateWithUsage, GenerateStructured, StreamGenerate, GenerateEmbedding.
@@ -77,17 +78,11 @@ OpenRouter and Failover clients also implemented. Critical for:
 - Cost reduction
 - Offline usage
 
-### 3. Document Loaders — 1 IMPLEMENTED, MORE NEEDED
-Existing: `pkg/tools/file_read.go` for plain text file reading. PDF library (`ledongthuc/pdf`) in go.mod but unused.
-Missing: PDF loader (library available), Excel (.xlsx), CSV, HTML, PowerPoint, Google Docs, Notion export, Confluence, S3 objects, YouTube transcripts, email (IMAP).
+### 3. Document Loaders — ✅ IMPLEMENTED
+`pkg/knowledge/ingestion.go` handles CSV/JSON/JSONL/PDF/DOCX/URL/directory; `pkg/tools` ships `csv/pdf/excel/html/xml/yaml/json_parse` readers. (Earlier revisions of this doc claimed only `file_read.go` existed — stale.)
 
-### 4. Cloud Deploy Service
-> **CrewAI has CrewAI+, LangChain has LangSmith, LangGraph has LangGraph Cloud.**
-
-We have a Dockerfile but no managed deployment platform. Need at minimum:
-- `gocrew deploy` CLI command
-- REST API wrapper for serving crews
-- Webhook triggers
+### 4. Cloud Deploy Service — ✅ PARTIAL
+`pkg/server` + `cmd/server/` + `pkg/dashboard` + `pkg/api/handlers.go:61 handleKickoff` serve crews over REST; Dockerfile + railway/render configs exist. Still missing: `gocrew deploy` CLI command and webhook triggers. (Earlier revisions claimed no REST layer — stale.)
 
 ---
 
@@ -95,10 +90,9 @@ We have a Dockerfile but no managed deployment platform. Need at minimum:
 
 | Gap | Competitors | Impact |
 |-----|------------|--------|
-| **Callback/Event system** | LangChain has 15+ callback types | Medium — limits observability integrations |
-| **Output parsers** | LangChain has Pydantic, XML, Regex, CSV parsers | Medium — we have JSON only |
+| **Output parsers** | LangChain has Pydantic, XML, Regex, CSV parsers | Medium — we have JSON only (`pkg/guardrails/json.go`) |
 | **Prompt templates** | LangChain has ChatPromptTemplate, FewShotPrompt | Low — our system prompt approach works |
-| **Time-travel debugging** | LangGraph can replay from any checkpoint | Low — niche but impressive |
+| **Time-travel debugging** | LangGraph can replay from any checkpoint | Low — `Crew.Replay` + flow checkpoints cover task-level replay |
 | **Visual flow builder** | n8n has drag-and-drop UI | Low — different target audience |
 
 ---
@@ -122,10 +116,12 @@ We have a Dockerfile but no managed deployment platform. Need at minimum:
 
 | Priority | Gap | Effort | Impact |
 |----------|-----|--------|--------|
-| 🔴 P0 | **Ollama/local LLM client** | 1 file | Opens entire self-hosted market |
-| 🔴 P0 | **10 more SaaS tool integrations** | 10 files | 2x tool count |
-| 🟡 P1 | **REST API server** (`gocrew serve`) | 2 files | Production deploys |
-| 🟡 P1 | **More document loaders** (Excel, GDocs) | 3 files | RAG completeness |
-| 🟡 P1 | **Structured output parsers** (XML, CSV) | 1 file | Data pipeline use cases |
-| 🟢 P2 | **LangSmith-style tracing export** | 1 file | Enterprise observability |
+| ✅ Done | **Ollama/local LLM client** | — | Self-hosted market opened (`pkg/llm/ollama.go`) |
+| ✅ Done | **Output parsers** | — | XML/CSV/Regex validators + extractors (`pkg/guardrails/parsers.go`) |
+| ✅ Done | **JWT auth option** | — | HS256 Bearer via `JWT_SECRET` on server/api/dashboard (`pkg/auth`) |
+| ✅ Done | **Completion webhooks** | — | Signed HMAC delivery on kickoff (`pkg/webhook`, `CrewConfig.WebhookURL/Secret`) |
+| ✅ Partial | **Deploy** | — | `gocrew deploy` builds release binaries; managed hosting + triggers roadmap |
+| 🟡 P1 | **Managed deploy service** (hosting + webhook triggers) | 3 files | Production deploys |
+| 🟡 P1 | **Managed deploy service** (`gocrew deploy` + webhook triggers) | 3 files | Production deploys |
+| 🟡 P1 | **JWT/OIDC auth option** (current posture: API-key/bearer + mTLS mesh) | 2 files | Enterprise SSO |
 | 🟢 P2 | **Visual flow builder** (web UI) | Complex | Non-developer users |

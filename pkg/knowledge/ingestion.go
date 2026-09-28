@@ -19,6 +19,7 @@ import (
 
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/memory"
+	"github.com/Ecook14/gocrewwai/pkg/utils"
 	"github.com/ledongthuc/pdf"
 )
 
@@ -249,8 +250,11 @@ func (ie *IngestionEngine) IngestDocx(ctx context.Context, filePath string) erro
 
 // IngestURL fetches content from a URL, extracts text, and ingests it.
 // For HTML pages, basic tag stripping is applied. For JSON endpoints,
-// the response is parsed as JSON.
+// the response is parsed as JSON. SSRF-protected via utils.ValidateURL.
 func (ie *IngestionEngine) IngestURL(ctx context.Context, url string) error {
+	if _, err := utils.ValidateURL(url); err != nil {
+		return fmt.Errorf("blocked ingestion URL: %w", err)
+	}
 	client := &http.Client{Timeout: 30 * time.Second}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {

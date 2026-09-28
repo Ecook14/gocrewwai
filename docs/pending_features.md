@@ -16,11 +16,14 @@ While Crew-GO is exceptionally feature-rich for an enterprise deployment, there 
 
 ## 3. Web UI Dashboard (`web-ui/`)
 
-The real-time telemetry Glassmorphism UI is functional for streaming events from `pkg/telemetry`. However, it currently lives as a static `index.html` and `app.js`.
+The real-time telemetry dashboard streams events from `pkg/telemetry` and serves
+entity management + HITL review from `pkg/dashboard` (`POST /api/review`,
+approve/reject from the browser; `/ws` telemetry stream; Bearer + read-only
+tokens; same-origin WebSocket check). Static `index.html`/`app.js` era is over —
+see `docs/features/production.md` and the `dashboard_demo`/`mission_control` examples.
 
-**Action Required**:
-*   The UI doesn't allow for starting/stopping the Crew execution dynamically; it acts purely as a read-only observability layer.
-*   HITL (Human-in-the-loop) reviews currently print to the console. The Web UI needs a websocket endpoint `POST /review` to allow users to click [Approve/Reject] on a tool call directly from the browser.
+**Remaining:**
+*   `gocrew deploy` + webhook triggers for managed hosting (see `docs/Gap.md` roadmap).
 
 ## ~~4. Wasm Sandboxing Limitations~~ ✅ COMPLETED
 

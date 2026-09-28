@@ -1,52 +1,31 @@
-# Gocrewwai ⚓🏆🚀
+# Gocrewwai
 
-High-performance, strictly-typed agentic orchestration for the Go ecosystem. Inspired by **CrewAI, LangChain, and LangGraph**, Gocrewwai is built for developers who demand speed, reliability, and production-ready precision.
+Strictly-typed agentic orchestration for Go. Inspired by CrewAI, LangChain, and LangGraph.
 
----
-
-> [!IMPORTANT]
-> **Status: v0.9.0 (Alpha → Beta).** The framework is feature-complete against the public roadmap; v1.0.0 will ship once the next CHANGELOG entry is published. Native A2A protocols, durable flow persistence, and recursive self-correction are in production use today.
+> **Status: v0.9.0 (Alpha → Beta).** The framework is feature-complete against the public roadmap; v1.0.0 will ship once the next CHANGELOG entry is published.
 
 ---
 
-## 🌟 Why Gocrewwai?
+## Why Go?
 
-While many AI tools remain in the Python ecosystem, Go gives Gocrewwai real production advantages:
+While most AI orchestration tooling lives in the Python ecosystem, Go offers real production advantages:
 
-1. **⚡ Concurrency**: Native goroutines enable true parallel agent execution without a GIL.
-2. **🛡️ Reliability**: Every LLM response is unmarshaled into strictly-typed Go structs — no runtime `KeyError` surprises.
-3. **🧠 Memory & State**: Vector-indexed memory (11 backends) with durable flow persistence (checkpoints / time-travel).
-4. **Single-Binary Deployment**: Compile the full orchestrator into a zero-dependency binary.
+1. **Concurrency**: Native goroutines for parallel agent execution — no GIL.
+2. **Type safety**: Every LLM response is unmarshaled into strictly-typed Go structs. No runtime `KeyError` surprises.
+3. **Memory & State**: Vector-indexed memory (12 backends) with durable flow checkpoints.
+4. **Single binary**: Compile the full orchestrator into a zero-dependency binary.
 
 ---
 
-## ⚡ Core Features
+## Core Features
 
-### 🛡️ 1. Durable Flows & Checkpoints (LangGraph Parity)
-Pause, resume, and time-travel through long-running workflows. State is checkpointed to SQLite or Redis after every node.
-
-### 👤 2. Human-in-the-Loop (HITL)
-Manual interrupts and approvals via CLI or the real-time Dashboard.
-
-### 🛡️ 3. Recursive Self-Correction
-Agents reflect on their own work via internal loops or peer-review crews.
-
-### 📊 4. Native Observability (OpenTelemetry)
-Vendor-neutral tracing with built-in OTEL integration.
-
-### 🌐 5. Model Context Protocol (MCP) & Discovery
-Standard MCP protocol with local/remote server support and peer health-checks.
-
-### 🤖 6. Agent-to-Agent (A2A) Protocols
-Decentralized swarm intelligence with peer health-checks.
-
-### 🛡️ 7. Security-First Tooling
-- **Docker sandboxing**: Code execution runs in hardened containers (--network none, --cap-drop ALL, --read-only, --user 1000:1000, --pids-limit).
-- **SSRF protection**: URL-fetching tools validate schemes and block private/special IPs before connecting.
-- **Shell command whitelist**: Exact basename matching — empty AllowedCommands list denies all commands by default.
-- **Human review gates**: Dangerous tools (file writes, HTTP requests, database ops, code execution) require explicit approval before execution.
-- **API auth**: Constant-time token comparison (`crypto/subtle`) + 1MB request body limit to prevent memory exhaustion.
-- **HTTP timeouts**: All outbound HTTP clients have per-package timeout configs (dial, TLS, response header) — no bare `http.Get` or `http.DefaultClient`.
+1. **Durable Flows & Checkpoints** — Pause, resume, and time-travel through long-running workflows. State checkpointed to SQLite or Redis after every node.
+2. **Human-in-the-Loop (HITL)** — Manual interrupts and approvals via CLI or Dashboard.
+3. **Recursive Self-Correction** — Agents reflect on their work via internal loops or peer-review crews.
+4. **OpenTelemetry Tracing** — Vendor-neutral observability.
+5. **MCP Protocol** — Standard MCP with local/remote servers and peer health-checks.
+6. **A2A Protocols** — Agent-to-agent swarm communication with health-checks.
+7. **Security-First Tooling** — Docker sandboxing (`--network none`, `--cap-drop ALL`, `--read-only`, `--user 1000:1000`, `--pids-limit`), SSRF protection, shell command whitelist, human review gates for dangerous tools, constant-time API auth, and per-client HTTP timeouts.
 
 ---
 
@@ -126,6 +105,15 @@ gocrew run
 # Execute the demo crew
 gocrew kickoff
 
+# Train / smoke-test / replay against your project
+gocrew train -n 5
+gocrew test -n 3
+gocrew replay -t task_1
+
+# Reset a SQLite memory store / chat with your project
+gocrew reset-memories --store sqlite --conn memory.db
+gocrew chat
+
 # Show version
 gocrew version
 ```
@@ -140,71 +128,23 @@ gocrew kickoff --ui
 
 ---
 
-## 📚 Documentation Portal
+## 📚 Documentation
 
-Dive deep into the Gocrewwai ecosystem with our world-class documentation guides:
-
-- **[⚓ Core Concepts](docs/CORE_CONCEPTS.md)**: The "Four Pillars" of Gocrewwai.
-- **[🚀 Getting Started](docs/GETTING_STARTED.md)**: Full installation and quickstart guide.
-- **[🔄 Migration Guide](docs/MIGRATION.md)**: Transitioning from CrewAI, LangChain, or LangGraph.
-- **[🧩 Agents, Tasks & Crews](docs/index.md#core-components)**: Detailed orchestration guides.
-- **[💾 Persistence & HITL](docs/PERSISTENCE.md)**: Durable execution and human oversight.
-- **[🛡️ Self-Correction](docs/SELF_CORRECTION.md)**: Reflective reasoning and reliability.
-- **[📊 Observability](docs/features/telemetry.md)**: Native OTEL tracing and performance metrics.
-- **[🧰 MCP Hub](docs/features/mcp.md)**: Model Context Protocol integration.
-- **[🌐 A2A Protocols](docs/features/agent_delegation.md)**: Agent-to-agent communication.
-- **[🛡️ Security Architecture](docs/features/production.md)**: Sandboxing, TLS, access control, audit logging.
-
----
-
-## 🏗️ Architecture
-
-```
-gocrewwai/
-├── api/proto/           # Protocol buffers
-├── benchmarks/          # Benchmarks
-├── cmd/
-│   ├── gocrew/          # CLI entrypoint
-│   └── server/          # HTTP API & dashboard server
-├── docs/                # Guides + feature docs
-├── examples/            # Demo crews
-├── gocrew/              # SDK facade (gocrew.NewAgent, NewCrew, ...)
-├── internal/            # Private impl (cli, delegation, guardrails)
-├── pkg/
-│   ├── agents/          # Agent definitions & reasoning loops
-│   ├── api/mesh/        # Gin REST + gRPC mesh
-│   ├── compat/          # Compatibility adapters
-│   ├── config/          # YAML/JSON config
-│   ├── core/            # Interfaces, primitives
-│   ├── crew/            # Orchestration engines
-│   ├── delegation/      # A2A internal delegation
-│   ├── dashboard/       # Dashboard APIs
-│   ├── errors/          # Structured errors
-│   ├── events/          # GlobalBus event system
-│   ├── files/           # File abstraction
-│   ├── flow / flows/    # Workflow persistence
-│   ├── guardrails/      # Validation hooks + HITL
-│   ├── i18n/            # Localization
-│   ├── knowledge/       # RAG ingestion
-│   ├── llm/             # Provider clients + caching
-│   ├── memory/          # Vector + entity memory
-│   ├── protocols/       # MCP, A2A, WebMCP
-│   ├── sandbox/         # Docker + WASM sandboxing
-│   ├── server/          # HTTP server, health, metrics
-│   ├── tasks/           # Task lifecycle
-│   ├── telemetry/       # OTEL tracing
-│   ├── testing/         # Test harnesses
-│   ├── tools/           # Built-in tool ecosystem
-│   ├── training/        # HITL training data
-│   └── utils/           # Shared helpers
-├── web/                 # React/Vite Dashboard
-└── web-ui/              # Static embeddable UI
-```
+- **[Core Concepts](docs/CORE_CONCEPTS.md)** — the "Four Pillars" of Gocrewwai.
+- **[Getting Started](docs/GETTING_STARTED.md)** — installation and quickstart.
+- **[Migration Guide](docs/MIGRATION.md)** — transitioning from CrewAI, LangChain, or LangGraph.
+- **[Agents, Tasks & Crews](docs/index.md#core-components)** — orchestration guides.
+- **[Persistence & HITL](docs/PERSISTENCE.md)** — durable execution and human oversight.
+- **[Self-Correction](docs/SELF_CORRECTION.md)** — reflective reasoning and reliability.
+- **[Observability](docs/features/telemetry.md)** — OTEL tracing and metrics.
+- **[MCP Hub](docs/features/mcp.md)** — Model Context Protocol integration.
+- **[A2A Protocols](docs/features/agent_delegation.md)** — agent-to-agent communication.
+- **[Security Architecture](docs/features/production.md)** — sandboxing, TLS, access control.
+- **[Architecture](ARCHITECTURE.md)** — module layout and dependency flow.
 
 ---
 
-## 🤝 Community & Support
+## 🤝 Community
 
-- **Gocrew** - High-performance agentic AI, built for Go developers.
-- Follow the development on [GitHub](https://github.com/Ecook14/gocrewwai).
-- Join the mission to build the most scalable AI framework in the community! 🚀⚓🛡️🏆🏁
+- [GitHub](https://github.com/Ecook14/gocrewwai)
+- Report issues, propose features, and discuss on the repository.

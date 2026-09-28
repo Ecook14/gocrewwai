@@ -2,9 +2,15 @@ package telemetry
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
+	"strings"
+	"time"
+
+	"google.golang.org/grpc/credentials"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
@@ -58,12 +64,22 @@ func DefaultTelemetryConfig() TelemetryConfig {
 // When Exporter is "otlp" and OTLPCollectorAddr is set, traces are sent to
 // the OTLP collector over gRPC. When the collector is unreachable, the
 // function returns an error rather than silently falling back to stderr.
+//
+// SamplingRate is clamped to [0,1]. The stderr exporter only emits span
+// names and IDs (no attributes), so it never leaks prompt content.
 func InitTelemetry(cfg TelemetryConfig) (*sdktrace.TracerProvider, error) {
 	if !cfg.Enabled {
 		Enabled = false
 		return nil, nil
 	}
 	Enabled = true
+
+	if cfg.SamplingRate < 0 {
+		cfg.SamplingRate = 0
+	}
+	if cfg.SamplingRate > 1 {
+		cfg.SamplingRate = 1
+	}
 
 	if cfg.ServiceName == "" {
 		cfg.ServiceName = os.Getenv("OTEL_SERVICE_NAME")
@@ -109,6 +125,10 @@ func InitTelemetry(cfg TelemetryConfig) (*sdktrace.TracerProvider, error) {
 // newOTLPExporter creates a gRPC OTLP trace exporter connected to the
 // collector address from config. It does not fall back to stderr when
 // the collector is unreachable.
+//
+// Transport security: loopback collectors (localhost/127.0.0.1/::1) use
+// insecure gRPC; non-loopback collectors use TLS with system roots unless
+// OTEL_EXPORTER_OTLP_INSECURE=1 explicitly opts into plaintext.
 func newOTLPExporter(cfg TelemetryConfig) (sdktrace.SpanExporter, error) {
 	addr := cfg.OTLPCollectorAddr
 	if addr == "" {
@@ -118,24 +138,48 @@ func newOTLPExporter(cfg TelemetryConfig) (sdktrace.SpanExporter, error) {
 		addr = "localhost:4317"
 	}
 
-	clientOpts := []otlptracegrpc.Option{
-		otlptracegrpc.WithInsecure(), // Use TLS in production via WithTLSCredentials
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		host = addr
 	}
+	insecure := strings.EqualFold(os.Getenv("OTEL_EXPORTER_OTLP_INSECURE"), "1") ||
+		host == "localhost" || host == "127.0.0.1" || host == "::1"
 
-	if cfg.OTLPCollectorAddr != "" {
-		clientOpts = append(clientOpts, otlptracegrpc.WithEndpoint(addr))
+	clientOpts := []otlptracegrpc.Option{
+		otlptracegrpc.WithEndpoint(addr),
+	}
+	if insecure {
+		clientOpts = append(clientOpts, otlptracegrpc.WithInsecure())
+	} else {
+		clientOpts = append(clientOpts, otlptracegrpc.WithTLSCredentials(credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS12})))
 	}
 
 	return otlptracegrpc.New(context.Background(), clientOpts...)
 }
 
 func startPrometheusServer(port int) {
+	if port <= 0 || port > 65535 {
+		fmt.Printf("Warning: invalid Prometheus port %d, metrics server disabled\n", port)
+		return
+	}
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", GlobalMetrics().Handler())
 
-	addr := fmt.Sprintf(":%d", port)
+	// Bind loopback only: metrics must not be exposed on all interfaces
+	// without an explicit override.
+	bind := os.Getenv("PROMETHEUS_BIND")
+	if bind == "" {
+		bind = "127.0.0.1"
+	}
+	addr := fmt.Sprintf("%s:%d", bind, port)
 	fmt.Printf("Prometheus metrics server starting on %s/metrics\n", addr)
-	if err := http.ListenAndServe(addr, mux); err != nil {
+	srv := &http.Server{
+		Addr:         addr,
+		Handler:      mux,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 30 * time.Second,
+	}
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		fmt.Printf("Warning: Prometheus server failed: %v\n", err)
 	}
 }

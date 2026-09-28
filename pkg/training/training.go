@@ -40,8 +40,19 @@ type Store struct {
 
 // NewStore creates a new training data store.
 func NewStore(dir string) *Store {
-	os.MkdirAll(dir, 0755)
+	if dir == "" {
+		dir = "training_data"
+	}
+	os.MkdirAll(dir, 0700)
 	return &Store{Dir: dir}
+}
+
+// Dir returns the store directory.
+func (s *Store) DirPath() string {
+	if s == nil || s.Dir == "" {
+		return "training_data"
+	}
+	return s.Dir
 }
 
 // cleanRole rejects roles that could escape the store directory.
@@ -69,7 +80,7 @@ func (s *Store) SaveAgentData(role string, data *AgentTrainingData) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filename, bytes, 0644)
+	return os.WriteFile(filename, bytes, 0600)
 }
 
 // LoadAgentData retrieves training results for an agent role.
@@ -120,5 +131,17 @@ func ConsolidateFeedback(data *AgentTrainingData) {
 	}
 
 	data.Summary = fmt.Sprintf("Agent improved over %d iterations based on human feedback.", len(data.Iterations))
-	data.QualityScore = 8.5 // Default placeholder for now
+	// QualityScore is derived from feedback density: ratio of iterations with
+	// non-empty human feedback, scaled to 0-10. Empty feedback yields 0.
+	withFeedback := 0
+	for _, it := range data.Iterations {
+		if it.HumanFeedback != "" {
+			withFeedback++
+		}
+	}
+	if len(data.Iterations) > 0 {
+		data.QualityScore = float64(withFeedback) / float64(len(data.Iterations)) * 10.0
+	} else {
+		data.QualityScore = 0
+	}
 }

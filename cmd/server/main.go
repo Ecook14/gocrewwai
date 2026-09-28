@@ -6,12 +6,14 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 
 	"github.com/Ecook14/gocrewwai/pkg/api"
 	"github.com/Ecook14/gocrewwai/pkg/config"
 	"github.com/Ecook14/gocrewwai/pkg/core"
+	"github.com/Ecook14/gocrewwai/pkg/kv"
 	"github.com/Ecook14/gocrewwai/pkg/telemetry"
 	"github.com/Ecook14/gocrewwai/web"
 )
@@ -159,6 +161,15 @@ func main() {
 		fmt.Printf("🚀 Crew-GO API Engine starting on port %s...\n", apiPort)
 		fmt.Printf("📡 SSE Streaming enabled at /api/v1/stream/:id\n")
 		fmt.Println("---------------------------------------------------------")
+
+		// 1.4 Validate the KV backend contract (Redis-protocol: redis|dragonfly|valkey).
+		// Fail fast here so a typo'd REDIS_BACKEND can never silently target the
+		// wrong store once checkpoint/cache clients dial lazily.
+		if kvCfg, err := kv.ConfigFromEnv(); err != nil {
+			log.Fatalf("❌ Invalid KV backend config: %v", err)
+		} else {
+			log.Printf("🗄️  KV backend: %s (%s)", kvCfg.Backend, strings.Join(kvCfg.Addrs, ","))
+		}
 		if err := server.Run(":" + apiPort); err != nil {
 			setError(err)
 			shutdown()

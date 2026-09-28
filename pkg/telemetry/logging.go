@@ -1,6 +1,7 @@
 package telemetry
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -238,29 +239,49 @@ var (
 // ---------------------------------------------------------------------------
 
 // BridgeEventsToMetrics subscribes to the global EventBus and auto-records metrics.
+// The bridge stops when ctx is done (unsubscribing the channel) so it cannot
+// leak goroutines after shutdown.
 func BridgeEventsToMetrics(metrics *Metrics) chan Event {
+	return BridgeEventsToMetricsWithContext(context.Background(), metrics)
+}
+
+// BridgeEventsToMetricsWithContext is BridgeEventsToMetrics with a caller context.
+func BridgeEventsToMetricsWithContext(ctx context.Context, metrics *Metrics) chan Event {
 	ch := GlobalBus.Subscribe()
 	go func() {
-		for event := range ch {
-			switch event.Type {
-			case EventAgentStarted:
-				metrics.AgentStarted()
-			case EventAgentFinished:
-				metrics.AgentStopped()
-			case EventToolStarted:
-				if name, ok := event.Payload["tool"].(string); ok {
-					metrics.RecordToolCall(name, 0, nil)
+		defer GlobalBus.Unsubscribe(ch)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case event, ok := <-ch:
+				if !ok {
+					return
 				}
-			case EventTaskFinished:
-				taskType := "unknown"
-				if desc, ok := event.Payload["description"].(string); ok && len(desc) > 50 {
-					taskType = desc[:50]
-				} else if desc, ok := event.Payload["description"].(string); ok {
-					taskType = desc
-				}
-				metrics.RecordTaskExecution(taskType, 0, nil)
+				bridgeEventToMetrics(metrics, event)
 			}
 		}
 	}()
 	return ch
+}
+
+func bridgeEventToMetrics(metrics *Metrics, event Event) {
+	switch event.Type {
+	case EventAgentStarted:
+		metrics.AgentStarted()
+	case EventAgentFinished:
+		metrics.AgentStopped()
+	case EventToolStarted:
+		if name, ok := event.Payload["tool"].(string); ok {
+			metrics.RecordToolCall(name, 0, nil)
+		}
+	case EventTaskFinished:
+		taskType := "unknown"
+		if desc, ok := event.Payload["description"].(string); ok && len(desc) > 50 {
+			taskType = desc[:50]
+		} else if desc, ok := event.Payload["description"].(string); ok {
+			taskType = desc
+		}
+		metrics.RecordTaskExecution(taskType, 0, nil)
+	}
 }

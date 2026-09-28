@@ -8,10 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"os/exec"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
@@ -27,8 +24,9 @@ func getE2BBaseURL() string {
 }
 
 // CodeInterpreterTool allows agents to execute Python or Go code snippets in a sandboxed environment.
-// When SafeMode is true or no sandbox is configured, code executes directly on the host — dangerous.
-// Use WithDockerConfig() or WithE2BConfig() to enable container isolation.
+// Host execution is disabled: without E2B or Docker configured, Execute
+// returns an error. Use WithDockerConfig() or WithE2BConfig() to enable
+// container isolation.
 // The tool's DockerHardened field controls whether security-hardened Docker flags are applied.
 //
 // Example:
@@ -43,6 +41,9 @@ type CodeInterpreterOption func(*CodeInterpreterTool)
 // CodeInterpreterTool allows agents to execute Python or Go code snippets.
 type CodeInterpreterTool struct {
 	BaseTool
+	// SafeMode is deprecated: execution gating no longer depends on it.
+	// RequiresReview is now derived from sandbox configuration (review is
+	// required unless Docker/E2B confinement is active). Kept for API compatibility.
 	SafeMode    bool
 	E2BKey      string
 	DockerImage string
@@ -194,18 +195,7 @@ func (t *CodeInterpreterTool) runPython(ctx context.Context, code string) (strin
 	if t.DockerImage != "" {
 		return t.runDocker(ctx, "python3", "-c", code)
 	}
-
-	tmpFile := filepath.Join(os.TempDir(), fmt.Sprintf("script_%d.py", os.Getpid()))
-	if err := os.WriteFile(tmpFile, []byte(code), 0644); err != nil {
-		return "", err
-	}
-	defer os.Remove(tmpFile)
-
-	pythonCmd := "python3"
-	if runtime.GOOS == "windows" {
-		pythonCmd = "python"
-	}
-	return t.runCommand(ctx, pythonCmd, tmpFile)
+	return "", fmt.Errorf("code interpreter sandbox not configured: host python execution is disabled")
 }
 
 func (t *CodeInterpreterTool) runGo(ctx context.Context, code string) (string, error) {
@@ -214,19 +204,7 @@ func (t *CodeInterpreterTool) runGo(ctx context.Context, code string) (string, e
 		// For now we assume the image has 'go' installed.
 		return t.runDocker(ctx, "go", "run", "-e", code)
 	}
-
-	tmpDir, err := os.MkdirTemp("", "go-run-*")
-	if err != nil {
-		return "", err
-	}
-	defer os.RemoveAll(tmpDir)
-
-	tmpFile := filepath.Join(tmpDir, "main.go")
-	if err := os.WriteFile(tmpFile, []byte(code), 0644); err != nil {
-		return "", err
-	}
-
-	return t.runCommand(ctx, "go", "run", tmpFile)
+	return "", fmt.Errorf("code interpreter sandbox not configured: host go execution is disabled")
 }
 
 func (t *CodeInterpreterTool) runE2B(ctx context.Context, lang, code string) (string, error) {
@@ -316,11 +294,12 @@ func (t *CodeInterpreterTool) runBash(ctx context.Context, code string) (string,
 	if t.DockerImage != "" {
 		return t.runDocker(ctx, "sh", "-c", code)
 	}
-	return t.runCommand(ctx, "bash", "-c", code)
+	return "", fmt.Errorf("code interpreter sandbox not configured: host shell execution is disabled")
 }
 
 func (t *CodeInterpreterTool) RequiresReview() bool {
-	return t.SafeMode
+	// Review is required unless the tool is confined to a sandbox.
+	return t.DockerImage == "" && t.E2BKey == ""
 }
 
 var _ Tool = (*CodeInterpreterTool)(nil)

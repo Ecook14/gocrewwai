@@ -7,9 +7,11 @@ import (
 	"io"
 	"time"
 
+	"github.com/Ecook14/gocrewwai/pkg/telemetry"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // DockerProvider executes code within a Docker container.
@@ -38,6 +40,11 @@ func NewDockerProvider(image string) (*DockerProvider, error) {
 //   - CPU quota (--cpu-quota)
 //   - Pid limit (--pids-limit)
 func (p *DockerProvider) Execute(ctx context.Context, code string, env map[string]string) (string, error) {
+	ctx, span := telemetry.StartSpan(ctx, "sandbox.docker.Execute")
+	if span != nil {
+		span.SetAttributes(attribute.String("sandbox.image", p.image))
+		defer span.End()
+	}
 	// 1. Pull image if needed (simplified: assuming it exists or let container create fail)
 	// In production, we'd check if image exists or Pull it.
 
@@ -54,6 +61,7 @@ func (p *DockerProvider) Execute(ctx context.Context, code string, env map[strin
 	hostConfig := &container.HostConfig{
 		NetworkMode:    "none",
 		ReadonlyRootfs: true,
+		CapDrop:        []string{"ALL"},
 		Tmpfs: map[string]string{
 			"/tmp": "rw,noexec,nosuid,size=65536k",
 		},

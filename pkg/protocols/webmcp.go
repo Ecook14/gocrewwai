@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Ecook14/gocrewwai/pkg/utils"
 	"golang.org/x/net/html"
 )
 
@@ -52,7 +53,11 @@ func NewWebMCPClient() *WebMCPClient {
 }
 
 // DiscoverTools attempts to pull WebMCP declarations from the target URL.
+// SSRF-protected: private/link-local/metadata hosts are rejected.
 func (c *WebMCPClient) DiscoverTools(ctx context.Context, targetURL string) ([]WebMCPToolDeclaration, error) {
+	if _, err := utils.ValidateURL(targetURL); err != nil {
+		return nil, fmt.Errorf("webmcp: blocked target: %w", err)
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, targetURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("webmcp: invalid url: %w", err)
@@ -118,7 +123,11 @@ func (c *WebMCPClient) parseHTMLForMCP(r io.Reader, base string) ([]WebMCPToolDe
 }
 
 // ExecuteTool attempts to fire the REST/HTTP request constructed by the schema back to the remote endpoint.
+// SSRF-protected and response-size bounded.
 func (c *WebMCPClient) ExecuteTool(ctx context.Context, tool WebMCPToolDeclaration, params map[string]interface{}) ([]byte, error) {
+	if _, err := utils.ValidateURL(tool.Endpoint); err != nil {
+		return nil, fmt.Errorf("webmcp: blocked tool endpoint: %w", err)
+	}
 	var bodyReader io.Reader
 	method := strings.ToUpper(tool.Method)
 
@@ -159,7 +168,7 @@ func (c *WebMCPClient) ExecuteTool(ctx context.Context, tool WebMCPToolDeclarati
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, utils.MaxURLBytes+1))
 	if err != nil {
 		return nil, fmt.Errorf("webmcp: failed to read tool response: %w", err)
 	}

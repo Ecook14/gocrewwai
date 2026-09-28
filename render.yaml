@@ -19,3 +19,14 @@ services:
         value: "json"
       - key: CREW_GO_LOG_LEVEL
         value: "info"
+      - key: REDIS_BACKEND
+        value: "dragonfly"
+      # Set these in the Render dashboard (secrets, never in repo):
+      # - key: API_AUTH_TOKEN
+      #   sync: false
+      # - key: REDIS_ADDR
+      #   sync: false   # e.g. Dragonfly Cloud endpoint or private service host:port
+      # - key: REDIS_PASSWORD
+      #   sync: false
+      # - key: JWT_SECRET
+      #   sync: false

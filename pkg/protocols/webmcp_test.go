@@ -54,6 +54,9 @@ const fakeWebMCPPage = `
 `
 
 func TestWebMCPDiscoverAndExecute(t *testing.T) {
+	// SSRF guard blocks loopback by default; this test uses a local
+	// httptest server, so opt into private URLs (never in production).
+	t.Setenv("GOCREW_ALLOW_PRIVATE_URLS", "1")
 	// 1. Setup a fake HTTP server that acts as a WebMCP host
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" {

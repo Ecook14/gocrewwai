@@ -47,27 +47,54 @@ CGO_ENABLED=0 go build -ldflags="-w -s" -o gocrew-agent cmd/server/main.go
 ```
 
 ### 4. Publisher Operations (`kickoff`)
-Run a crew with your project config. Gocrew merges the project config
-with environment variables and executes the crew in a dedicated process
-with full OpenTelemetry tracing.
+Run the demo crew. `kickoff` executes a built-in demo agent against
+`OPENAI_API_KEY` with full OpenTelemetry tracing; pass `--ui` to also start
+the dashboard on port 8080 (execution pauses until START is clicked).
+Project-config-driven kickoff (merging `agents.yaml`/`tasks.yaml`) is roadmap.
 
 ```bash
 gocrew kickoff
+gocrew kickoff --ui
 ```
 
 ### 5. Runner Execution (`run`)
-Execute a specific mission file. This is the delegator's default workflow
-for running agent assignments with full tool access and CLI output.
+Run the `main.go` of the current project (`go run main.go`, extra args passed
+through except `--ui`). Arbitrary mission files (`gocrew run ./mission.go`)
+and `-k` key overrides are **not** supported — set keys via environment
+(`OPENAI_API_KEY`, etc.) or `config.json`.
 
 ```bash
-# Run a mission file directly
-gocrew run ./mission.go
-
-# Run with an explicit API key (overrides config)
-gocrew run ./mission.go -k $OPENAI_API_KEY
+gocrew run
 ```
 
-### 6. Version Check (`version`)
+### 6. Training / Testing / Replay / Memory / Chat
+`train`, `test`, `replay`, and `chat` validate args, then delegate to the
+project (`go run main.go <subcommand>`) with a secrets-stripped environment —
+the project owns its agents/config. Scaffolded projects (`gocrew create`)
+ship a subcommand-aware `main.go`: `train -n` → `Crew.Train`, `test -n` →
+N kickoffs with pass count, `replay -t` → `Crew.Replay`, `chat` → interactive
+agent loop. Outside a project dir these fail closed (`main.go not found`).
+`reset-memories` executes directly: `--store sqlite --conn <basename>` resets
+the SQLite memory store (basename only, no traversal).
+
+```bash
+gocrew train -n 5
+gocrew test -n 3
+gocrew replay -t task_1
+gocrew reset-memories --store sqlite --conn memory.db
+gocrew chat
+```
+
+### 7. Deploy (`deploy`)
+Build release binaries (`gocrew`, `gocrewwai-server`) into `--out DIR`
+(default `./dist`) from the repo root. Webhook triggers for managed hosting
+remain roadmap; binary + `Dockerfile` artifacts are the deploy unit.
+
+```bash
+gocrew deploy --out ./dist
+```
+
+### 8. Version Check (`version`)
 Print the current Gocrewwai CLI version and build information.
 
 ```bash

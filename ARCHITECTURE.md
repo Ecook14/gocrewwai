@@ -1,33 +1,46 @@
 # Architecture
 
 ```
-Crew-GO/
-├── api/proto/            # Protocol buffers for gRPC/REST APIs
+gocrewwai/
+├── api/proto/           # Protocol buffers
+├── benchmarks/          # Benchmarks
 ├── cmd/
-│   ├── gocrew/           # CLI entrypoint
-│   └── server/           # HTTP API & Dashboard Server entrypoint
-├── gocrew/               # Unified SDK Facade (Recommended for users)
-├── pkg/                  # Core Modular Packages
-│   ├── agents/           # Agent implementation & reasoning loops
-│   ├── core/             # Base interfaces (breaks circular dependencies)
-│   ├── crew/             # Orchestration engines (Sequential, Graph, etc.)
-│   ├── delegation/       # Agent-to-Agent internal delegation logic
-│   ├── events/           # System-wide event structures for WebSockets
-│   ├── flows/            # LangGraph-style workflow persistence
-│   ├── guardrails/       # Pre/post validation hooks & HITL interrupts
-│   ├── knowledge/        # RAG document parsing, chunking & sourcing
-│   ├── llm/              # Provider clients (OpenAI, Anthropic, Gemini)
-│   ├── memory/           # Vector & entity memory systems
-│   ├── protocols/        # MCP and A2A communication layers
-│   ├── sandbox/          # Wasm/Docker code execution environments
-│   ├── server/           # HTTP Server and Dashboard APIs
-│   ├── tasks/            # Task lifecycle & structured output
-│   ├── telemetry/        # OpenTelemetry tracing & GlobalBus events
-│   ├── tools/            # Tool ecosystem & custom tool patterns
-│   └── training/         # Synthetic data pipelines & evaluation
-├── internal/             # Private implementation details
-├── web/                  # Modern React/Vite Dashboard
-└── web-ui/               # Static/Vanilla UI embeds
+│   ├── gocrew/          # CLI entrypoint
+│   └── server/          # HTTP API & dashboard server
+├── docs/                # Guides + feature docs
+├── examples/            # Example crews and demos
+├── gocrew/              # SDK facade (recommended user entrypoint)
+├── internal/            # Private impl (cli, delegation, guardrails)
+├── pkg/
+│   ├── agents/          # Agent definitions & reasoning loops
+│   ├── api/mesh/        # Gin REST + gRPC mesh
+│   ├── compat/          # Compatibility adapters
+│   ├── config/          # YAML/JSON config loading
+│   ├── core/            # Base interfaces, primitives
+│   ├── crew/            # Orchestration engines
+│   ├── dashboard/       # Dashboard APIs
+│   ├── delegation/      # A2A internal delegation
+│   ├── errors/          # Structured error types
+│   ├── events/          # GlobalBus event system
+│   ├── files/           # File abstraction
+│   ├── flow/            # Workflow persistence (graph nodes/edges)
+│   ├── flows/           # Higher-level flow combinators
+│   ├── guardrails/      # Pre/post validation + HITL interrupts
+│   ├── i18n/            # Internationalization / localization
+│   ├── knowledge/       # RAG document parsing, chunking, sourcing
+│   ├── llm/             # Provider clients + caching
+│   ├── memory/          # Vector + entity memory stores
+│   ├── protocols/       # MCP, A2A, WebMCP implementations
+│   ├── sandbox/         # Docker + WASM execution isolation
+│   ├── server/          # HTTP server, health, metrics
+│   ├── tasks/           # Task lifecycle & structured output
+│   ├── telemetry/       # OTEL tracing + metrics
+│   ├── testing/         # Test harnesses
+│   ├── tools/           # Built-in tool ecosystem
+│   ├── training/        # HITL training data & pipelines
+│   └── utils/           # Shared helpers
+├── web/                 # React/Vite dashboard
+└── web-ui/              # Static embeddable UI
 ```
 
 ## Dependency Flow
@@ -62,17 +75,17 @@ graph TD
 
 ## Design Principles
 
-1. **Interface-first & Decoupled**: The `pkg/core` package defines the `Agent` interface, allowing `pkg/crew` and `pkg/tasks` to interact with agents without depending on the heavy `pkg/agents` implementation.
-2. **Deterministic Orchestration**: Every LLM interaction is parsed into strictly-typed Go structs. 
+1. **Interface-first & Decoupled**: `pkg/core` defines the `Agent` interface; `pkg/crew` and `pkg/tasks` depend only on that interface, not on `pkg/agents`.
+2. **Deterministic Orchestration**: Every LLM interaction is parsed into strictly-typed Go structs.
 3. **Reactive Telemetry**: The `GlobalBus` provides a high-fidelity event stream for real-time observability.
-4. **Durable Persistence**: LangGraph-style checkpoints allow for "time-travel" debugging and long-running flow resilience.
-5. **Polyglot Safety**: Code execution is isolated via Wasm or Docker sandboxes by default.
+4. **Durable Persistence**: LangGraph-style checkpoints allow time-travel debugging and long-running flow resilience.
+5. **Polyglot Safety**: Code execution is isolated via WASM or Docker sandboxes by default.
 
 ---
 
-## 🧠 Subsystem Deep Dive: Memory
+## Memory
 
-Gocrewwai's memory model is designed to operate concurrently and deterministically.
+Gocrewwai's memory model operates concurrently and deterministically.
 
 ```mermaid
 graph LR
@@ -84,25 +97,23 @@ graph LR
     F -->|Background Save| C
 ```
 
-The memory subsystem is entirely decoupled from the LLM provider, meaning a model using OpenAI for reasoning can seamlessly query a Redis vector store populated by an open-source Ollama embedding model.
+The memory subsystem is entirely decoupled from the LLM provider — a model using OpenAI for reasoning can query a Redis vector store populated by an Ollama embedding model.
 
 ---
 
-## 🛡️ Subsystem Deep Dive: Polyglot Sandboxing
+## Sandboxing
 
-Allowing LLMs to write and execute code is dangerous. The `pkg/sandbox` module acts as a strict execution boundary.
+The `pkg/sandbox` module acts as a strict execution boundary for LLM-generated code.
 
-When a `CodeInterpreter` tool is invoked, the request is intercepted by the Sandbox Manager:
+When a `CodeInterpreter` tool is invoked:
 
-1. **WASM (Recommended)**: For lightweight Python/JS execution, Gocrewwai uses a embedded WebAssembly runtime (`wazero`). This provides microsecond startup times with zero filesystem access.
-2. **E2B (Cloud)**: For complex environments needing PIP installations, the SDK connects to remote, ephemeral Firecracker microVMs via the E2B SDK.
-3. **Docker (Local Enterprise)**: Spins up short-lived containers, binds specific `/tmp` directories, and enforces hard limits (e.g., `--cpus="0.5" --memory="512m"`).
+1. **WASM (Recommended)**: Embedded WebAssembly runtime (`wazero`). Microsecond startup, zero filesystem access.
+2. **E2B (Cloud)**: Remote, ephemeral microVMs via a custom HTTP client against `api.e2b.dev` (E2B-compatible; not the official E2B SDK). Supports PIP installs.
+3. **Docker (Local Enterprise)**: Short-lived containers with resource limits (`--cpus="0.5" --memory="512m"`).
 
 ---
 
-## 📚 Subsystem Deep Dive: Knowledge (RAG)
-
-Connecting agents to local or remote documents is handled securely by the `pkg/knowledge` subsystem, avoiding direct memory manipulation by the LLM.
+## Knowledge (RAG)
 
 ```mermaid
 graph LR
@@ -112,4 +123,4 @@ graph LR
     E[Agent Config] -->|Attach Source| D
 ```
 
-When a Knowledge source is bound to an Agent, the engine automatically intercepts the agent's tasks, queries the Vector Store for relevant chunks, and prepends the findings to the prompt as strict `<context>` blocks. This ensures the agent is grounded in facts *before* generation begins.
+When a Knowledge source is bound to an Agent, the engine intercepts tasks, queries the Vector Store for relevant chunks, and prepends them as `<context>` blocks before generation.

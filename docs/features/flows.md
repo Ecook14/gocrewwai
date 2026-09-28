@@ -58,31 +58,34 @@ out, err := flow.Kickoff(ctx)
 ```
 
 ### 👤 2. Human-in-the-Loop (HITL)
-Add `Interrupt` nodes to your flow to pause execution for manual review. The engine will halt until a payload is submitted via the REST API or Dashboard.
+Pause execution for manual review with `AddHumanFeedback` (console prompt) or gate individual nodes on human approval. The engine halts at the node until input is provided; browser approve/reject via the Dashboard review endpoint (`POST /api/review`) is supported where the dashboard server runs.
 
 ```go
-flow.AddInterrupt("human_review", func(ctx context.Context, s *MyState, input interface{}) error {
-    // Process input sent by the human
-    userInput := input.(string)
-    s.Result += "\nHuman Feedback: " + userInput
-    return nil
+flow.AddHumanFeedback(flow.HumanFeedbackConfig{
+    Message:        "Approve the research draft?",
+    PossibleRoutes: []string{"approved", "rejected"},
+    DefaultOutcome: "rejected",
 })
 ```
 
 ### 📈 3. Graph-Based Routing (Multi-Crew)
-Flows transcend the standard linear sequence. Use router nodes to determine the "Next" execution step based on real-time state, effectively wiring multiple independent Crews together.
+Flows transcend the standard linear sequence. Use router nodes to determine the next execution step based on real-time state, effectively wiring multiple independent Crews together. On `*flow.Flow`, register conditional branches with `AddEventRouter`/`AddRouter`; on the `flows` DAG engine, use `NodeRouter` nodes (see [Flow vs Flows](./flow-vs-flows.md)).
 
 ```go
-flow.AddRouter("quality_gate", func(ctx context.Context, s *MyState) (string, error) {
-    if !s.IsDraft {
+// flow.Flow: conditional branch via event router
+flow.AddEventRouter(func(ctx context.Context, s flow.State) (string, error) {
+    if done, _ := s["is_draft"].(bool); !done {
         return "publish_crew", nil // Route to the publisher crew
     }
     return "research_crew", nil    // Route back to research
 })
 
-// Wire the workflow edges
-flow.AddEdge("research", "quality_gate")
-flow.AddEdge("quality_gate", "publish_crew")
+// flows DAG engine: router node in a graph
+node := &flows.FlowNode{
+    ID:     "quality_gate",
+    Type:   flows.NodeRouter,
+    Router: func(s flows.State) string { return nextNodeID(s) },
+}
 ```
 
 ---

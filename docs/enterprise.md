@@ -23,7 +23,7 @@ High-performance, enterprise-grade agentic orchestration for the Go ecosystem. D
 
 ### Integration & Interoperability
 - **7 LLM providers** — OpenAI, Anthropic, Gemini, Groq, OpenRouter, Ollama, Failover
-- **57 built-in tools** — spanning SaaS, databases, code execution, web, search, and more
+- **52 built-in tools** — spanning SaaS, databases, code execution, web, search, and more
 - **MCP Protocol** — connect to any MCP-compatible tool server
 - **A2A Protocol** — agent-to-agent communication with discovery
 - **OpenTelemetry** — vendor-neutral observability, export to any OTEL backend

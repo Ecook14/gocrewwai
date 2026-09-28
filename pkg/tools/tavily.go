@@ -84,14 +84,25 @@ func (t *TavilyTool) Execute(ctx context.Context, input map[string]interface{}) 
 		includeDomains = d
 	}
 
-	url := fmt.Sprintf("https://api.tavily.com/search?query=%s&api_key=%s&max_results=%d&search_depth=%s",
-		strings.ReplaceAll(query, " ", "+"), t.APIKey, maxResults, searchType)
-
-	if includeDomains != "" {
-		url += "&include_domains=" + includeDomains
+	// Tavily's API takes api_key in the POST JSON body — never in the URL,
+	// so the key stays out of access logs, proxies, and error strings.
+	body, err := json.Marshal(map[string]interface{}{
+		"api_key":         t.APIKey,
+		"query":           query,
+		"max_results":     maxResults,
+		"search_depth":    searchType,
+		"include_domains": includeDomains,
+	})
+	if err != nil {
+		return "", fmt.Errorf("tavily: failed to encode request: %w", err)
 	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.tavily.com/search", strings.NewReader(string(body)))
+	if err != nil {
+		return "", fmt.Errorf("tavily: failed to build request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := tavilyHTTPClient.Get(url)
+	resp, err := tavilyHTTPClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("tavily search failed: %w", err)
 	}

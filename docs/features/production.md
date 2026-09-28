@@ -21,7 +21,7 @@ Never run agentic code directly on your host machine. Gocrewwai provides native 
   ```
   The Docker container runs with `--network none`, `--cap-drop ALL`, `--read-only`, `--user 1000:1000`, `--pids-limit 100`, and memory/CPU limits. Host execution is disabled by default when no sandbox is configured.
 - **WASM (wazero)**: Lightning-fast, zero-dependency sandboxing for Go-based tools natively inside the host process.
-- **E2B**: Offload execution to remote, secure cloud sandboxes via Firecracker microVMs.
+- **E2B-compatible**: Offload execution to remote, secure cloud sandboxes via a custom `api.e2b.dev` HTTP client.
 
 ### 2. Durable Persistence (Checkpoints)
 Production workflows often span hours or days. Gocrewwai's **Flow 2.0** engine automatically checkpoints state to SQLite, Redis, or Postgres, allowing you to resume execution after system restarts or human interrupts.

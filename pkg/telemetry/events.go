@@ -67,13 +67,17 @@ func (b *EventBus) Unsubscribe(ch chan Event) {
 }
 
 // Publish broadcasts an event to all active subscribers.
+// Subscribers are snapshotted under read lock so slow consumers and
+// concurrent Subscribe/Unsubscribe can never block or deadlock publishing.
 func (b *EventBus) Publish(e Event) {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
 	if e.Timestamp.IsZero() {
 		e.Timestamp = time.Now()
 	}
-	for _, sub := range b.subscribers {
+	b.mu.RLock()
+	subs := make([]chan Event, len(b.subscribers))
+	copy(subs, b.subscribers)
+	b.mu.RUnlock()
+	for _, sub := range subs {
 		// Non-blocking send to avoid hanging the engine if a subscriber is slow
 		select {
 		case sub <- e:

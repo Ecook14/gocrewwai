@@ -10,7 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go-version: ['1.23', '1.24', '1.25']
+        # go.mod requires go 1.25.0, so earlier toolchains would auto-upgrade
+        # via GOTOOLCHAIN and silently test 1.25 anyway. Only list real floors.
+        go-version: ['1.25']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -25,7 +27,9 @@ jobs:
           CREW_CONFIG_PATH: config.json
         run: go test ./pkg/... ./cmd/... -v -count=1
       - name: Lint
-        run: go vet ./pkg/... ./cmd/... ./gocrew/...
+        run: go vet ./pkg/... ./cmd/... ./gocrew/... ./internal/...
+      - name: Format check
+        run: test -z "$(gofmt -l pkg/ cmd/ gocrew/ internal/)"
       - name: Build binaries
         run: |
           CGO_ENABLED=1 go build -o gocrew-cli ./cmd/gocrew

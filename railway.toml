@@ -3,8 +3,19 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "/app/gocrew-server"
+startCommand = "/usr/local/bin/gocrewwai-server --api-port 8080"
 healthcheckPath = "/api/v1/health"
 healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
+
+# Required service variables (set in Railway dashboard, never in repo):
+#   API_AUTH_TOKEN(S)   — API bearer token(s); server refuses insecure default
+#   REDIS_BACKEND       — redis|dragonfly|valkey (default redis)
+#   REDIS_ADDR          — e.g. dragonfly.railway.internal:6379
+#   REDIS_PASSWORD      — when the KV service requires auth
+#   JWT_SECRET          — enables JWT Bearer (optional)
+#   ALLOW_INSECURE_DEV  — set to 1 for local dev only, never in production
+
+# KV backing (provision separately and reference via REDIS_ADDR):
+#   railway add --service dragonfly  (or provision Dragonfly Cloud and use its endpoint)
