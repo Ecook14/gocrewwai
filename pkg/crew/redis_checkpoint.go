@@ -135,7 +135,13 @@ func (s *RedisCheckpointStore) LoadByID(ctx context.Context, crewID string, time
 func (s *RedisCheckpointStore) ListCheckpoints(ctx context.Context, crewID string) ([]*Checkpoint, error) {
 	var checkpoints []*Checkpoint
 
-	iter := s.client.Scan(ctx, 0, s.prefix+crewID+":", 0).Iterator()
+	// Glob pattern needs the trailing "*": a bare "prefix+crewID+:" matches
+	// only the exact key of that name, so the scan returned nothing and
+	// ListCheckpoints was always empty on Redis-backed stores.
+	// Glob pattern needs the trailing "*": a bare "prefix+crewID+:" matches
+	// only the exact key of that name, so the scan returned nothing and
+	// ListCheckpoints was always empty on Redis-backed stores.
+	iter := s.client.Scan(ctx, 0, s.prefix+crewID+":*", 0).Iterator()
 	for iter.Next(ctx) {
 		key := iter.Val()
 		// Skip the "latest" pointer

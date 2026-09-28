@@ -84,9 +84,26 @@ func TestCompat_CheckpointStore(t *testing.T) {
 	if err != nil || got == nil || got.CrewID != "compat-crew" {
 		t.Fatalf("load = %+v, %v", got, err)
 	}
+	// Regression: ListCheckpoints SCANs with a glob pattern. A pattern ending
+	// in ":" (no "*") matches only an exact key of that name, so this returned
+	// 0 on every Redis-protocol backend while Save/LoadLatest kept working.
 	list, err := st.ListCheckpoints(ctx, "compat-crew")
 	if err != nil || len(list) == 0 {
 		t.Fatalf("list = %d, %v", len(list), err)
+	}
+	// The "latest" pointer is not a checkpoint entry and must be excluded.
+	for _, c := range list {
+		if c == nil || c.CrewID != "compat-crew" {
+			t.Fatalf("unexpected checkpoint in list: %+v", c)
+		}
+	}
+	// Listing a crew with no checkpoints returns empty, not an error.
+	empty, err := st.ListCheckpoints(ctx, "compat-crew-absent")
+	if err != nil {
+		t.Fatalf("list absent crew: %v", err)
+	}
+	if len(empty) != 0 {
+		t.Fatalf("expected no checkpoints for absent crew, got %d", len(empty))
 	}
 }
 
