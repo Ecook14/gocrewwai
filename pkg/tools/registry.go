@@ -73,7 +73,7 @@ func (r *ToolRegistry) LoadPlugin(path string) error {
 
 // CreateTool instantiates a tool by name with the provided configuration map.
 func CreateTool(name string, config map[string]interface{}) (Tool, error) {
-	// Elite Pattern: Dynamic tool instantiation from external configuration.
+	// Dynamic tool instantiation from external configuration.
 	// This mapping ensures that any tool can be requested by Developers/Users via YAML.
 	switch name {
 	case "GitHubTool":

@@ -135,7 +135,7 @@ func RunAll(guardrails []Guardrail, output string) error {
 	return nil
 }
 
-// Elite Tier: Advanced Guardrails
+// Advanced guardrails
 
 // PIIRedactionGuardrail detects PII in outputs.
 type PIIRedactionGuardrail struct {

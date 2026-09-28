@@ -2,7 +2,43 @@
 
 All notable changes to Gocrewwai will be documented in this file.
 
-## [Unreleased]
+## [1.0.0-beta.3] - 2026-09-28
+
+### 🐛 Fixes
+
+- **`RedisCheckpointStore.ListCheckpoints` always returned empty** — the SCAN glob pattern
+  ended at `"<prefix><crewID>:"` with no trailing `*`, so it matched only a key of exactly
+  that name and never the versioned checkpoint keys. Callers saw zero checkpoints on every
+  Redis-protocol backend while `Save`/`LoadLatest` kept working, which is why it went
+  unnoticed. Caught by the CI compat matrix against real service containers.
+- **Idempotency reservation was not a test-and-set** — `reserveIdem` returned nothing, so a
+  concurrent request that lost the race after both requests missed `checkIdem` silently
+  no-opped and continued, persisting a second session and executing a duplicate crew under
+  one `Idempotency-Key`. The loser now receives 409.
+- **Kickoff semaphore released tokens to the wrong channel** — `releaseSem` re-read the
+  package global instead of returning the token to the channel `acquireSem` took it from,
+  permanently draining the acquired channel if the variable was reassigned in between.
+- **Kickoff tests dialed the real provider** — two tests set a fake `OPENAI_API_KEY` and
+  still made a live `api.openai.com` request (401 + retry), adding ~150ms, flakiness, and
+  outbound traffic to CI. They now use an in-memory stub via a `newLLMClient` seam.
+
+### 🔧 Build & release
+
+- **Single source of truth for version** — new `pkg/version` package, injected at link time
+  via `-ldflags -X`. Previously the version was hardcoded in three places and the release
+  workflow's `-ldflags` was just `-s -w`, so a tagged release shipped binaries that
+  self-reported the old version. Unset builds now report `dev` rather than a stale number.
+- **Release workflow** now stamps the tag and commit SHA into every binary, verifies the
+  embedded version matches the tag (failing the release if not), publishes `SHA256SUMS`,
+  and generates release notes. macOS and Windows builds previously got no `-ldflags` at all.
+- **Go matrix trimmed to 1.25** — `go.mod` requires `go 1.25.0`, so the 1.23/1.24 legs were
+  auto-upgrading via `GOTOOLCHAIN` and testing 1.25 anyway.
+
+### 🧹 Housekeeping
+
+- Removed remaining "Elite" branding from shipped binaries and source, including the
+  user-visible `Initiating Elite Graph Execution` log line. Docs were already cleaned; the
+  binary and comments were missed.
 
 ### 🔒 Security
 

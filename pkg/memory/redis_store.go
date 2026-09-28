@@ -57,7 +57,7 @@ func (s *RedisStore) Add(ctx context.Context, item *MemoryItem) error {
 }
 
 func (s *RedisStore) Search(ctx context.Context, queryVector []float32, limit int) ([]*MemoryItem, error) {
-	// Elite Implementation: High-Consistency Scan across Universal Redis Cluster.
+	// High-consistency scan across the Redis cluster.
 	// This ensures total recall across distributed agent memory.
 
 	iter := s.client.Scan(ctx, 0, s.prefix+"*", 0).Iterator()

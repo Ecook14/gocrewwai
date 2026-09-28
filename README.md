@@ -2,7 +2,7 @@
 
 Strictly-typed agentic orchestration for Go. Inspired by CrewAI, LangChain, and LangGraph.
 
-> **Status: v0.9.0 (Alpha → Beta).** The framework is feature-complete against the public roadmap; v1.0.0 will ship once the next CHANGELOG entry is published.
+> **Status: v1.0.0-beta.3.** The framework is feature-complete against the public roadmap; v1.0.0 will ship once the next CHANGELOG entry is published.
 
 ---
 

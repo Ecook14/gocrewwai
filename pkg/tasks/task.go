@@ -89,7 +89,7 @@ type Task struct {
 	// Dependencies define explicit graph edges for DAG orchestration.
 	Dependencies []*Task `json:"-"`
 
-	// Elite Tier: State Machine & Cyclic Logic
+	// State machine & cyclic logic
 	// OutputCondition returns a key used to select the next task from NextPaths.
 	OutputCondition func(result interface{}) string `json:"-"`
 
@@ -125,7 +125,7 @@ func NewTask(description string, agent core.Agent) *Task {
 	return t
 }
 
-// New creates a new Task using a declarative configuration struct (Elite Style).
+// New creates a new Task using a declarative configuration struct (declarative style).
 func New(cfg TaskConfig) *Task {
 	t := &Task{
 		Name:                cfg.Name,

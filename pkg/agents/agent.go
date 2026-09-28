@@ -978,7 +978,7 @@ func (a *Agent) Execute(ctx context.Context, taskInput string, options map[strin
 			}
 		}
 
-		// Elite Tier: Usage Metrics Tracking (Token Heuristic)
+		// Usage metrics tracking (token heuristic)
 		promptTokens := len(enrichedInput) / 4
 		completionTokens := len(responseText) / 4
 		a.UsageMetrics["prompt_tokens"] += promptTokens

@@ -198,7 +198,7 @@ func (c *AnthropicClient) GenerateWithUsage(ctx context.Context, messages []Mess
 	}
 	usage.CostUSD = CalculateCost(*usage)
 
-	// Elite: Record to Global Tracker
+	// Record to global tracker
 	GlobalTracker().Record(*usage)
 
 	if len(result.Content) > 0 {

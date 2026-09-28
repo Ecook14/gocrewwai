@@ -105,7 +105,7 @@ func NewCrew(agents []core.Agent, tasks []*tasks.Task, opts ...CrewOption) *Crew
 	return c
 }
 
-// New creates a new Crew using a declarative configuration struct (Elite Style).
+// New creates a new Crew using a declarative configuration struct (declarative style).
 func New(cfg CrewConfig) *Crew {
 	return &Crew{
 		Agents:           cfg.Agents,
@@ -159,12 +159,12 @@ type Crew struct {
 	StepCallback   func(step map[string]interface{})       `json:"-"` // Called per agent step for collaboration tracking
 	TaskCallback   func(taskIndex int, output interface{}) `json:"-"` // Called when any task produces output
 
-	// Persistence & Logging (Elite)
+	// Persistence & logging
 	SessionID     string
 	StateFile     string
 	OutputLogFile string
 
-	// Elite Features
+	// Features
 	Planning         bool
 	PlanningLLM      llm.Client
 	TrainingDir      string
@@ -373,7 +373,7 @@ func (c *Crew) Kickoff(ctx context.Context) (interface{}, error) {
 		return "", crewErrors.ErrNoAgents
 	}
 
-	// Elite Persistence: Load from SQL if SessionID is provided
+	// Persistence: load from SQL if SessionID is provided
 	if c.SessionID != "" {
 		m, err := core.GetSessionManager()
 		if err == nil {
@@ -507,7 +507,7 @@ func (c *Crew) executeSequential(ctx context.Context) (interface{}, error) {
 			continue
 		}
 
-		// Cooldown delay between tasks to prevent bursty rate limits (Elite Tier Reliability)
+		// Cooldown delay between tasks to prevent bursty rate limits (tier-2 reliability)
 		if i > 0 && c.TaskCooldown > 0 {
 			time.Sleep(c.TaskCooldown)
 		}
@@ -582,7 +582,7 @@ func (c *Crew) executeSequential(ctx context.Context) (interface{}, error) {
 				c.OnTaskComplete(i+1, result)
 			}
 
-			// Elite: Save Checkpoint after each task
+			// Save checkpoint after each task
 			if c.SessionID != "" {
 				if m, err := core.GetSessionManager(); err == nil {
 					_ = m.SaveCheckpoint(c.SessionID, c)
@@ -780,7 +780,7 @@ func (c *Crew) executeHierarchical(ctx context.Context) (interface{}, error) {
 					defaultLogger.Info("🔄 Manager INITIATED RE-PLANNING", slog.String("decision", decisionStr))
 				}
 
-				// Elite Pattern: Dynamic Re-Planning native injection.
+				// Dynamic re-planning injection.
 				newTask := &tasks.Task{
 					Description: "Follow-up execution based on manager refinement: " + decisionStr,
 					Agent:       &orchestrator.Agent,
@@ -958,7 +958,7 @@ func (c *Crew) executeGraph(ctx context.Context) (string, error) {
 	}
 
 	if c.Verbose {
-		defaultLogger.Info("Initiating Elite Graph Execution (Supports Cycles)")
+		defaultLogger.Info("Initiating graph execution (supports cycles)")
 	}
 
 	// Track processing state
@@ -1252,7 +1252,7 @@ func (c *Crew) runPlanningPhase(ctx context.Context) error {
 }
 
 // RunCreatorMode enters a continuous polling loop, executing any new tasks staged via the UI.
-// This is an Elite Tier developer feature for building long-running AI orchestration services.
+// This is a developer feature for building long-running AI orchestration services.
 func (c *Crew) RunCreatorMode(ctx context.Context) error {
 	slog.Info("✅ Engine is now in 'Creator Mode'. Active polling for UI-staged entities...")
 

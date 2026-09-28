@@ -15,6 +15,7 @@ import (
 	"github.com/Ecook14/gocrewwai/pkg/dashboard"
 	"github.com/Ecook14/gocrewwai/pkg/memory"
 	"github.com/Ecook14/gocrewwai/pkg/telemetry"
+	"github.com/Ecook14/gocrewwai/pkg/version"
 )
 
 // printHelp prints the usage instructions
@@ -43,7 +44,7 @@ func Run(args []string) error {
 	command := args[1]
 	switch command {
 	case "version":
-		fmt.Println("gocrew v0.9.0 (Autonomous Interoperability)")
+		fmt.Println("gocrew " + version.Display() + " (Autonomous Interoperability)")
 		return nil
 	case "create":
 		if len(args) < 3 {

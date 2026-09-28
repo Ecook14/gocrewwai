@@ -183,7 +183,7 @@ func (c *GeminiClient) GenerateWithUsage(ctx context.Context, messages []Message
 	}
 	usage.CostUSD = CalculateCost(*usage)
 
-	// Elite: Record to Global Tracker
+	// Record to global tracker
 	GlobalTracker().Record(*usage)
 
 	return text, usage, nil

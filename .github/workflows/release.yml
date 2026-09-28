@@ -3,28 +3,73 @@ on:
   push:
     tags: ['v*']
 
+permissions:
+  contents: write
+
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
           go-version: '1.25'
+
       - name: Download dependencies
         run: go mod download
+
+      # Inject the tag name and commit SHA into pkg/version so a released
+      # binary reports the same version as the tag it came from. Without this
+      # the binaries keep their hardcoded "dev" default and contradict the
+      # release page.
+      - name: Resolve version metadata
+        id: meta
+        run: |
+          set -euo pipefail
+          echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "ldflags=-s -w -X github.com/Ecook14/gocrewwai/pkg/version.Version=${GITHUB_REF_NAME} -X github.com/Ecook14/gocrewwai/pkg/version.Commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
       - name: Build Linux
         run: |
-          GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -ldflags="-s -w" -o gocrew-cli-linux ./cmd/gocrew
-          GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -ldflags="-s -w" -o gocrewwai-server-linux ./cmd/server
+          set -euo pipefail
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -ldflags="${{ steps.meta.outputs.ldflags }}" -o gocrew-cli-linux ./cmd/gocrew
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -ldflags="${{ steps.meta.outputs.ldflags }}" -o gocrewwai-server-linux ./cmd/server
+
       - name: Build macOS
         run: |
-          GOOS=darwin GOARCH=amd64 go build -o gocrew-cli-macos ./cmd/gocrew
-          GOOS=darwin GOARCH=amd64 go build -o gocrewwai-server-macos ./cmd/server
+          set -euo pipefail
+          GOOS=darwin GOARCH=amd64 go build -ldflags="${{ steps.meta.outputs.ldflags }}" -o gocrew-cli-macos ./cmd/gocrew
+          GOOS=darwin GOARCH=amd64 go build -ldflags="${{ steps.meta.outputs.ldflags }}" -o gocrewwai-server-macos ./cmd/server
+
       - name: Build Windows
         run: |
-          GOOS=windows GOARCH=amd64 go build -o gocrew-cli.exe ./cmd/gocrew
-          GOOS=windows GOARCH=amd64 go build -o gocrewwai-server.exe ./cmd/server
+          set -euo pipefail
+          GOOS=windows GOARCH=amd64 go build -ldflags="${{ steps.meta.outputs.ldflags }}" -o gocrew-cli.exe ./cmd/gocrew
+          GOOS=windows GOARCH=amd64 go build -ldflags="${{ steps.meta.outputs.ldflags }}" -o gocrewwai-server.exe ./cmd/server
+
+      # Fail the release rather than ship binaries that disagree with the tag.
+      - name: Verify embedded version
+        run: |
+          set -euo pipefail
+          want="${GITHUB_REF_NAME#v}"
+          got="$(./gocrew-cli-linux version | sed -E 's/^gocrew ([^ ]+).*/\1/')"
+          echo "tag version : $want"
+          echo "binary says : $got"
+          if [ "$got" != "$want" ]; then
+            echo "ERROR: binary version does not match the release tag" >&2
+            exit 1
+          fi
+          if ./gocrewwai-server-linux --help | grep -qi elite; then
+            echo "ERROR: server binary still ships Elite branding" >&2
+            exit 1
+          fi
+
+      - name: Generate checksums
+        run: sha256sum gocrew-cli-linux gocrewwai-server-linux gocrew-cli-macos gocrewwai-server-macos gocrew-cli.exe gocrewwai-server.exe > SHA256SUMS
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
@@ -35,5 +80,7 @@ jobs:
             gocrewwai-server-macos
             gocrew-cli.exe
             gocrewwai-server.exe
+            SHA256SUMS
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

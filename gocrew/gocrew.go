@@ -12,9 +12,12 @@
 //	mem := gocrew.NewMemory(store, llmClient, nil)
 //	f := gocrew.NewFlow(nil)
 //
-// Gocrewwai v0.9.0 — 30 core packages, 57 built-in tools, 7 LLM providers,
+// Gocrewwai — 30 core packages, 57 built-in tools, 7 LLM providers,
 // 12 memory store types, 6 orchestration modes, full OTEL observability,
 // MCP+A2A+WebMCP protocols, Docker+WASM sandboxing.
+//
+// Version is reported by the pkg/version package, not hardcoded here, so this
+// comment cannot drift from the release tag.
 package gocrew
 
 import (

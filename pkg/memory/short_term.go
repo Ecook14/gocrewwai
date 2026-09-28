@@ -26,7 +26,7 @@ func (s *ShortTermMemory) Search(ctx context.Context, query string, limit int) (
 	count := 0
 	results := make([]*MemoryItem, 0)
 	for i := len(s.items) - 1; i >= 0 && count < limit; i-- {
-		// Elite Pattern: Direct contextual recall
+		// Direct contextual recall
 		results = append(results, s.items[i])
 		count++
 	}

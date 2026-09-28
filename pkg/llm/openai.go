@@ -224,7 +224,7 @@ func (c *OpenAIClient) GenerateWithUsage(ctx context.Context, messages []Message
 	}
 	usage.CostUSD = CalculateCost(*usage)
 
-	// Elite: Record to Global Tracker
+	// Record to global tracker
 	GlobalTracker().Record(*usage)
 
 	return resp.Choices[0].Message.Content, usage, nil

@@ -15,6 +15,7 @@ import (
 	"github.com/Ecook14/gocrewwai/pkg/core"
 	"github.com/Ecook14/gocrewwai/pkg/kv"
 	"github.com/Ecook14/gocrewwai/pkg/telemetry"
+	"github.com/Ecook14/gocrewwai/pkg/version"
 	"github.com/Ecook14/gocrewwai/web"
 )
 
@@ -26,7 +27,7 @@ func main() {
 	helpFlag := flag.Bool("help", false, "Show this help message")
 
 	flag.Usage = func() {
-		fmt.Printf("Gocrewwai Elite Server\n\n")
+		fmt.Printf("Gocrewwai Server\n\n")
 		fmt.Printf("Usage:\n")
 		fmt.Printf("  server [options]\n\n")
 		fmt.Printf("Options:\n")
@@ -50,14 +51,14 @@ func main() {
 		log.Fatalf("❌ Failed to initialize configuration: %v", err)
 	}
 
-	// 1.1 Print Elite Banner
-	fmt.Println(`
-   ______                      _       __  ___ 
+	// 1.1 Print banner
+	fmt.Printf(`
+   ______                      _       __  ___
   / ____/________ _      __   | |     / / /   |
  / /   / ___/ _ \ | /| / /   | | /| / / /| |
 / /___/ /  / __/ |/ |/ /    | |/ |/ / / ___ |
-\____/_/   \___/|__/|__/     |__/|__/ /_/  |_| v0.9.0 (Beta)
-                                               `)
+\____/_/   \___/|__/|__/     |__/|__/ /_/  |_| v%s
+                                               `, version.Display())
 	log.Printf("🛠️  Engine: Gocrewwai | Mode: Multi-Service Orchestrator")
 	log.Printf("📂 Config: %s", os.Getenv("CREW_CONFIG_PATH"))
 	if os.Getenv("CREW_CONFIG_PATH") == "" {

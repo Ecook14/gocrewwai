@@ -244,7 +244,7 @@ func main() {
 		return err
 	}
 
-	// 5. Elite Hardening: Automatic module initialization
+	// 5. Automatic module initialization
 	slog.Info("Running 'go mod init'...", slog.String("project", projectName))
 	initCmd := exec.Command("go", "mod", "init", projectName)
 	initCmd.Dir = baseDir
