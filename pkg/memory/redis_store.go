@@ -7,6 +7,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/Ecook14/gocrewwai/pkg/kv"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -16,18 +17,17 @@ type RedisStore struct {
 	prefix string
 }
 
-// NewRedisStore initializes a new Redis client (Universal for Cluster/Sentinel support).
+// NewRedisStore initializes a new Redis-protocol client (Universal for
+// Cluster/Sentinel support; works against Redis, Dragonfly, or Valkey —
+// backend selected via REDIS_BACKEND for logging only).
 func NewRedisStore(addrs []string, password string, db int, prefix string) (*RedisStore, error) {
-	client := redis.NewUniversalClient(&redis.UniversalOptions{
+	client, err := kv.Dial(context.Background(), kv.Config{
 		Addrs:    addrs,
 		Password: password,
 		DB:       db,
 		PoolSize: 10, // Hardened pool
 	})
-
-	// Test connection
-	ctx := context.Background()
-	if err := client.Ping(ctx).Err(); err != nil {
+	if err != nil {
 		return nil, fmt.Errorf("failed to connect to redis: %w", err)
 	}
 

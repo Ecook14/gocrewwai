@@ -1,0 +1,43 @@
+# Dragonfly (local/dev) — single primary + async replica, AOF persistence.
+# Production topology per docs/ops/dragonfly.md. No cluster mode.
+services:
+  dragonfly-primary:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.40.0
+    command:
+      - --appendonly=yes
+      - --appendfsync=everysec
+      - --maxmemory=2gb
+      - --eviction-policy=noeviction
+    ports:
+      - "6379:6379"
+    volumes:
+      - dragonfly-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  dragonfly-replica:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.40.0
+    command:
+      - --replicaof=dragonfly-primary:6379
+      - --appendonly=yes
+    depends_on:
+      dragonfly-primary:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Engine (example wiring — set secrets via env file, never in repo):
+  # gocrew-server:
+  #   build: ../..
+  #   environment:
+  #     REDIS_BACKEND: dragonfly
+  #     REDIS_ADDR: dragonfly-primary:6379
+  #   depends_on:
+  #     dragonfly-primary:
+  #       condition: service_healthy
+
+volumes:
+  dragonfly-data:

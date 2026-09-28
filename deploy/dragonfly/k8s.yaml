@@ -1,0 +1,39 @@
+# Dragonfly on Kubernetes via the official operator.
+# Install the operator first:
+#   helm repo add dragonfly https://dragonflydb.github.io/dragonfly-operator-helm-charts
+#   helm install dragonfly-operator dragonfly/dragonfly-operator
+# Then apply this file. Single primary + replica; no cluster mode
+# (see docs/ops/dragonfly.md for the rationale).
+apiVersion: dragonflydb.io/v1alpha1
+kind: Dragonfly
+metadata:
+  name: gocrew-kv
+  namespace: gocrewwai
+spec:
+  replicas: 2
+  image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.40.0
+  args:
+    - --appendonly=yes
+    - --appendfsync=everysec
+    - --maxmemory=4gb
+    - --eviction-policy=noeviction
+  resources:
+    requests:
+      memory: 4Gi
+      cpu: "2"
+    limits:
+      memory: 6Gi
+---
+# Service exposing the primary for the engine (REDIS_ADDR=gocrew-kv:6379).
+apiVersion: v1
+kind: Service
+metadata:
+  name: gocrew-kv
+  namespace: gocrewwai
+spec:
+  selector:
+    app.kubernetes.io/name: gocrew-kv
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379

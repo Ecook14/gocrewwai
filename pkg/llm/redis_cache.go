@@ -6,12 +6,14 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/Ecook14/gocrewwai/pkg/kv"
 	"github.com/redis/go-redis/v9"
 )
 
-// RedisCache implement the Cache interface using a Redis backend.
+// RedisCache implement the Cache interface using a Redis-protocol backend
+// (Redis, Dragonfly, or Valkey).
 type RedisCache struct {
-	client *redis.Client
+	client redis.UniversalClient
 	ttl    time.Duration
 }
 
@@ -21,16 +23,12 @@ func NewRedisCache(addr, password string, db int, ttl time.Duration) (*RedisCach
 		return nil, fmt.Errorf("redis address is required")
 	}
 
-	client := redis.NewClient(&redis.Options{
-		Addr:     addr,
+	client, err := kv.Dial(context.Background(), kv.Config{
+		Addrs:    []string{addr},
 		Password: password,
 		DB:       db,
 	})
-
-	// Test connection
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := client.Ping(ctx).Err(); err != nil {
+	if err != nil {
 		return nil, fmt.Errorf("failed to connect to redis: %w", err)
 	}
 
