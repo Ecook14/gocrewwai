@@ -234,6 +234,41 @@ curl -X POST http://localhost:8080/api/v1/crews/kickoff \
 Returns `202` immediately and executes in the background. Crew events stream from
 `/api/v1/stream/:id`.
 
+### Multi-agent kickoff
+
+For crews of N agents and M tasks, send `agents[]` and `tasks[]` instead of the
+flat fields (the two shapes are never mixed):
+
+```bash
+curl -X POST http://localhost:8080/api/v1/crews/kickoff \
+  -H "Authorization: Bearer $API_AUTH_TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: run-$(uuidgen)" \
+  -d '{
+        "session_id": "crew-0001",
+        "crew_process": "sequential",
+        "agents": [
+          {"role": "Researcher", "goal": "Gather facts", "model": "gpt-4o"},
+          {"role": "Writer", "goal": "Write the report", "model": "gpt-4o"}
+        ],
+        "tasks": [
+          {"description": "Research the topic.", "agent_role": "Researcher"},
+          {"description": "Write it up.", "agent_role": "Writer", "expected_output": "A markdown report."}
+        ]
+      }'
+```
+
+Rules:
+
+- Up to **10 agents** and **32 tasks** per request.
+- Every task wires to an agent by `agent_role`. The role may be omitted only when
+  exactly one agent is defined; duplicate agent roles are rejected.
+- Each agent's model key resolves from its own `api_key` first, then the server's
+  `OPENAI_API_KEY`. Keys are used to build the client and are never logged or
+  persisted. A requested model with no key anywhere is a `503`.
+- One session owns the whole run; idempotency, SSE, and owner scoping work exactly
+  as in the single-agent case.
+
 **`Idempotency-Key` matters.** It makes retries safe:
 
 - While the first run is still in flight, a second kickoff with the same key gets **`409`**
@@ -249,8 +284,9 @@ Responses:
 | `202` | Accepted, crew is running |
 | `409` | Same key, first run still in progress |
 | `200` | Same key, run already finished — returns the stored result |
+| `400` | Invalid request: unknown agent role, ambiguous wiring, mixed flat/array fields, or over the agent/task caps |
 | `401` | Missing or invalid bearer token |
-| `503` | `agent_model` requested but `OPENAI_API_KEY` is not configured |
+| `503` | A requested model has no key (neither per-agent `api_key` nor server `OPENAI_API_KEY`) |
 
 ### Configuration
 

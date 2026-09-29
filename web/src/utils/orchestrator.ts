@@ -1,5 +1,5 @@
 import { Node, Edge } from '@xyflow/react';
-import type { KickoffRequest } from '../api/client';
+import type { KickoffRequest, KickoffAgent, KickoffTask } from '../api/client';
 
 export const DEFAULT_MODEL = 'gpt-4o';
 
@@ -15,14 +15,12 @@ export interface TaskSpec {
   expectedOutput: string;
 }
 
-// NoAgentTaskPairError means the canvas has no task wired to an agent, so
-// there is nothing the backend can execute. The backend runs exactly one
-// agent and one task per kickoff; when several pairs exist the first
-// task (in canvas order) with an incoming edge from an agent wins, and the
-// UI surfaces which pair was sent.
+// NoAgentTaskPairError means the canvas has no executable content, so there
+// is nothing the backend can run: at least one agent and one task are
+// required. The UI surfaces this instead of sending a doomed request.
 export class NoAgentTaskPairError extends Error {
   constructor() {
-    super('Connect a task node to an agent node before kicking off.');
+    super('Add at least one agent node and one task node before kicking off.');
     this.name = 'NoAgentTaskPairError';
   }
 }
@@ -51,44 +49,50 @@ function taskData(n: Node): TaskSpec | null {
   };
 }
 
-// mapGraphToKickoff converts the canvas into the backend's flat kickoff
-// schema. The backend accepts one agent and one task per request
-// (agent_role + task_description are required), so this picks the first
-// task with an incoming edge from an agent.
+// mapGraphToKickoff converts the whole canvas into the backend's multi-agent
+// kickoff schema: every valid agent node becomes an agents[] entry and every
+// valid task node a tasks[] entry, wired by incoming edges. Tasks without an
+// incoming edge leave agent_role empty, which the backend resolves only when
+// exactly one agent exists (otherwise it rejects with a clear 400 the UI
+// surfaces). Throws NoAgentTaskPairError when there is nothing executable.
 export function mapGraphToKickoff(nodes: Node[], edges: Edge[]): KickoffRequest {
-  for (const taskNode of nodes) {
-    const task = taskData(taskNode);
-    if (!task) continue;
-    const edge = edges.find((e) => e.target === taskNode.id);
-    if (!edge) continue;
-    const source = nodes.find((sn) => sn.id === edge.source);
-    if (!source) continue;
-    const agent = agentData(source);
-    if (!agent) continue;
-    return {
-      session_id: `sess_${Date.now()}`,
-      agent_role: agent.role,
-      agent_goal: agent.goal,
-      agent_backstory: agent.backstory,
-      agent_model: agent.model,
-      task_description: task.description,
-      task_expected_output: task.expectedOutput || undefined,
-      crew_process: 'sequential',
-    };
+  const agents: KickoffAgent[] = [];
+  for (const n of nodes) {
+    const agent = agentData(n);
+    if (agent) agents.push(agent);
   }
-  throw new NoAgentTaskPairError();
+  const tasks: KickoffTask[] = [];
+  for (const n of nodes) {
+    const task = taskData(n);
+    if (!task) continue;
+    const edge = edges.find((e) => e.target === n.id);
+    const source = edge ? nodes.find((sn) => sn.id === edge.source) : undefined;
+    const sourceAgent = source ? agentData(source) : null;
+    tasks.push({
+      description: task.description,
+      expected_output: task.expectedOutput || undefined,
+      agent_role: sourceAgent ? sourceAgent.role : undefined,
+    });
+  }
+  if (agents.length === 0 || tasks.length === 0) {
+    throw new NoAgentTaskPairError();
+  }
+  return {
+    session_id: `sess_${Date.now()}`,
+    agents,
+    tasks,
+    crew_process: 'sequential',
+  };
 }
 
-// describeKickoffPair returns a human-readable "role → task" summary of what
+// describeKickoffPair returns a human-readable summary of what
 // mapGraphToKickoff would send, for confirmation UI. Null when invalid.
 export function describeKickoffPair(nodes: Node[], edges: Edge[]): string | null {
   try {
     const req = mapGraphToKickoff(nodes, edges);
-    const short =
-      req.task_description.length > 60
-        ? req.task_description.slice(0, 60) + '…'
-        : req.task_description;
-    return `${req.agent_role} → ${short}`;
+    const nAgents = req.agents?.length ?? 0;
+    const nTasks = req.tasks?.length ?? 0;
+    return `${nAgents} agent${nAgents === 1 ? '' : 's'}, ${nTasks} task${nTasks === 1 ? '' : 's'}`;
   } catch {
     return null;
   }

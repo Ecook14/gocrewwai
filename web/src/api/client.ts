@@ -48,15 +48,34 @@ client.interceptors.request.use((config) => {
   return config;
 });
 
+export interface KickoffAgent {
+  role: string;
+  goal?: string;
+  backstory?: string;
+  model?: string;
+  api_key?: string;
+  max_iterations?: number;
+}
+
+export interface KickoffTask {
+  description: string;
+  expected_output?: string;
+  agent_role?: string;
+}
+
 export interface KickoffRequest {
   session_id: string;
-  agent_role: string;
+  // Legacy flat single-agent shape. Never combined with agents/tasks.
+  agent_role?: string;
   agent_goal?: string;
   agent_backstory?: string;
   agent_model?: string;
-  task_description: string;
+  task_description?: string;
   task_expected_output?: string;
   crew_process?: string;
+  // Multi-agent shape: the whole canvas in one request.
+  agents?: KickoffAgent[];
+  tasks?: KickoffTask[];
 }
 
 export interface KickoffResponse {

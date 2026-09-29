@@ -176,23 +176,73 @@ func (s *Server) storeIdem(key, owner, sessionID string) {
 	s.idemBySession[sessionID] = key
 }
 
+// Bounds for the multi-agent kickoff arrays. Sized like the existing flat
+// limits (max=32 tools, max=1000 iterations): large enough for real crews,
+// small enough that one request cannot exhaust the worker pool or the
+// idempotency ledger with fan-out.
+const (
+	maxKickoffAgents = 10
+	maxKickoffTasks  = 32
+)
+
+// kickoffAgent is one entry of the optional agents[] array. Only fields the
+// handler actually honors are accepted here — notably there is no tools or
+// system_prompt field, because the flat path already demonstrates that
+// accepting fields and silently dropping them is worse than rejecting them.
+// (Flat agent_system_prompt/task_tools remain accepted-but-ignored for
+// backward compatibility and are documented as such.)
+type kickoffAgent struct {
+	Role          string `json:"role" binding:"required,max=256"`
+	Goal          string `json:"goal" binding:"max=2000"`
+	Backstory     string `json:"backstory" binding:"max=4000"`
+	Model         string `json:"model" binding:"max=128"`
+	APIKey        string `json:"api_key" binding:"max=512"`
+	MaxIterations int    `json:"max_iterations" binding:"min=0,max=1000"`
+}
+
+// kickoffTask is one entry of the optional tasks[] array. AgentRole wires
+// the task to an agent by role; it may be omitted only when the request
+// defines exactly one agent.
+type kickoffTask struct {
+	Description    string `json:"description" binding:"required,max=20000"`
+	ExpectedOutput string `json:"expected_output" binding:"max=20000"`
+	AgentRole      string `json:"agent_role" binding:"max=256"`
+}
+
+// kickoffRequest is the POST /api/v1/crews/kickoff body. Two shapes are
+// accepted and never mixed: the legacy flat single-agent fields, or the
+// agents[]/tasks[] arrays for multi-agent crews. Flat agent_role and
+// task_description carry no `required` tag (unlike before) because the
+// multi-agent shape omits them; the flat path enforces presence in code so
+// its 400 behavior is unchanged.
+type kickoffRequest struct {
+	SessionID          string         `json:"session_id" binding:"omitempty,max=128"`
+	AgentRole          string         `json:"agent_role" binding:"max=256"`
+	AgentGoal          string         `json:"agent_goal" binding:"max=2000"`
+	AgentBackstory     string         `json:"agent_backstory" binding:"max=4000"`
+	AgentModel         string         `json:"agent_model" binding:"max=128"`
+	AgentSystemPrompt  string         `json:"agent_system_prompt" binding:"max=4000"`
+	TaskDescription    string         `json:"task_description" binding:"max=20000"`
+	TaskExpectedOutput string         `json:"task_expected_output" binding:"max=20000"`
+	TaskTools          []string       `json:"task_tools" binding:"max=32,dive,max=128"`
+	CrewProcess        string         `json:"crew_process" binding:"max=32"`
+	MaxIterations      int            `json:"max_iterations" binding:"min=0,max=1000"`
+	Agents             []kickoffAgent `json:"agents" binding:"max=10,dive"`
+	Tasks              []kickoffTask  `json:"tasks" binding:"max=32,dive"`
+}
+
+// apiError is a rejection the handler renders as-is: status plus a message
+// safe to expose (never includes secrets or internals).
+type apiError struct {
+	status  int
+	message string
+}
+
 // handleKickoff accepts a full crew execution request and starts execution.
 // It validates the payload, constructs the crew from the definition, persists
 // the session, and dispatches execution to the Crew engine.
 func (s *Server) handleKickoff(c *gin.Context) {
-	var payload struct {
-		SessionID          string   `json:"session_id" binding:"omitempty,max=128"`
-		AgentRole          string   `json:"agent_role" binding:"required,max=256"`
-		AgentGoal          string   `json:"agent_goal" binding:"max=2000"`
-		AgentBackstory     string   `json:"agent_backstory" binding:"max=4000"`
-		AgentModel         string   `json:"agent_model" binding:"max=128"`
-		AgentSystemPrompt  string   `json:"agent_system_prompt" binding:"max=4000"`
-		TaskDescription    string   `json:"task_description" binding:"required,max=20000"`
-		TaskExpectedOutput string   `json:"task_expected_output" binding:"max=20000"`
-		TaskTools          []string `json:"task_tools" binding:"max=32,dive,max=128"`
-		CrewProcess        string   `json:"crew_process" binding:"max=32"`
-		MaxIterations      int      `json:"max_iterations" binding:"min=0,max=1000"`
-	}
+	var payload kickoffRequest
 
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -267,6 +317,21 @@ func (s *Server) handleKickoff(c *gin.Context) {
 	}
 	s.mu.RUnlock()
 
+	if len(payload.Agents) > 0 {
+		crw, apiErr := buildMultiCrew(payload)
+		if apiErr != nil {
+			c.JSON(apiErr.status, gin.H{"error": apiErr.message})
+			return
+		}
+		s.dispatchCrew(c, crw, payload, owner, idemKey)
+		return
+	}
+
+	if len(payload.Tasks) > 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "'tasks[]' requires 'agents[]'; tasks cannot run without agents"})
+		return
+	}
+
 	if payload.AgentRole == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "'agent_role' is required"})
 		return
@@ -325,6 +390,114 @@ func (s *Server) handleKickoff(c *gin.Context) {
 	// Build the crew. NewCrew accepts agents first, then tasks.
 	crw := crew.NewCrew([]core.Agent{agent}, []*tasks.Task{task})
 
+	s.dispatchCrew(c, crw, payload, owner, idemKey)
+}
+
+// buildMultiCrew constructs a multi-agent crew from agents[]/tasks[].
+// On any rejection it returns a non-nil *apiError and the caller renders it;
+// apiError messages are safe to expose (no secrets, no internals).
+//
+// Contract:
+//   - agents[] and the flat agent_role/task_description must never be mixed.
+//   - Every task wires to an agent by role; duplicate agent roles are
+//     rejected because wiring would be ambiguous.
+//   - A role-less task is allowed only with exactly one agent.
+//   - Each agent's LLM key resolves per-agent api_key first, then the
+//     OPENAI_API_KEY environment. A requested model with no key anywhere is
+//     a 503, matching the flat path.
+//   - Per-agent api_key values are used only to construct the client and are
+//     never logged or persisted (persistSession* stores session_id/owner
+//     only).
+func buildMultiCrew(payload kickoffRequest) (*crew.Crew, *apiError) {
+	if payload.AgentRole != "" || payload.TaskDescription != "" {
+		return nil, &apiError{http.StatusBadRequest,
+			"cannot combine flat 'agent_role'/'task_description' with 'agents[]'/'tasks[]'"}
+	}
+	if len(payload.Agents) > maxKickoffAgents {
+		return nil, &apiError{http.StatusBadRequest,
+			fmt.Sprintf("too many agents: got %d, max %d", len(payload.Agents), maxKickoffAgents)}
+	}
+	if len(payload.Tasks) > maxKickoffTasks {
+		return nil, &apiError{http.StatusBadRequest,
+			fmt.Sprintf("too many tasks: got %d, max %d", len(payload.Tasks), maxKickoffTasks)}
+	}
+	if len(payload.Tasks) == 0 {
+		return nil, &apiError{http.StatusBadRequest,
+			"'tasks[]' is required with 'agents[]'"}
+	}
+
+	envKey := os.Getenv("OPENAI_API_KEY")
+	byRole := make(map[string]*agents.Agent, len(payload.Agents))
+	coreAgents := make([]core.Agent, 0, len(payload.Agents))
+	for i := range payload.Agents {
+		a := &payload.Agents[i]
+		if _, dup := byRole[a.Role]; dup {
+			return nil, &apiError{http.StatusBadRequest,
+				fmt.Sprintf("duplicate agent role %q: roles must be unique so tasks wire unambiguously", a.Role)}
+		}
+		var client llm.Client
+		if a.Model != "" && newLLMClient != nil {
+			key := a.APIKey
+			if key == "" {
+				key = envKey
+			}
+			if key == "" {
+				return nil, &apiError{http.StatusServiceUnavailable,
+					"api_provider_unconfigured: agent '" + a.Role + "' requests a model but no api_key was provided and OPENAI_API_KEY is unset"}
+			}
+			client = newLLMClient(key)
+		}
+		iters := a.MaxIterations
+		if iters == 0 {
+			iters = payload.MaxIterations
+		}
+		agent := agents.NewAgentLegacy(a.Role, a.Goal, a.Backstory, client,
+			[]agents.AgentOption{agents.WithMaxIterations(iters)}...,
+		)
+		if agent == nil {
+			return nil, &apiError{http.StatusInternalServerError,
+				"failed to construct agent '" + a.Role + "'"}
+		}
+		byRole[a.Role] = agent
+		coreAgents = append(coreAgents, agent)
+	}
+
+	crewTasks := make([]*tasks.Task, 0, len(payload.Tasks))
+	for i := range payload.Tasks {
+		t := &payload.Tasks[i]
+		role := t.AgentRole
+		if role == "" {
+			if len(byRole) != 1 {
+				return nil, &apiError{http.StatusBadRequest,
+					fmt.Sprintf("task %d has no 'agent_role' and %d agents are defined; role is required", i, len(byRole))}
+			}
+			for only := range byRole {
+				role = only
+			}
+		}
+		agent, ok := byRole[role]
+		if !ok {
+			return nil, &apiError{http.StatusBadRequest,
+				fmt.Sprintf("task %d references unknown agent role %q", i, role)}
+		}
+		task := tasks.NewTask(t.Description, agent)
+		task.ExpectedOutput = t.ExpectedOutput
+		crewTasks = append(crewTasks, task)
+	}
+
+	opts := []crew.CrewOption{}
+	if payload.CrewProcess != "" {
+		// CrewProcess was already validated against the supported names.
+		opts = append(opts, crew.WithProcess(crew.ProcessType(payload.CrewProcess)))
+	}
+	return crew.NewCrew(coreAgents, crewTasks, opts...), nil
+}
+
+// dispatchCrew persists the session, finalizes the idempotency reservation,
+// and launches the crew in the background, returning 202. It is shared by
+// the flat and multi-agent paths so persistence, idempotency, and semaphore
+// semantics cannot drift between them.
+func (s *Server) dispatchCrew(c *gin.Context, crw *crew.Crew, payload kickoffRequest, owner, idemKey string) {
 	// Persist the session as "running" via the checkpoint backend.
 	if err := s.persistSessionStart(payload.SessionID, owner); err != nil {
 		// Release the idempotency reservation so a retry (with the same
