@@ -2,6 +2,36 @@
 
 All notable changes to Gocrewwai will be documented in this file.
 
+## [1.0.0-beta.4] - 2026-09-29
+
+### ✨ Multi-agent crews over HTTP
+
+- **`POST /api/v1/crews/kickoff` accepts `agents[]`/`tasks[]`** — the engine always ran
+  N agents and M tasks, but the endpoint only exposed one of each. The flat
+  single-agent fields are unchanged and the two shapes are never mixed (400).
+  Up to 10 agents and 32 tasks per request; tasks wire to agents by role
+  (omittable only with a single agent); duplicate roles rejected.
+- **Per-agent model keys** — each agent resolves its key from its own `api_key`
+  first, then the server's `OPENAI_API_KEY`; a requested model with no key
+  anywhere is a 503. Keys are construction-only: never logged, never persisted.
+- **`crew_process` is honored** in the multi-agent path (it was validated but
+  silently ignored before; the flat path keeps its sequential default).
+- **Session, idempotency, semaphore, SSE, and owner scoping are shared** with the
+  flat path via a common dispatch function, so the guarantees cannot drift.
+- **Visual Builder sends whole canvases** — token auth, per-kickoff
+  idempotency keys, authenticated SSE streaming, and live node statuses driven
+  by real backend event types. The release pipeline compiles the React app and
+  embeds it in the server binary (`-tags webdist`); the release job boots the
+  binary and fails unless it serves the app.
+- **Static frontend paths bypass API auth** (same model as the dashboard: assets
+  carry no secrets and navigations cannot send headers); every `/api/*`
+  endpoint stays gated.
+
+### 🐛 Fixes
+
+- **`/api/v1/health` reported a hardcoded `0.9.0`** — now reads the link-time
+  `pkg/version`, so health, CLI, and banner agree with the release tag.
+
 ## [1.0.0-beta.3] - 2026-09-28
 
 ### 🐛 Fixes
