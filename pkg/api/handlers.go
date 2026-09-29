@@ -58,14 +58,19 @@ func releaseSem(sem chan struct{}) {
 // checkIdem returns the ledger entry for an Idempotency-Key. Entries are
 // owner-scoped: a key presented by a different token is treated as unseen
 // (no cross-tenant oracle).
-func (s *Server) checkIdem(key, owner string) (*idemEntry, bool) {
+// checkIdem looks up an Idempotency-Key for the caller's owner scope.
+// It returns a COPY of the entry, not the live pointer: the background crew
+// goroutine mutates entries via finishIdem while concurrent requests are
+// reading them, so handing out the map's pointer would race (the handler
+// reads entry.done/sessionID after this lock is released).
+func (s *Server) checkIdem(key, owner string) (idemEntry, bool) {
 	s.idemMu.Lock()
 	defer s.idemMu.Unlock()
 	e, ok := s.idemKeys[key]
 	if !ok || (owner != "" && e.owner != "" && e.owner != owner) {
-		return nil, false
+		return idemEntry{}, false
 	}
-	return e, true
+	return *e, true
 }
 
 // newLLMClient builds the provider client for a kickoff agent. It is a
@@ -88,17 +93,19 @@ const (
 // doIdem applies one ledger mutation under the lock and reports whether the
 // op was applied. For idemOpReserve that bool is the load-bearing result: it
 // is an atomic test-and-set, and false means another request already owns the
-// key, so the caller must abort rather than continue as if it had won.
-func (s *Server) doIdem(op idemOp, key, owner, sessionID, status string) bool {
+// key, so the caller must abort rather than continue as if it had won. On a
+// lost reserve the second return value names the owning session, so the
+// caller can point the loser at the run that won.
+func (s *Server) doIdem(op idemOp, key, owner, sessionID, status string) (applied bool, existingSession string) {
 	if key == "" && op != idemOpFinish {
-		return false
+		return false, ""
 	}
 	s.idemMu.Lock()
 	defer s.idemMu.Unlock()
 	switch op {
 	case idemOpReserve:
-		if _, exists := s.idemKeys[key]; exists {
-			return false
+		if e, exists := s.idemKeys[key]; exists {
+			return false, e.sessionID
 		}
 		s.idemKeys[key] = &idemEntry{sessionID: sessionID, owner: owner, createdAt: time.Now()}
 		s.idemBySession[sessionID] = key
@@ -127,14 +134,15 @@ func (s *Server) doIdem(op idemOp, key, owner, sessionID, status string) bool {
 			delete(s.idemBySession, sessionID)
 		}
 	}
-	return true
+	return true, ""
 }
 
 // reserveIdem atomically claims an Idempotency-Key for a session. The pair
 // must be reserved BEFORE the session is persisted so a concurrent request
 // with the same key but a different session_id cannot pass both the
 // checkIdem gate and the session-running map gate in the same window.
-func (s *Server) reserveIdem(key, owner, sessionID string) bool {
+// Returns won=false plus the owning session when the key is already held.
+func (s *Server) reserveIdem(key, owner, sessionID string) (bool, string) {
 	return s.doIdem(idemOpReserve, key, owner, sessionID, "")
 }
 
@@ -294,10 +302,14 @@ func (s *Server) handleKickoff(c *gin.Context) {
 		// in-flight request won the race between our checkIdem miss and this
 		// call, so we must return 409 rather than continue. Without this the
 		// loser proceeded and both sessions were persisted, which is exactly
-		// the duplicate-execution bug the gate exists to prevent.
-		if !s.reserveIdem(idemKey, owner, payload.SessionID) {
+		// the duplicate-execution bug the gate exists to prevent. The 409
+		// names the winning session (like the checkIdem-hit path above) so
+		// the loser can poll it; the session itself stays owner-scoped, so a
+		// cross-owner loser learns an ID it cannot read.
+		if won, running := s.reserveIdem(idemKey, owner, payload.SessionID); !won {
 			c.JSON(http.StatusConflict, gin.H{
-				"error": "duplicate request still running",
+				"error":      "duplicate request still running",
+				"session_id": running,
 			})
 			return
 		}
