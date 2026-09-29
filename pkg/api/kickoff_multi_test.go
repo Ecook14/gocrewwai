@@ -205,6 +205,22 @@ func TestKickoff_MultiAgent_ConcurrentSameKey(t *testing.T) {
 	t.Setenv("OPENAI_API_KEY", "fake-test-key")
 	s := multiTestServer(t)
 
+	// Isolate from slots leaked by earlier tests: kickoffSem is global with
+	// a production cap of 10, and some tests leave background crews in
+	// flight (no Shutdown). Without headroom, our 8 concurrent kickoffs can
+	// legitimately 429 under -race slowness — a busy server, not a bug.
+	// (In-flight releases target their captured channel, so the swap-back
+	// order relative to Shutdown cannot corrupt accounting.)
+	kickoffSemMu.Lock()
+	prevSem := kickoffSem
+	kickoffSem = make(chan struct{}, 64)
+	kickoffSemMu.Unlock()
+	t.Cleanup(func() {
+		kickoffSemMu.Lock()
+		kickoffSem = prevSem
+		kickoffSemMu.Unlock()
+	})
+
 	const n = 8
 	var wg sync.WaitGroup
 	type outcome struct {
