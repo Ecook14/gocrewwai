@@ -190,15 +190,19 @@ Full reference: **[CLI reference](docs/features/cli.md)**.
 ## 🌐 The server (`gocrewwai-server`)
 
 ```bash
-gocrewwai-server --api-port 8080 --mesh-port 50051 --web
+gocrewwai-server --api-port 8080 --mesh-port 50051
 ```
 
-It starts three things and stays up until stopped, shutting them all down cleanly on
+It starts two services and stays up until stopped, shutting them both down cleanly on
 SIGINT/SIGTERM:
 
 - **REST API** (Gin) on `:8080` — kickoff, session reads, and SSE event streaming
 - **gRPC Agent Mesh** on `:50051` — agent-to-agent communication
-- **Visual Builder** — served from embedded files, only with `--web`
+
+> The optional `--web` flag starts the Visual Builder route, but this release serves an
+> explicit “Visual Builder is not built” page instead of a working app. The React
+> TypeScript source in `web/src/` has no compiled `web/dist/` frontend yet. Use
+> `gocrew kickoff --ui` or the REST API below.
 
 ### Endpoints
 

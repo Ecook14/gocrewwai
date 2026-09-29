@@ -43,4 +43,5 @@ crew_cache_*.json
 /my-crew
 
 node_modules/
-web/
+web/node_modules/
+web/dist/
