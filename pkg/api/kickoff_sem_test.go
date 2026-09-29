@@ -20,7 +20,7 @@ func TestKickoff_SemSaturationReleasesIdem(t *testing.T) {
 	// Stub the provider so the accepted (202) kickoff never makes a real
 	// network call. Without this the crew goroutine dials api.openai.com,
 	// gets a 401, and retries — slow, flaky, and outbound traffic in CI.
-	restore := stubLLMClient(t)
+	_, restore := stubLLMClient(t)
 	defer restore()
 
 	// Saturate kickoffSem under the production mutex so the in-flight

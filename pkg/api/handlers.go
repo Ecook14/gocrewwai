@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sort"
 	"sync"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/Ecook14/gocrewwai/pkg/llm"
 	"github.com/Ecook14/gocrewwai/pkg/tasks"
 	"github.com/Ecook14/gocrewwai/pkg/telemetry"
+	"github.com/Ecook14/gocrewwai/pkg/tools"
 )
 
 // kickoffSem bounds concurrent async crew executions to prevent goroutine
@@ -205,16 +207,19 @@ type kickoffAgent struct {
 	Backstory     string `json:"backstory" binding:"max=4000"`
 	Model         string `json:"model" binding:"max=128"`
 	APIKey        string `json:"api_key" binding:"max=512"`
+	SystemPrompt  string `json:"system_prompt" binding:"max=4000"`
 	MaxIterations int    `json:"max_iterations" binding:"min=0,max=1000"`
 }
 
 // kickoffTask is one entry of the optional tasks[] array. AgentRole wires
 // the task to an agent by role; it may be omitted only when the request
-// defines exactly one agent.
+// defines exactly one agent. Tools names instances from the headless-safe
+// subset (see resolveTaskTools); anything else is rejected, never ignored.
 type kickoffTask struct {
-	Description    string `json:"description" binding:"required,max=20000"`
-	ExpectedOutput string `json:"expected_output" binding:"max=20000"`
-	AgentRole      string `json:"agent_role" binding:"max=256"`
+	Description    string   `json:"description" binding:"required,max=20000"`
+	ExpectedOutput string   `json:"expected_output" binding:"max=20000"`
+	AgentRole      string   `json:"agent_role" binding:"max=256"`
+	Tools          []string `json:"tools" binding:"max=32,dive,max=128"`
 }
 
 // kickoffRequest is the POST /api/v1/crews/kickoff body. Two shapes are
@@ -239,11 +244,81 @@ type kickoffRequest struct {
 	Tasks              []kickoffTask  `json:"tasks" binding:"max=32,dive"`
 }
 
+// normalizeCrewProcess validates a requested crew process and returns its
+// engine-canonical form. The hyphenated "state-machine" is normalized to the
+// engine's "state_machine": it used to pass validation and then fail at
+// runtime with ErrUnsupportedProcess, accepting a 202 for a run that could
+// never execute. Anything outside the supported set is a 400.
+func normalizeCrewProcess(process string) (string, *apiError) {
+	switch process {
+	case "", "sequential", "hierarchical", "consensual", "graph", "reflective", "state_machine":
+		return process, nil
+	case "state-machine":
+		return "state_machine", nil
+	default:
+		return "", &apiError{http.StatusBadRequest, "unsupported crew_process"}
+	}
+}
+
 // apiError is a rejection the handler renders as-is: status plus a message
 // safe to expose (never includes secrets or internals).
 type apiError struct {
 	status  int
 	message string
+}
+
+// headlessToolAllowlist names the only tools that may be attached over the
+// API. The headless server has no human to answer review gates, and an
+// unanswered gate blocks the crew goroutine forever while holding its
+// semaphore slot (a tenant could wedge all 10 slots with no resolution
+// path, since the main API server exposes no /api/review endpoint). The
+// engine already marks every side-effecting or exfiltrating tool with
+// RequiresReview()==true (shell, files-write, HTTP, browsers, DBs, mail,
+// search APIs); the allowlist admits only pure-compute tools, and the
+// RequiresReview check below double-guards in case a future change flips
+// one of them to gated.
+var headlessToolAllowlist = map[string]bool{
+	"JSONTool":  true,
+	"RegexTool": true,
+}
+
+// resolveTaskTools maps requested tool names to instances for API-built
+// agents. Unknown names and anything outside the headless-safe allowlist are
+// rejected with a 400 that names the offender — never silently dropped, and
+// never attached blind. Tools are constructed with empty config, so
+// credential-gated tools would fail at execution anyway; the allowlist keeps
+// them out entirely.
+func resolveTaskTools(names []string) ([]tools.Tool, *apiError) {
+	if len(names) == 0 {
+		return nil, nil
+	}
+	out := make([]tools.Tool, 0, len(names))
+	for _, name := range names {
+		if !headlessToolAllowlist[name] {
+			return nil, &apiError{http.StatusBadRequest,
+				fmt.Sprintf("tool %q cannot be attached over the API: only headless-safe tools %v are allowed (review-gated and unknown tools are rejected, never ignored)", name, headlessToolNames())}
+		}
+		tool, err := tools.CreateTool(name, nil)
+		if err != nil {
+			return nil, &apiError{http.StatusBadRequest,
+				fmt.Sprintf("tool %q unavailable: %v", name, err)}
+		}
+		if tool.RequiresReview() {
+			return nil, &apiError{http.StatusBadRequest,
+				fmt.Sprintf("tool %q requires human review, which the headless API cannot provide", name)}
+		}
+		out = append(out, tool)
+	}
+	return out, nil
+}
+
+func headlessToolNames() []string {
+	names := make([]string, 0, len(headlessToolAllowlist))
+	for name := range headlessToolAllowlist {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 // handleKickoff accepts a full crew execution request and starts execution.
@@ -259,12 +334,12 @@ func (s *Server) handleKickoff(c *gin.Context) {
 
 	// CrewAI-compatible process names only; anything else is rejected rather
 	// than silently defaulting.
-	switch payload.CrewProcess {
-	case "", "sequential", "hierarchical", "consensual", "graph", "reflective", "state_machine", "state-machine":
-	default:
-		c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported crew_process"})
+	normalized, apiErr := normalizeCrewProcess(payload.CrewProcess)
+	if apiErr != nil {
+		c.JSON(apiErr.status, gin.H{"error": apiErr.message})
 		return
 	}
+	payload.CrewProcess = normalized
 
 	if payload.SessionID == "" {
 		payload.SessionID = fmt.Sprintf("sess_%d", time.Now().UnixMilli())
@@ -332,6 +407,9 @@ func (s *Server) handleKickoff(c *gin.Context) {
 	if len(payload.Agents) > 0 {
 		crw, apiErr := buildMultiCrew(payload)
 		if apiErr != nil {
+			// Rejected before anything started: release the reservation so
+			// a corrected retry with the same key is not stuck at 409.
+			s.releaseIdem(idemKey)
 			c.JSON(apiErr.status, gin.H{"error": apiErr.message})
 			return
 		}
@@ -340,16 +418,19 @@ func (s *Server) handleKickoff(c *gin.Context) {
 	}
 
 	if len(payload.Tasks) > 0 {
+		s.releaseIdem(idemKey)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "'tasks[]' requires 'agents[]'; tasks cannot run without agents"})
 		return
 	}
 
 	if payload.AgentRole == "" {
+		s.releaseIdem(idemKey)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "'agent_role' is required"})
 		return
 	}
 
 	if payload.TaskDescription == "" {
+		s.releaseIdem(idemKey)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "'task_description' is required"})
 		return
 	}
@@ -367,6 +448,7 @@ func (s *Server) handleKickoff(c *gin.Context) {
 		// bearer (noisy DoS surface, log-leak surface).
 		apiKey := os.Getenv("OPENAI_API_KEY")
 		if apiKey == "" {
+			s.releaseIdem(idemKey)
 			c.JSON(http.StatusServiceUnavailable, gin.H{
 				"error":   "api_provider_unconfigured",
 				"message": "agent_model requires a configured OPENAI_API_KEY",
@@ -380,6 +462,19 @@ func (s *Server) handleKickoff(c *gin.Context) {
 		agents.WithMaxIterations(payload.MaxIterations),
 	}
 
+	// Task tools are resolved against the headless-safe allowlist: unknown
+	// or review-gated names reject the request rather than being silently
+	// dropped (the previous behavior) or blindly attached.
+	taskTools, apiErr := resolveTaskTools(payload.TaskTools)
+	if apiErr != nil {
+		s.releaseIdem(idemKey)
+		c.JSON(apiErr.status, gin.H{"error": apiErr.message})
+		return
+	}
+	if len(taskTools) > 0 {
+		agentOpts = append(agentOpts, agents.WithTools(taskTools))
+	}
+
 	agent := agents.NewAgentLegacy(
 		payload.AgentRole,
 		payload.AgentGoal,
@@ -389,15 +484,27 @@ func (s *Server) handleKickoff(c *gin.Context) {
 	)
 
 	if agent == nil {
+		s.releaseIdem(idemKey)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "failed to construct agent",
 		})
 		return
 	}
 
+	// A caller-supplied system prompt replaces the default role-playing
+	// template (see Agent.SystemTemplate); empty means "use the default".
+	// Previously accepted by binding and silently discarded. Enabling
+	// UseSystemPrompt only here keeps the default no-system-message behavior
+	// for all existing callers.
+	if payload.AgentSystemPrompt != "" {
+		agent.SystemTemplate = payload.AgentSystemPrompt
+		agent.UseSystemPrompt = true
+	}
+
 	// Build the task from the request payload. The agent is attached to the task
 	// so the crew can dispatch work to it during execution.
 	task := tasks.NewTask(payload.TaskDescription, agent)
+	task.ExpectedOutput = payload.TaskExpectedOutput
 
 	// Build the crew. NewCrew accepts agents first, then tasks.
 	crw := crew.NewCrew([]core.Agent{agent}, []*tasks.Task{task})
@@ -463,12 +570,15 @@ func buildMultiCrew(payload kickoffRequest) (*crew.Crew, *apiError) {
 		if iters == 0 {
 			iters = payload.MaxIterations
 		}
-		agent := agents.NewAgentLegacy(a.Role, a.Goal, a.Backstory, client,
-			[]agents.AgentOption{agents.WithMaxIterations(iters)}...,
-		)
+		agentOpts := []agents.AgentOption{agents.WithMaxIterations(iters)}
+		agent := agents.NewAgentLegacy(a.Role, a.Goal, a.Backstory, client, agentOpts...)
 		if agent == nil {
 			return nil, &apiError{http.StatusInternalServerError,
 				"failed to construct agent '" + a.Role + "'"}
+		}
+		if a.SystemPrompt != "" {
+			agent.SystemTemplate = a.SystemPrompt
+			agent.UseSystemPrompt = true
 		}
 		byRole[a.Role] = agent
 		coreAgents = append(coreAgents, agent)
@@ -494,6 +604,13 @@ func buildMultiCrew(payload kickoffRequest) (*crew.Crew, *apiError) {
 		}
 		task := tasks.NewTask(t.Description, agent)
 		task.ExpectedOutput = t.ExpectedOutput
+		taskTools, apiErr := resolveTaskTools(t.Tools)
+		if apiErr != nil {
+			return nil, apiErr
+		}
+		if len(taskTools) > 0 {
+			agent.Tools = append(agent.Tools, taskTools...)
+		}
 		crewTasks = append(crewTasks, task)
 	}
 

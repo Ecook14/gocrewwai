@@ -20,7 +20,7 @@ func multiTestServer(t *testing.T) *Server {
 	t.Setenv("API_AUTH_TOKEN", "tok-test")
 	t.Setenv("API_AUTH_TOKENS", "")
 	t.Setenv("ALLOW_INSECURE_DEV", "1")
-	restore := stubLLMClient(t)
+	_, restore := stubLLMClient(t)
 	t.Cleanup(restore)
 	s := NewServer()
 	t.Cleanup(s.Shutdown)
@@ -273,8 +273,8 @@ func TestKickoff_MultiAgent_ConcurrentSameKey(t *testing.T) {
 		// Both must name the winner's session.
 		sid, _ := resp["session_id"].(string)
 		if sid != winner {
-			t.Fatalf("request %d: collapsed onto %q, want winner %q (duplicate execution)",
-				i, sid, winner)
+			t.Fatalf("request %d: status %d body %s; collapsed onto %q, want winner %q (duplicate execution)",
+				i, o.code, o.body, sid, winner)
 		}
 	}
 }

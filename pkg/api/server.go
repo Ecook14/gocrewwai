@@ -120,6 +120,9 @@ type Server struct {
 	// them — prevents racing goroutines from writing to global state after
 	// a test or shutdown sequence completes.
 	kickoffWG sync.WaitGroup
+	// shutdownOnce makes Shutdown idempotent: deferred cleanups and signal
+	// paths can otherwise double-fire it, and close-of-closed-channel panics.
+	shutdownOnce sync.Once
 }
 
 // idemEntry tracks one Idempotency-Key from acceptance to completion.
@@ -257,19 +260,21 @@ func (s *Server) Run(addr string) error {
 // to finish. Bounded by kickoffShutdownTimeout so a stuck LLM call cannot
 // hang Shutdown forever.
 func (s *Server) Shutdown() {
-	close(s.shutdown)
-	done := make(chan struct{})
-	go func() {
-		s.kickoffWG.Wait()
-		close(done)
-	}()
-	select {
-	case <-done:
-	case <-time.After(kickoffShutdownTimeout):
-		// Best-effort: kickoffs still running are detached and will exit on
-		// their own when the LLM call returns or the process dies.
-	}
-	s.wg.Wait()
+	s.shutdownOnce.Do(func() {
+		close(s.shutdown)
+		done := make(chan struct{})
+		go func() {
+			s.kickoffWG.Wait()
+			close(done)
+		}()
+		select {
+		case <-done:
+		case <-time.After(kickoffShutdownTimeout):
+			// Best-effort: kickoffs still running are detached and will exit on
+			// their own when the LLM call returns or the process dies.
+		}
+		s.wg.Wait()
+	})
 }
 
 // kickoffShutdownTimeout caps how long Shutdown waits for in-flight kickoffs.

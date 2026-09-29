@@ -270,6 +270,40 @@ Rules:
   persisted. A requested model with no key anywhere is a `503`.
 - One session owns the whole run; idempotency, SSE, and owner scoping work exactly
   as in the single-agent case.
+- A rejected request releases its `Idempotency-Key` reservation, so fixing the
+  request and retrying with the same key starts fresh instead of hanging at `409`.
+
+### Task tools and system prompts
+
+Both shapes accept the remaining crew-definition fields, and every one of them
+takes effect (nothing accepted is ignored):
+
+```bash
+curl -X POST http://localhost:8080/api/v1/crews/kickoff \
+  -H "Authorization: Bearer $API_AUTH_TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: run-$(uuidgen)" \
+  -d '{
+        "session_id": "run-0002",
+        "agent_role": "Researcher",
+        "agent_backstory": "Performance specialist",
+        "agent_model": "gpt-4o",
+        "agent_system_prompt": "Answer concisely, with citations.",
+        "task_description": "Summarize the findings.",
+        "task_expected_output": "Three bullet points.",
+        "task_tools": ["JSONTool"]
+      }'
+```
+
+`task_expected_output` guides the agent's final answer; `agent_system_prompt`
+replaces the default role-playing template for that agent.
+
+**Tool policy (headless API):** only pure-compute tools may be attached —
+currently `JSONTool` and `RegexTool`. Anything else (`ShellTool`,
+`FileWriteTool`, `HTTPTool`, unknown names, …) is rejected with `400`, because
+those tools require a human review gate and the headless server has no human
+to answer it — an unanswered gate would hang the run forever while holding
+its execution slot. Use the CLI or SDK for crews that need gated tools.
 
 **`Idempotency-Key` matters.** It makes retries safe:
 

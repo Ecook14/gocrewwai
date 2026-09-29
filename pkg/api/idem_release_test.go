@@ -67,7 +67,7 @@ func TestKickoff_PersistFailureReleasesIdem(t *testing.T) {
 
 	// Defensive: the retry below carries agent_model, so a provider client
 	// gets constructed. Stub it so no real endpoint is ever contacted.
-	restore := stubLLMClient(t)
+	_, restore := stubLLMClient(t)
 	defer restore()
 
 	s := NewServer()
