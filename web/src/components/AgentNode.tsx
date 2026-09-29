@@ -23,7 +23,9 @@ const AgentNode = ({ data }: { data: any }) => {
         <div className="pt-2 flex items-center gap-4">
           <div className="flex items-center gap-1.5">
             <Cpu className="w-3.5 h-3.5 text-slate-500" />
-            <span className="text-[10px] text-slate-400 font-medium">GPT-4o</span>
+            <span className="text-[10px] text-slate-400 font-medium">
+              {typeof data.model === 'string' && data.model ? data.model : 'gpt-4o'}
+            </span>
           </div>
           <div className="flex items-center gap-1.5">
             <Zap className="w-3.5 h-3.5 text-amber-500" />

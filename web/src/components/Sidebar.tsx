@@ -3,9 +3,10 @@ import { UserPlus, FilePlus, Settings, Database, Cpu } from 'lucide-react';
 
 interface SidebarProps {
   onAddNode: (type: 'agentNode' | 'taskNode') => void;
+  sessionId: string | null;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ onAddNode }) => {
+const Sidebar: React.FC<SidebarProps> = ({ onAddNode, sessionId }) => {
   return (
     <aside className="w-72 h-full bg-slate-900 border-r border-slate-800 flex flex-col p-6 gap-8">
       <div>
@@ -65,13 +66,17 @@ const Sidebar: React.FC<SidebarProps> = ({ onAddNode }) => {
       
       <div className="mt-auto pt-6 border-t border-slate-800">
         <div className="bg-slate-800/30 p-4 rounded-xl">
-           <div className="flex items-center justify-between mb-2">
-             <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Real-time Usage</h4>
-             <span className="text-[10px] text-emerald-500">$0.12 total</span>
-           </div>
-           <div className="w-full bg-slate-700/50 h-1 rounded-full overflow-hidden">
-             <div className="bg-blue-600 h-full w-1/4 rounded-full"></div>
-           </div>
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Session</h4>
+            <span className="text-[10px] text-emerald-500 font-mono">
+              {sessionId ? sessionId.slice(0, 18) : 'none'}
+            </span>
+          </div>
+          <p className="text-[10px] text-slate-500">
+            {sessionId
+              ? 'Streaming live events for this run.'
+              : 'Kick off a run to stream live events here.'}
+          </p>
         </div>
       </div>
     </aside>

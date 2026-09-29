@@ -1,5 +1,5 @@
 import { Handle, Position } from '@xyflow/react';
-import { FileText, Target, Clock, MoreVertical } from 'lucide-react';
+import { FileText, Target, MoreVertical } from 'lucide-react';
 
 const TaskNode = ({ data }: { data: any }) => {
   return (
@@ -24,10 +24,6 @@ const TaskNode = ({ data }: { data: any }) => {
           <div className="flex items-center gap-1.5">
             <Target className="w-3.5 h-3.5 text-slate-500" />
             <span className="text-[10px] text-slate-400 font-medium">Sequential</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 text-slate-500" />
-            <span className="text-[10px] text-slate-400 font-medium">300s Limit</span>
           </div>
         </div>
       </div>
