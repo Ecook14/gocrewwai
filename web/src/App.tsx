@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback } from 'react';
 import {
   ReactFlow,
   MiniMap,
@@ -23,7 +23,25 @@ import { useSSE } from './hooks/useSSE';
 import { kickoffCrew } from './api/client';
 import { mapGraphToCrewConfig } from './utils/orchestrator';
 
-const initialNodes = [
+type AgentNodeData = {
+  role: string;
+  goal: string;
+  model?: string;
+  backstory?: string;
+  status: string;
+};
+
+type TaskNodeData = {
+  description: string;
+  expectedOutput?: string;
+  status: string;
+};
+
+// CrewNode pins the node data shape so useNodesState does not infer a narrow
+// literal union from the initial array (which breaks every setNodes call).
+type CrewNode = Node<AgentNodeData | TaskNodeData>;
+
+const initialNodes: CrewNode[] = [
   {
     id: 'agent-1',
     type: 'agentNode',
@@ -46,8 +64,8 @@ const nodeTypes = {
 };
 
 function Flow() {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [nodes, setNodes, onNodesChange] = useNodesState<CrewNode>(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges);
   const [activeSession, setActiveSession] = React.useState<string | null>(null);
 
   const { lastEvent } = useSSE(activeSession);
@@ -56,7 +74,7 @@ function Flow() {
   React.useEffect(() => {
     if (!lastEvent) return;
 
-    setNodes((nds: Node[]) => nds.map((node: Node) => {
+    setNodes((nds) => nds.map((node) => {
       if (node.type === 'agentNode' && node.data && typeof node.data === 'object' && 'role' in node.data && node.data.role === lastEvent.agent_role) {
         return {
           ...node,
@@ -68,7 +86,7 @@ function Flow() {
   }, [lastEvent, setNodes]);
 
   const onConnect = useCallback(
-    (params: Connection | Edge) => setEdges((eds: Edge[]) => addEdge(params, eds)),
+    (params: Connection | Edge) => setEdges((eds) => addEdge(params, eds)),
     [setEdges],
   );
 
@@ -89,7 +107,7 @@ function Flow() {
       <div className="flex h-full pt-16">
         <Sidebar onAddNode={(type: 'agentNode' | 'taskNode') => {
           const id = `${type}-${nodes.length + 1}`;
-          setNodes((nds: Node[]) => [...nds, {
+          setNodes((nds) => [...nds, {
             id,
             type,
             position: { x: Math.random() * 400, y: Math.random() * 400 },

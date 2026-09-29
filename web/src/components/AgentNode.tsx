@@ -1,4 +1,3 @@
-import React from 'react';
 import { Handle, Position } from '@xyflow/react';
 import { User, Cpu, Zap, MoreVertical } from 'lucide-react';
 
