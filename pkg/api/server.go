@@ -316,8 +316,17 @@ func tokenFingerprint(token string) string {
 // Authorization header against the server's token set using constant-time
 // comparison. Set API_AUTH_TOKEN (or API_AUTH_TOKENS for multi-tenant) to a
 // non-empty value in production; the default is intentionally insecure.
+//
+// Only /api/* paths are gated. Static frontend assets served via NoRoute
+// (--web) stay public, matching the dashboard: they contain no secrets, a
+// browser navigation cannot attach an Authorization header, and every data
+// endpoint underneath remains authenticated.
 func authenticationMiddleware(authTokens []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if !strings.HasPrefix(c.Request.URL.Path, "/api/") {
+			c.Next()
+			return
+		}
 		if len(authTokens) == 0 {
 			// No token configured — skip auth (insecure, for dev only)
 			c.Next()

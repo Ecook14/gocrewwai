@@ -16,9 +16,30 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.25'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
 
       - name: Download dependencies
         run: go mod download
+
+      # Build the Visual Builder first: the Go binaries embed web/dist via
+      # -tags webdist, so without this step they would ship the "not built"
+      # placeholder instead of the app.
+      - name: Build Visual Builder
+        working-directory: web
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build
+          test -f dist/index.html || { echo "ERROR: web/dist not produced" >&2; exit 1; }
+
+      - name: Verify embedded UI
+        run: |
+          set -euo pipefail
+          go test -tags webdist ./web/ -count=1
 
       # Inject the tag name and commit SHA into pkg/version so a released
       # binary reports the same version as the tag it came from. Without this
@@ -35,20 +56,20 @@ jobs:
       - name: Build Linux
         run: |
           set -euo pipefail
-          GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -ldflags="${{ steps.meta.outputs.ldflags }}" -o gocrew-cli-linux ./cmd/gocrew
-          GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -ldflags="${{ steps.meta.outputs.ldflags }}" -o gocrewwai-server-linux ./cmd/server
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -tags webdist -ldflags="${{ steps.meta.outputs.ldflags }}" -o gocrew-cli-linux ./cmd/gocrew
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=1 go build -tags webdist -ldflags="${{ steps.meta.outputs.ldflags }}" -o gocrewwai-server-linux ./cmd/server
 
       - name: Build macOS
         run: |
           set -euo pipefail
-          GOOS=darwin GOARCH=amd64 go build -ldflags="${{ steps.meta.outputs.ldflags }}" -o gocrew-cli-macos ./cmd/gocrew
-          GOOS=darwin GOARCH=amd64 go build -ldflags="${{ steps.meta.outputs.ldflags }}" -o gocrewwai-server-macos ./cmd/server
+          GOOS=darwin GOARCH=amd64 go build -tags webdist -ldflags="${{ steps.meta.outputs.ldflags }}" -o gocrew-cli-macos ./cmd/gocrew
+          GOOS=darwin GOARCH=amd64 go build -tags webdist -ldflags="${{ steps.meta.outputs.ldflags }}" -o gocrewwai-server-macos ./cmd/server
 
       - name: Build Windows
         run: |
           set -euo pipefail
-          GOOS=windows GOARCH=amd64 go build -ldflags="${{ steps.meta.outputs.ldflags }}" -o gocrew-cli.exe ./cmd/gocrew
-          GOOS=windows GOARCH=amd64 go build -ldflags="${{ steps.meta.outputs.ldflags }}" -o gocrewwai-server.exe ./cmd/server
+          GOOS=windows GOARCH=amd64 go build -tags webdist -ldflags="${{ steps.meta.outputs.ldflags }}" -o gocrew-cli.exe ./cmd/gocrew
+          GOOS=windows GOARCH=amd64 go build -tags webdist -ldflags="${{ steps.meta.outputs.ldflags }}" -o gocrewwai-server.exe ./cmd/server
 
       # Fail the release rather than ship binaries that disagree with the tag.
       - name: Verify embedded version
@@ -66,6 +87,29 @@ jobs:
             echo "ERROR: server binary still ships Elite branding" >&2
             exit 1
           fi
+
+      # Boot the release server binary and confirm --web serves the built
+      # React app, not the "not built" placeholder. Fails the release
+      # otherwise.
+      - name: Verify served UI
+        run: |
+          set -euo pipefail
+          echo '{}' > /tmp/ci-config.json
+          CREW_CONFIG_PATH=/tmp/ci-config.json API_AUTH_TOKEN=ci-check \
+            ./gocrewwai-server-linux --api-port 18099 --mesh-port 50099 --web &
+          SRV=$!
+          trap "kill $SRV" EXIT
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:18099/ >/dev/null 2>&1 && break
+            sleep 2
+          done
+          body="$(curl -s http://localhost:18099/)"
+          echo "$body" | grep -q 'id="root"' || { echo "ERROR: server does not serve the built UI" >&2; exit 1; }
+          if echo "$body" | grep -q 'not built'; then
+            echo "ERROR: server serves the placeholder UI" >&2
+            exit 1
+          fi
+          echo "served UI OK"
 
       - name: Generate checksums
         run: sha256sum gocrew-cli-linux gocrewwai-server-linux gocrew-cli-macos gocrewwai-server-macos gocrew-cli.exe gocrewwai-server.exe > SHA256SUMS

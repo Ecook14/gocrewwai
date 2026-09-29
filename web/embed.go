@@ -1,5 +1,6 @@
+//go:build !webdist
+
 // Package web provides embedded static-asset serving for the API server.
-//
 // The Visual Builder is a Vite + React application that lives in web/src/.
 // It is NOT embedded here: browsers cannot execute the raw .tsx source, and
 // the project has no build step in the release pipeline yet, so there is no
