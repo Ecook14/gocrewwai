@@ -1,10 +1,13 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
+
+	"github.com/Ecook14/gocrewwai/pkg/version"
 )
 
 func TestServerNew(t *testing.T) {
@@ -19,6 +22,28 @@ func TestServerRun(t *testing.T) {
 	go func() {
 		_ = s.Run(":0")
 	}()
+}
+
+func TestServerHealthReportsVersion(t *testing.T) {
+	t.Setenv("API_AUTH_TOKEN", "test-token")
+	s := NewServer()
+
+	req := httptest.NewRequest("GET", "/api/v1/health", nil)
+	req.Header.Set("Authorization", "Bearer test-token")
+	w := httptest.NewRecorder()
+	s.router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("health status = %d, want %d", w.Code, http.StatusOK)
+	}
+	var body struct {
+		Version string `json:"version"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode health response: %v", err)
+	}
+	if body.Version != version.Display() {
+		t.Fatalf("health version = %q, want %q", body.Version, version.Display())
+	}
 }
 
 func TestServerSetupRoutes(t *testing.T) {

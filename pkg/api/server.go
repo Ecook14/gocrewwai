@@ -19,6 +19,7 @@ import (
 	"github.com/Ecook14/gocrewwai/pkg/auth"
 	"github.com/Ecook14/gocrewwai/pkg/crew"
 	"github.com/Ecook14/gocrewwai/pkg/telemetry"
+	"github.com/Ecook14/gocrewwai/pkg/version"
 )
 
 // rateLimiter is a minimal per-IP token bucket to protect API routes
@@ -220,7 +221,7 @@ func (s *Server) setupRoutes() {
 func (s *Server) handleHealth(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "ok",
-		"version": "0.9.0",
+		"version": version.Display(),
 		"time":    time.Now().Format(time.RFC3339),
 	})
 }
