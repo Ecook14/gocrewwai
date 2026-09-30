@@ -358,6 +358,21 @@ func authenticationMiddleware(authTokens []string) gin.HandlerFunc {
 				}
 			}
 		}
+		// Browser fallback: EventSource cannot set Authorization headers, so
+		// read-only GETs (session poll, SSE stream) accept the static token
+		// as ?token= — mirroring dashboard WS auth. JWTs are never accepted
+		// via query (URL credentials leak into logs).
+		if c.Request.Method == http.MethodGet {
+			if q := c.Query("token"); q != "" {
+				for _, tok := range authTokens {
+					if len(q) != 0 && subtle.ConstantTimeCompare([]byte(q), []byte(tok)) == 1 {
+						c.Set("token_fp", tokenFingerprint(tok))
+						c.Next()
+						return
+					}
+				}
+			}
+		}
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 			"error": "unauthorized: invalid or missing API_AUTH_TOKEN",
 		})
