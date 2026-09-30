@@ -5,7 +5,7 @@ Knowledge represents the structured and unstructured data your agents can access
 ---
 
 > [!IMPORTANT]
-> **Status: v1.0.0-beta.4.** Gocrewwai Knowledge systems support automatic **Chunking & Vectorization** for PDF, Web, and Text sources with native storage.
+> **Status: v1.0.0-beta.5.** Gocrewwai Knowledge systems support automatic **Chunking & Vectorization** for PDF, Web, and Text sources with native storage.
 
 ---
 

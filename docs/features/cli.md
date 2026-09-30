@@ -5,7 +5,7 @@ The Gocrewwai CLI (`gocrew`) is the primary interface for scaffolding projects, 
 ---
 
 > [!IMPORTANT]
-> **Status: v1.0.0-beta.4.** The `gocrew` CLI supports **Rapid Scaffolding**, **Crew Kickoff**, and **Embedded Dashboard** deployment.
+> **Status: v1.0.0-beta.5.** The `gocrew` CLI supports **Rapid Scaffolding**, **Crew Kickoff**, and **Embedded Dashboard** deployment.
 
 ---
 

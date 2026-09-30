@@ -5,7 +5,7 @@ A Crew is the core orchestration unit in Gocrewwai. It represents a collaborativ
 ---
 
 > [!IMPORTANT]
-> **Status: v1.0.0-beta.4.** Gocrewwai Crews support **6 orchestration strategies** (Sequential, Hierarchical, Consensual, Graph, Reflective, StateMachine) with native **OpenTelemetry** tracing.
+> **Status: v1.0.0-beta.5.** Gocrewwai Crews support **6 orchestration strategies** (Sequential, Hierarchical, Consensual, Graph, Reflective, StateMachine) with native **OpenTelemetry** tracing.
 
 ---
 

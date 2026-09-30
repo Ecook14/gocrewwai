@@ -2,7 +2,7 @@
 
 Strictly-typed agentic orchestration for Go. Inspired by CrewAI, LangChain, and LangGraph.
 
-> **Status: v1.0.0-beta.4.** Feature-complete against the public roadmap; v1.0.0 ships when the
+> **Status: v1.0.0-beta.5.** Feature-complete against the public roadmap; v1.0.0 ships when the
 > next CHANGELOG entry is published. Released binaries are on the
 > [releases page](https://github.com/Ecook14/gocrewwai/releases).
 

@@ -5,7 +5,7 @@ Training in Gocrewwai goes beyond simple prompt engineering. It is the process o
 ---
 
 > [!IMPORTANT]
-> **Status: v1.0.0-beta.4.** Gocrewwai training mode supports **Feedback Capture**, **Advice Injection**, and **Long-term Reasoning Refinement**.
+> **Status: v1.0.0-beta.5.** Gocrewwai training mode supports **Feedback Capture**, **Advice Injection**, and **Long-term Reasoning Refinement**.
 
 ---
 

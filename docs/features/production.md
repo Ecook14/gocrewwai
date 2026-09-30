@@ -5,7 +5,7 @@ Gocrewwai is designed for mission-critical production environments. Unlike other
 ---
 
 > [!IMPORTANT]
-> **Status: v1.0.0-beta.4.** Gocrewwai production features include **Sandboxed Execution**, **Durable Persistence**, and **Strict Type Safety**.
+> **Status: v1.0.0-beta.5.** Gocrewwai production features include **Sandboxed Execution**, **Durable Persistence**, and **Strict Type Safety**.
 
 ---
 

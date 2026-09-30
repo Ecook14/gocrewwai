@@ -5,7 +5,7 @@ Gocrew agents are stateful, goal-oriented entities designed for reliable orchest
 ---
 
 > [!IMPORTANT]
-> **Status: v1.0.0-beta.4.** Gocrewwai agents are built on a declarative, strictly-typed `AgentConfig` pattern with compile-time safety, **Docker Sandbox**, **WASM (wazero)**, and **E2B-compatible** sandboxing for code execution, plus **Browser Automation** and **MCP** integration.
+> **Status: v1.0.0-beta.5.** Gocrewwai agents are built on a declarative, strictly-typed `AgentConfig` pattern with compile-time safety, **Docker Sandbox**, **WASM (wazero)**, and **E2B-compatible** sandboxing for code execution, plus **Browser Automation** and **MCP** integration.
 
 ---
 

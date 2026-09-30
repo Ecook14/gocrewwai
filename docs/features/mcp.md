@@ -5,7 +5,7 @@ Model Context Protocol (MCP) is the industry standard for connecting AI agents t
 ---
 
 > [!IMPORTANT]
-> **Status: v1.0.0-beta.4.** Gocrewwai supports **HTTP**, **Stdio**, and **SSE (Server-Sent Events)** MCP transports with native tool filtering and validation.
+> **Status: v1.0.0-beta.5.** Gocrewwai supports **HTTP**, **Stdio**, and **SSE (Server-Sent Events)** MCP transports with native tool filtering and validation.
 
 ---
 
