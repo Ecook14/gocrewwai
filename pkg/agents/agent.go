@@ -30,6 +30,21 @@ import (
 
 var _ core.Agent = (*Agent)(nil)
 
+// agentUsageMuInit guards lazy initialization of per-agent usage mutexes.
+var agentUsageMuInit sync.Mutex
+
+// usageLock returns the agent's metrics mutex, initializing it on first use.
+// The mutex is heap-allocated (pointer) so Agent values remain copyable —
+// ManagerAgent embeds Agent by value and copies must share the lock.
+func (a *Agent) usageLock() *sync.Mutex {
+	agentUsageMuInit.Lock()
+	defer agentUsageMuInit.Unlock()
+	if a.usageMu == nil {
+		a.usageMu = &sync.Mutex{}
+	}
+	return a.usageMu
+}
+
 // agentOut resolves the interactive-output stream, defaulting to stdout.
 func (a *Agent) agentOut() io.Writer {
 	if a.Stdout != nil {
@@ -150,8 +165,11 @@ type Agent struct {
 	// UsageMetrics tracks token consumption during the agent's lifecycle.
 	// Guarded by usageMu: concurrent mesh/A2A delegations share the agent
 	// object, and unsynchronized map access is process-fatal (CWE-362).
+	// usageMu is a pointer so Agent stays copyable by value (ManagerAgent
+	// embeds Agent); copies share the lock and counters. Always access via
+	// usageLock(), which lazily initializes it.
 	UsageMetrics map[string]int `json:"-"`
-	usageMu      sync.Mutex     `json:"-"`
+	usageMu      *sync.Mutex    `json:"-"`
 
 	// AllowDelegation enables this agent to delegate sub-tasks to coworkers.
 	AllowDelegation bool `json:"-"`
@@ -629,8 +647,9 @@ func isAllowed(name string, allowList, blockList []string) bool {
 
 // GetRole returns the agent's role. Implements the delegation.Agent interface.
 func (a *Agent) GetRole() string {
-	a.usageMu.Lock()
-	defer a.usageMu.Unlock()
+	mu := a.usageLock()
+	mu.Lock()
+	defer mu.Unlock()
 	if a.UsageMetrics == nil {
 		a.UsageMetrics = make(map[string]int)
 	}
@@ -654,8 +673,9 @@ func (a *Agent) SetMaxRPM(rpm int) {
 }
 
 func (a *Agent) GetUsageMetrics() map[string]int {
-	a.usageMu.Lock()
-	defer a.usageMu.Unlock()
+	mu := a.usageLock()
+	mu.Lock()
+	defer mu.Unlock()
 	if a.UsageMetrics == nil {
 		a.UsageMetrics = make(map[string]int)
 	}
@@ -771,9 +791,11 @@ func (a *Agent) Execute(ctx context.Context, taskInput string, options map[strin
 		)
 	}
 
+	a.usageLock().Lock()
 	if a.UsageMetrics == nil {
 		a.UsageMetrics = make(map[string]int)
 	}
+	a.usageLock().Unlock()
 
 	if a.LLM == nil {
 		return "Task executed successfully by " + a.Role, nil
@@ -1020,13 +1042,14 @@ func (a *Agent) Execute(ctx context.Context, taskInput string, options map[strin
 		// delegations may execute this agent object concurrently.
 		promptTokens := len(enrichedInput) / 4
 		completionTokens := len(responseText) / 4
-		a.usageMu.Lock()
+		mu := a.usageLock()
+		mu.Lock()
 		if a.UsageMetrics == nil {
 			a.UsageMetrics = make(map[string]int)
 		}
 		a.UsageMetrics["prompt_tokens"] += promptTokens
 		a.UsageMetrics["completion_tokens"] += completionTokens
-		a.usageMu.Unlock()
+		mu.Unlock()
 
 		// Record to Global Metrics
 		telemetry.GlobalMetrics().RecordTokens(a.LLMModel, promptTokens, completionTokens)
