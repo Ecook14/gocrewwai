@@ -58,6 +58,9 @@ func (c *AnthropicClient) Generate(ctx context.Context, messages []Message, opti
 	if c.APIKey == "" {
 		return "", fmt.Errorf("anthropic API Key is required")
 	}
+	if err := AdmitBudget(); err != nil {
+		return "", err
+	}
 
 	model := options.Model
 	if model == "" {
@@ -116,7 +119,13 @@ func (c *AnthropicClient) Generate(ctx context.Context, messages []Message, opti
 	}
 
 	if len(result.Content) > 0 {
-		return result.Content[0].Text, nil
+		text := result.Content[0].Text
+		var promptText strings.Builder
+		for _, m := range messages {
+			promptText.WriteString(m.Content)
+		}
+		TrackHeuristicUsage("anthropic", model, promptText.String(), text, 0)
+		return text, nil
 	}
 	return "", fmt.Errorf("anthropic returned empty content")
 }
@@ -240,6 +249,9 @@ func (c *AnthropicClient) GenerateStructured(ctx context.Context, messages []Mes
 func (c *AnthropicClient) StreamGenerate(ctx context.Context, messages []Message, options GenerateOptions) (<-chan string, error) {
 	if c.APIKey == "" {
 		return nil, fmt.Errorf("anthropic API Key is required")
+	}
+	if err := AdmitBudget(); err != nil {
+		return nil, err
 	}
 
 	model := options.Model

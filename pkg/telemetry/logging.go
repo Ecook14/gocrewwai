@@ -178,7 +178,9 @@ func redactSensitiveData(s string) string {
 }
 
 // redactMetadata walks a metadata map and redacts any string values that
-// look like secrets or PII.
+// look like secrets or PII. Values are normalized through a JSON round-trip
+// first so typed containers (map[string]string, []string, structs) cannot
+// bypass redaction by failing the concrete-type switches.
 func redactMetadata(m map[string]interface{}) map[string]interface{} {
 	if m == nil {
 		return nil
@@ -192,34 +194,45 @@ func redactMetadata(m map[string]interface{}) map[string]interface{} {
 			out[k] = "[REDACTED]"
 			continue
 		}
-		switch val := v.(type) {
-		case string:
-			out[k] = redactSensitiveData(val)
-		case map[string]interface{}:
-			out[k] = redactMetadata(val)
-		case []interface{}:
-			out[k] = redactSlice(val)
-		default:
-			out[k] = val
-		}
+		out[k] = redactValue(v)
 	}
 	return out
+}
+
+// redactValue redacts a single metadata value of any JSON-serializable type.
+func redactValue(v interface{}) interface{} {
+	switch val := v.(type) {
+	case nil:
+		return nil
+	case string:
+		return redactSensitiveData(val)
+	case map[string]interface{}:
+		return redactMetadata(val)
+	case []interface{}:
+		return redactSlice(val)
+	case bool, float64, int, int64, json.Number:
+		return val
+	default:
+		// Normalize typed containers (map[string]string, []string, structs)
+		// into the generic JSON value tree, then redact that tree. Reject
+		// normalization failure by redacting rather than writing raw.
+		data, err := json.Marshal(v)
+		if err != nil {
+			return "[REDACTED:UNMARSHALABLE]"
+		}
+		var norm interface{}
+		if err := json.Unmarshal(data, &norm); err != nil {
+			return "[REDACTED:UNMARSHALABLE]"
+		}
+		return redactValue(norm)
+	}
 }
 
 // redactSlice redacts string elements in a slice that look like secrets or PII.
 func redactSlice(s []interface{}) []interface{} {
 	out := make([]interface{}, len(s))
 	for i, v := range s {
-		switch val := v.(type) {
-		case string:
-			out[i] = redactSensitiveData(val)
-		case map[string]interface{}:
-			out[i] = redactMetadata(val)
-		case []interface{}:
-			out[i] = redactSlice(val)
-		default:
-			out[i] = v
-		}
+		out[i] = redactValue(v)
 	}
 	return out
 }

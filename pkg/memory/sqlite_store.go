@@ -136,11 +136,51 @@ func (s *SQLiteStore) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
+// DeleteScope removes every item in scope or its descendant scopes without
+// semantic filtering or candidate caps, returning the deleted count. Rows
+// are selected in Go (not SQL LIKE) so scope separators cannot act as
+// wildcards and sibling scopes are never matched.
+func (s *SQLiteStore) DeleteScope(ctx context.Context, scope string) (int64, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT id, metadata FROM memory_items`)
+	if err != nil {
+		return 0, fmt.Errorf("failed to list memory items: %w", err)
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id, metadataJSON string
+		if err := rows.Scan(&id, &metadataJSON); err != nil {
+			return 0, fmt.Errorf("failed to scan memory item: %w", err)
+		}
+		var meta map[string]interface{}
+		if err := json.Unmarshal([]byte(metadataJSON), &meta); err != nil {
+			continue
+		}
+		rec, _ := meta["scope"].(string)
+		if inScope(rec, scope) {
+			ids = append(ids, id)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return 0, fmt.Errorf("failed to list memory items: %w", err)
+	}
+	var deleted int64
+	for _, id := range ids {
+		res, err := s.db.ExecContext(ctx, `DELETE FROM memory_items WHERE id = ?`, id)
+		if err != nil {
+			return deleted, fmt.Errorf("failed to delete scope member: %w", err)
+		}
+		n, _ := res.RowsAffected()
+		deleted += n
+	}
+	return deleted, nil
+}
+
 // Count returns the number of non-expired items.
 func (s *SQLiteStore) Count(ctx context.Context) (int, error) {
 	var count int
 	err := s.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM memory_items WHERE expires_at = '' OR expires_at > datetime('now')`).Scan(&count)
+		`SELECT COUNT(*) FROM memory_items WHERE expires_at = '' OR datetime(expires_at) > datetime('now')`).Scan(&count)
 	return count, err
 }
 
@@ -154,9 +194,13 @@ func (s *SQLiteStore) Reset(ctx context.Context) error {
 }
 
 // PurgeExpired removes all items that have passed their TTL.
+// Expiry is stored RFC3339 while SQLite datetime('now') renders
+// "YYYY-MM-DD HH:MM:SS": comparing the raw strings lexicographically keeps
+// same-day expired rows. Normalize through datetime() so both sides compare
+// as instants.
 func (s *SQLiteStore) PurgeExpired(ctx context.Context) (int64, error) {
 	result, err := s.db.ExecContext(ctx,
-		`DELETE FROM memory_items WHERE expires_at != '' AND expires_at <= datetime('now')`)
+		`DELETE FROM memory_items WHERE expires_at != '' AND datetime(expires_at) <= datetime('now')`)
 	if err != nil {
 		return 0, fmt.Errorf("failed to purge expired items: %w", err)
 	}
@@ -204,7 +248,13 @@ func (s *SQLiteStore) Search(ctx context.Context, queryVector []float32, limit i
 	}
 
 	var results []scoredItem
+	now := time.Now()
 	for _, item := range items {
+		// Independent expiry exclusion: never return records past retention
+		// even if cleanup raced or the stored format drifts.
+		if !item.ExpiresAt.IsZero() && !item.ExpiresAt.After(now) {
+			continue
+		}
 		if len(item.Vector) != len(queryVector) {
 			continue
 		}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -71,9 +72,25 @@ func (j *JiraTool) Execute(ctx context.Context, input map[string]interface{}) (s
 	}
 }
 
+func validJiraKey(s string) bool {
+	if s == "" || len(s) > 64 {
+		return false
+	}
+	for _, r := range s {
+		if !(r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-' || r == '_') {
+			return false
+		}
+	}
+	return true
+}
+
 func (j *JiraTool) searchIssues(ctx context.Context, query string) (string, error) {
-	url := fmt.Sprintf("%s/rest/api/3/search?jql=%s&maxResults=10", j.baseURL, strings.ReplaceAll(query, " ", "+"))
-	req, _ := http.NewRequest("GET", url, nil)
+	q := url.QueryEscape(query)
+	url := fmt.Sprintf("%s/rest/api/3/search?jql=%s&maxResults=10", j.baseURL, q)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
 	req.SetBasicAuth(j.email, j.token)
 	resp, err := j.client.Do(req.WithContext(ctx))
 	if err != nil {
@@ -98,7 +115,10 @@ func (j *JiraTool) createIssue(ctx context.Context, project, summary, issueType 
 		},
 	})
 	url := fmt.Sprintf("%s/rest/api/3/issue", j.baseURL)
-	req, _ := http.NewRequest("POST", url, strings.NewReader(string(data)))
+	req, err := http.NewRequest("POST", url, strings.NewReader(string(data)))
+	if err != nil {
+		return "", err
+	}
 	req.SetBasicAuth(j.email, j.token)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := j.client.Do(req.WithContext(ctx))
@@ -113,9 +133,15 @@ func (j *JiraTool) createIssue(ctx context.Context, project, summary, issueType 
 }
 
 func (j *JiraTool) updateIssue(ctx context.Context, key string, updates map[string]interface{}) (string, error) {
+	if !validJiraKey(key) {
+		return "", fmt.Errorf("invalid Jira issue key")
+	}
 	data, _ := json.Marshal(map[string]interface{}{"fields": updates})
-	url := fmt.Sprintf("%s/rest/api/3/issue/%s", j.baseURL, key)
-	req, _ := http.NewRequest("PUT", url, strings.NewReader(string(data)))
+	url := fmt.Sprintf("%s/rest/api/3/issue/%s", j.baseURL, url.PathEscape(key))
+	req, err := http.NewRequest("PUT", url, strings.NewReader(string(data)))
+	if err != nil {
+		return "", err
+	}
 	req.SetBasicAuth(j.email, j.token)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := j.client.Do(req.WithContext(ctx))
@@ -127,8 +153,14 @@ func (j *JiraTool) updateIssue(ctx context.Context, key string, updates map[stri
 }
 
 func (j *JiraTool) getIssue(ctx context.Context, key string) (string, error) {
-	url := fmt.Sprintf("%s/rest/api/3/issue/%s", j.baseURL, key)
-	req, _ := http.NewRequest("GET", url, nil)
+	if !validJiraKey(key) {
+		return "", fmt.Errorf("invalid Jira issue key")
+	}
+	url := fmt.Sprintf("%s/rest/api/3/issue/%s", j.baseURL, url.PathEscape(key))
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
 	req.SetBasicAuth(j.email, j.token)
 	resp, err := j.client.Do(req.WithContext(ctx))
 	if err != nil {
@@ -143,7 +175,10 @@ func (j *JiraTool) getIssue(ctx context.Context, key string) (string, error) {
 
 func (j *JiraTool) listProjects(ctx context.Context) (string, error) {
 	url := fmt.Sprintf("%s/rest/api/3/project/search?maxResults=10", j.baseURL)
-	req, _ := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
 	req.SetBasicAuth(j.email, j.token)
 	resp, err := j.client.Do(req.WithContext(ctx))
 	if err != nil {

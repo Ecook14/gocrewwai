@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -66,10 +67,28 @@ func (d *DiscordTool) Execute(ctx context.Context, input map[string]interface{})
 	}
 }
 
+func validDiscordID(s string) bool {
+	if s == "" || len(s) > 32 {
+		return false
+	}
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
 func (d *DiscordTool) sendMessage(ctx context.Context, message string) (string, error) {
-	url := fmt.Sprintf("https://discord.com/api/v9/channels/%s/messages", d.channelID)
+	if !validDiscordID(d.channelID) {
+		return "", fmt.Errorf("invalid Discord channel id")
+	}
+	url := fmt.Sprintf("https://discord.com/api/v9/channels/%s/messages", url.PathEscape(d.channelID))
 	data, _ := json.Marshal(discordMessage{Content: message})
-	req, _ := http.NewRequest("POST", url, strings.NewReader(string(data)))
+	req, err := http.NewRequest("POST", url, strings.NewReader(string(data)))
+	if err != nil {
+		return "", err
+	}
 	req.Header.Set("Authorization", "Bot "+d.botToken)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := d.client.Do(req.WithContext(ctx))
@@ -84,8 +103,14 @@ func (d *DiscordTool) sendMessage(ctx context.Context, message string) (string, 
 }
 
 func (d *DiscordTool) deleteMessage(ctx context.Context, msgID string) (string, error) {
-	url := fmt.Sprintf("https://discord.com/api/v9/channels/%s/messages/%s", d.channelID, msgID)
-	req, _ := http.NewRequest("DELETE", url, nil)
+	if !validDiscordID(d.channelID) || !validDiscordID(msgID) {
+		return "", fmt.Errorf("invalid Discord channel or message id")
+	}
+	url := fmt.Sprintf("https://discord.com/api/v9/channels/%s/messages/%s", url.PathEscape(d.channelID), url.PathEscape(msgID))
+	req, err := http.NewRequest("DELETE", url, nil)
+	if err != nil {
+		return "", err
+	}
 	req.Header.Set("Authorization", "Bot "+d.botToken)
 	resp, err := d.client.Do(req.WithContext(ctx))
 	if err != nil {
@@ -96,9 +121,15 @@ func (d *DiscordTool) deleteMessage(ctx context.Context, msgID string) (string, 
 }
 
 func (d *DiscordTool) editMessage(ctx context.Context, msgID, newMessage string) (string, error) {
-	url := fmt.Sprintf("https://discord.com/api/v9/channels/%s/messages/%s", d.channelID, msgID)
+	if !validDiscordID(d.channelID) || !validDiscordID(msgID) {
+		return "", fmt.Errorf("invalid Discord channel or message id")
+	}
+	url := fmt.Sprintf("https://discord.com/api/v9/channels/%s/messages/%s", url.PathEscape(d.channelID), url.PathEscape(msgID))
 	data, _ := json.Marshal(discordMessage{Content: newMessage})
-	req, _ := http.NewRequest("PATCH", url, strings.NewReader(string(data)))
+	req, err := http.NewRequest("PATCH", url, strings.NewReader(string(data)))
+	if err != nil {
+		return "", err
+	}
 	req.Header.Set("Authorization", "Bot "+d.botToken)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := d.client.Do(req.WithContext(ctx))

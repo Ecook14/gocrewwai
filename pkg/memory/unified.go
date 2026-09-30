@@ -2,6 +2,7 @@ package memory
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math"
@@ -257,10 +258,11 @@ func (um *UnifiedMemory) Recall(ctx context.Context, query string, opts *RecallO
 	for _, r := range results {
 		meta := r.Metadata
 
-		// Apply scope filter
+		// Apply scope filter (segment-boundary match: "/tenant/a" must not
+		// match "/tenant/ab").
 		if scopeFilter != "" {
 			if scope, ok := meta["scope"].(string); ok {
-				if !strings.HasPrefix(scope, scopeFilter) {
+				if !inScope(scope, scopeFilter) {
 					continue
 				}
 			} else {
@@ -312,7 +314,7 @@ func (um *UnifiedMemory) Recall(ctx context.Context, query string, opts *RecallO
 			MemoryRecord: MemoryRecord{
 				ID:       r.ID,
 				Content:  r.Text,
-				Metadata: meta,
+				Metadata: copyMetadata(meta),
 			},
 			Score:      composite,
 			Similarity: similarity,
@@ -371,6 +373,18 @@ func (um *UnifiedMemory) deepRecall(ctx context.Context, query string, candidate
 // Forget deletes all memories under a specific scope.
 func (um *UnifiedMemory) Forget(ctx context.Context, scope string) error {
 	slog.Info("🗑️ Forgetting memories", slog.String("scope", scope))
+	// Preferred: complete scope deletion without semantic filtering or
+	// candidate caps. Failures propagate instead of reporting success.
+	if deleter, ok := um.store.(ScopeDeleter); ok {
+		n, err := deleter.DeleteScope(ctx, scope)
+		if err != nil {
+			return fmt.Errorf("forget scope delete failed: %w", err)
+		}
+		slog.Info("🗑️ Forgot memories", slog.String("scope", scope), slog.Int64("deleted", n))
+		return nil
+	}
+	// Fallback for backends without scope deletion (best-effort legacy).
+	slog.Warn("forget without ScopeDeleter: capped search fallback may be incomplete")
 	// Search for all records under this scope and delete them
 	// Retrieve all records under this scope without semantic filtering.
 	// We use an empty search (nil vector) which the store interprets as "return all."
@@ -382,19 +396,101 @@ func (um *UnifiedMemory) Forget(ctx context.Context, scope string) error {
 		return fmt.Errorf("forget search failed: %w", err)
 	}
 
+	var deleteErrs []error
+	deleted := 0
 	for _, r := range results {
 		if meta := r.Metadata; meta != nil {
 			if s, ok := meta["scope"].(string); ok {
-				if strings.HasPrefix(s, scope) {
+				if inScope(s, scope) {
 					if err := um.store.Delete(ctx, r.ID); err != nil {
 						slog.Error("Failed to delete memory", slog.String("id", r.ID), slog.Any("error", err))
+						deleteErrs = append(deleteErrs, err)
+					} else {
+						deleted++
 					}
 				}
 			}
 		}
 	}
 
+	// NOTE: capped semantic search is not a complete erasure primitive:
+	// backends that exclude nil-vector matches and scopes over 1000 records
+	// need a dedicated store-level scope-delete operation (see skill
+	// gocrewwai-secure references/agent-findings-67.md §5). Until then,
+	// callers must treat Forget as best-effort and check deleted counts.
+	if len(deleteErrs) > 0 {
+		return fmt.Errorf("forget deleted %d records with %d errors: %w", deleted, len(deleteErrs), errors.Join(deleteErrs...))
+	}
+
 	return nil
+}
+
+// normalizeScope ensures a leading slash and no trailing slash (except root).
+func normalizeScope(s string) string {
+	if s == "" {
+		return "/"
+	}
+	if !strings.HasPrefix(s, "/") {
+		s = "/" + s
+	}
+	if len(s) > 1 {
+		s = strings.TrimSuffix(s, "/")
+	}
+	return s
+}
+
+// inScope reports whether recordScope equals filter or is a proper descendant
+// (filter + "/..." ). Raw HasPrefix would admit siblings ("/tenant/ab" for
+// filter "/tenant/a").
+func inScope(recordScope, filter string) bool {
+	recordScope = normalizeScope(recordScope)
+	filter = normalizeScope(filter)
+	if filter == "/" {
+		return true
+	}
+	return recordScope == filter || strings.HasPrefix(recordScope, filter+"/")
+}
+
+// copyMetadata detaches result metadata from store-retained maps so read-only
+// callers cannot mutate stored labels through a shared reference.
+func copyMetadata(meta map[string]interface{}) map[string]interface{} {
+	if meta == nil {
+		return nil
+	}
+	out := make(map[string]interface{}, len(meta))
+	for k, v := range meta {
+		out[k] = copyMetaValue(v)
+	}
+	return out
+}
+
+func copyMetaValue(v interface{}) interface{} {
+	switch t := v.(type) {
+	case map[string]interface{}:
+		m := make(map[string]interface{}, len(t))
+		for k, c := range t {
+			m[k] = copyMetaValue(c)
+		}
+		return m
+	case map[string]string:
+		m := make(map[string]string, len(t))
+		for k, c := range t {
+			m[k] = c
+		}
+		return m
+	case []interface{}:
+		s := make([]interface{}, len(t))
+		for i, c := range t {
+			s[i] = copyMetaValue(c)
+		}
+		return s
+	case []string:
+		s := make([]string, len(t))
+		copy(s, t)
+		return s
+	default:
+		return v
+	}
 }
 
 // ============================================================

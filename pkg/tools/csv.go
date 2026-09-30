@@ -1,11 +1,11 @@
 package tools
 
 import (
+	"bytes"
 	"context"
 	"encoding/csv"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/Ecook14/gocrewwai/pkg/utils"
@@ -39,16 +39,11 @@ func (t *CSVReadTool) Execute(ctx context.Context, input map[string]interface{})
 		return "", fmt.Errorf("'file_path' must be a string")
 	}
 
-	safePath, err := utils.ValidatePath(path, t.Chroot)
+	data, err := utils.ReadFileInRoot(t.Chroot, path)
 	if err != nil {
 		return "", err
 	}
-
-	f, err := os.Open(safePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to open file: %w", err)
-	}
-	defer f.Close()
+	f := bytes.NewReader(data)
 
 	reader := csv.NewReader(f)
 	reader.FieldsPerRecord = -1 // variable number of fields

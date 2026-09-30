@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -90,6 +91,12 @@ func (t *ElasticsearchTool) Execute(ctx context.Context, input map[string]interf
 	if action == "" || index == "" {
 		return "", fmt.Errorf("'action' and 'index' are required")
 	}
+	// Resource-identifier guard: caller-supplied index/id must remain single
+	// path segments. A fragment (#) or ? would discard the tool-generated
+	// document route and repurpose the credentials (e.g. index deletion).
+	if !validESIndex(index) {
+		return "", fmt.Errorf("invalid Elasticsearch index name")
+	}
 
 	switch action {
 	case "search":
@@ -102,7 +109,7 @@ func (t *ElasticsearchTool) Execute(ctx context.Context, input map[string]interf
 			"query": query,
 			"size":  size,
 		}
-		data, err := t.doRequest(ctx, http.MethodPost, fmt.Sprintf("/%s/_search", index), body)
+		data, err := t.doRequest(ctx, http.MethodPost, "/"+url.PathEscape(index)+"/_search", body)
 		if err != nil {
 			return "", err
 		}
@@ -111,9 +118,12 @@ func (t *ElasticsearchTool) Execute(ctx context.Context, input map[string]interf
 	case "index":
 		id, _ := input["id"].(string)
 		doc := input["document"]
-		path := fmt.Sprintf("/%s/_doc", index)
+		path := "/" + url.PathEscape(index) + "/_doc"
 		if id != "" {
-			path = fmt.Sprintf("/%s/_doc/%s", index, id)
+			if !validESID(id) {
+				return "", fmt.Errorf("invalid Elasticsearch document id")
+			}
+			path = "/" + url.PathEscape(index) + "/_doc/" + url.PathEscape(id)
 		}
 		data, err := t.doRequest(ctx, http.MethodPost, path, doc)
 		if err != nil {
@@ -123,10 +133,10 @@ func (t *ElasticsearchTool) Execute(ctx context.Context, input map[string]interf
 
 	case "get":
 		id, _ := input["id"].(string)
-		if id == "" {
+		if !validESID(id) {
 			return "", fmt.Errorf("'id' is required for get action")
 		}
-		data, err := t.doRequest(ctx, http.MethodGet, fmt.Sprintf("/%s/_doc/%s", index, id), nil)
+		data, err := t.doRequest(ctx, http.MethodGet, "/"+url.PathEscape(index)+"/_doc/"+url.PathEscape(id), nil)
 		if err != nil {
 			return "", err
 		}
@@ -134,17 +144,17 @@ func (t *ElasticsearchTool) Execute(ctx context.Context, input map[string]interf
 
 	case "delete":
 		id, _ := input["id"].(string)
-		if id == "" {
+		if !validESID(id) {
 			return "", fmt.Errorf("'id' is required for delete action")
 		}
-		data, err := t.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/%s/_doc/%s", index, id), nil)
+		data, err := t.doRequest(ctx, http.MethodDelete, "/"+url.PathEscape(index)+"/_doc/"+url.PathEscape(id), nil)
 		if err != nil {
 			return "", err
 		}
 		return prettyJSON(data), nil
 
 	case "count":
-		data, err := t.doRequest(ctx, http.MethodGet, fmt.Sprintf("/%s/_count", index), nil)
+		data, err := t.doRequest(ctx, http.MethodGet, "/"+url.PathEscape(index)+"/_count", nil)
 		if err != nil {
 			return "", err
 		}
@@ -153,6 +163,36 @@ func (t *ElasticsearchTool) Execute(ctx context.Context, input map[string]interf
 	default:
 		return "", fmt.Errorf("unsupported action: %s", action)
 	}
+}
+
+// validESIndex enforces Elasticsearch identifier rules so values remain
+// single URL path segments (no fragments, queries, or extra routes).
+func validESIndex(s string) bool {
+	if s == "" || len(s) > 255 || s[0] == '-' || s[0] == '_' || s[0] == '+' {
+		return false
+	}
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+		case r == '-' || r == '_' || r == '+' || r == '.':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// validESID requires a non-empty single-segment document id.
+func validESID(s string) bool {
+	if s == "" || len(s) > 512 {
+		return false
+	}
+	for _, r := range s {
+		if r == '/' || r == '?' || r == '#' || r == '\n' || r == '\r' {
+			return false
+		}
+	}
+	return true
 }
 
 func (t *ElasticsearchTool) Name() string        { return t.BaseTool.NameValue }

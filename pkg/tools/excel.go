@@ -2,6 +2,7 @@ package tools
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
 	"encoding/xml"
 	"fmt"
@@ -39,12 +40,12 @@ func (t *ExcelReadTool) Execute(ctx context.Context, input map[string]interface{
 		return "", fmt.Errorf("'file_path' must be a string")
 	}
 
-	safePath, err := utils.ValidatePath(path, t.Chroot)
+	safe, err := utils.ReadFileInRoot(t.Chroot, path)
 	if err != nil {
 		return "", err
 	}
 
-	return extractXLSX(safePath)
+	return extractXLSXBytes(safe)
 }
 
 func (t *ExcelReadTool) ArgsSchema() []ArgSchema {
@@ -118,13 +119,17 @@ type inlineStr struct {
 	T string `xml:"t,omitempty"`
 }
 
-func extractXLSX(path string) (string, error) {
-	// Open ZIP
-	zr, err := zip.OpenReader(path)
+// extractXLSXBytes parses xlsx content already read through the confined
+// root, so archive opening cannot follow an escaping symlink.
+func extractXLSXBytes(data []byte) (string, error) {
+	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
 		return "", fmt.Errorf("failed to open xlsx: %w", err)
 	}
-	defer zr.Close()
+	return extractFromZipReader(zr)
+}
+
+func extractFromZipReader(zr *zip.Reader) (string, error) {
 
 	// Read shared strings
 	shared := make(map[int]string)
@@ -182,14 +187,22 @@ func readZipFile(f *zip.File) ([]byte, error) {
 		return nil, err
 	}
 	defer rc.Close()
-	data, err := io.ReadAll(rc)
+	// Zip-bomb guard: declared size pre-check plus enforced read cap.
+	const maxZipMemberBytes = 32 << 20 // 32MiB expanded
+	if f.UncompressedSize64 > maxZipMemberBytes {
+		return nil, fmt.Errorf("xlsx member exceeds %d byte budget", maxZipMemberBytes)
+	}
+	data, err := io.ReadAll(io.LimitReader(rc, maxZipMemberBytes+1))
 	if err != nil {
 		return nil, err
+	}
+	if int64(len(data)) > maxZipMemberBytes {
+		return nil, fmt.Errorf("xlsx member exceeds %d byte budget", maxZipMemberBytes)
 	}
 	return data, nil
 }
 
-func readZipFileByPath(zr *zip.ReadCloser, name string) ([]byte, error) {
+func readZipFileByPath(zr *zip.Reader, name string) ([]byte, error) {
 	for _, f := range zr.File {
 		if f.Name == name {
 			return readZipFile(f)

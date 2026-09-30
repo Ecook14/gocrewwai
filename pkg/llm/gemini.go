@@ -57,12 +57,47 @@ type geminiUsage struct {
 // Generate implements basic message generation for Gemini.
 func (c *GeminiClient) Generate(ctx context.Context, messages []Message, options GenerateOptions) (string, error) {
 	text, _, err := c.generateBase(ctx, messages, options)
-	return text, err
+	if err != nil {
+		return "", err
+	}
+	var promptText strings.Builder
+	for _, m := range messages {
+		promptText.WriteString(m.Content)
+	}
+	TrackHeuristicUsage("gemini", c.Model, promptText.String(), text, 0)
+	return text, nil
+}
+
+// sanitizeProviderError strips any credential material from provider errors
+// before they propagate to callers (and remote A2A responses).
+func sanitizeProviderError(err error, apiKey string) error {
+	if err == nil {
+		return nil
+	}
+	msg := err.Error()
+	if apiKey != "" {
+		msg = strings.ReplaceAll(msg, apiKey, "[REDACTED]")
+	}
+	// URLs (with query strings) sometimes appear in transport errors.
+	if i := strings.Index(msg, "https://"); i >= 0 {
+		if j := strings.Index(msg[i:], " "); j >= 0 {
+			msg = msg[:i] + "[url-redacted]" + msg[i+j:]
+		} else {
+			msg = msg[:i] + "[url-redacted]"
+		}
+	}
+	if msg != err.Error() {
+		return fmt.Errorf("%s", msg)
+	}
+	return err
 }
 
 func (c *GeminiClient) generateBase(ctx context.Context, messages []Message, options GenerateOptions) (string, *geminiUsage, error) {
 	if c.APIKey == "" {
 		return "", nil, fmt.Errorf("google Gemini API Key is required")
+	}
+	if err := AdmitBudget(); err != nil {
+		return "", nil, err
 	}
 
 	model := options.Model
@@ -107,14 +142,21 @@ func (c *GeminiClient) generateBase(ctx context.Context, messages []Message, opt
 	}
 
 	reqBody, _ := json.Marshal(reqPayload)
-	url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", c.BaseURL, model, c.APIKey)
+	// Credential goes in the provider-supported auth header, never the URL
+	// query: Go includes the query in transport-error text, which previously
+	// leaked the key into A2A task responses.
+	endpoint := fmt.Sprintf("%s/models/%s:generateContent", c.BaseURL, model)
 
-	req, _ := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(reqBody))
+	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(reqBody))
+	if err != nil {
+		return "", nil, fmt.Errorf("gemini request: %w", sanitizeProviderError(err, c.APIKey))
+	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-goog-api-key", c.APIKey)
 
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
-		return "", nil, err
+		return "", nil, sanitizeProviderError(err, c.APIKey)
 	}
 	defer resp.Body.Close()
 
@@ -230,6 +272,9 @@ func (c *GeminiClient) StreamGenerate(ctx context.Context, messages []Message, o
 	if c.APIKey == "" {
 		return nil, fmt.Errorf("google Gemini API Key is required")
 	}
+	if err := AdmitBudget(); err != nil {
+		return nil, err
+	}
 
 	model := options.Model
 	if model == "" {
@@ -247,14 +292,18 @@ func (c *GeminiClient) StreamGenerate(ctx context.Context, messages []Message, o
 
 	reqPayload := map[string]interface{}{"contents": geminiContents}
 	reqBody, _ := json.Marshal(reqPayload)
-	url := fmt.Sprintf("%s/models/%s:streamGenerateContent?key=%s", c.BaseURL, model, c.APIKey)
+	endpoint := fmt.Sprintf("%s/models/%s:streamGenerateContent", c.BaseURL, model)
 
-	req, _ := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(reqBody))
+	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(reqBody))
+	if err != nil {
+		return nil, fmt.Errorf("gemini request: %w", sanitizeProviderError(err, c.APIKey))
+	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-goog-api-key", c.APIKey)
 
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, sanitizeProviderError(err, c.APIKey)
 	}
 
 	if resp.StatusCode != http.StatusOK {

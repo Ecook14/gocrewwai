@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -45,16 +46,60 @@ func NewCheckpointManager(baseDir string) *CheckpointManager {
 	}
 }
 
+// validCheckpointID rejects path separators, traversal, glob metacharacters,
+// and URI syntax so identifiers can never escape BaseDir via filepath.Join.
+//
+// ValidCheckpointID is the exported gate for API-layer session IDs, which
+// become checkpoint CrewIDs.
+func ValidCheckpointID(id string) bool {
+	return validCheckpointID(id)
+}
+func validCheckpointID(id string) bool {
+	if id == "" || len(id) > 128 {
+		return false
+	}
+	for _, r := range id {
+		switch {
+		case r >= 'A' && r <= 'Z', r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+		case r == '-' || r == '_' || r == '.':
+		default:
+			return false
+		}
+	}
+	if id == "." || id == ".." {
+		return false
+	}
+	return true
+}
+
+// joinBase joins name onto BaseDir and verifies the cleaned result stays inside.
+func (cm *CheckpointManager) joinBase(name string) (string, error) {
+	absBase, err := filepath.Abs(cm.BaseDir)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve checkpoint dir: %w", err)
+	}
+	p := filepath.Join(absBase, name)
+	if p != absBase && !strings.HasPrefix(p, absBase+string(filepath.Separator)) {
+		return "", fmt.Errorf("checkpoint path escapes base directory")
+	}
+	return p, nil
+}
+
 // Save writes a checkpoint to disk.
 func (cm *CheckpointManager) Save(ctx context.Context, cp *Checkpoint) error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
+	if !validCheckpointID(cp.CrewID) {
+		return fmt.Errorf("invalid checkpoint crew id")
+	}
 	cp.Timestamp = time.Now()
 	cp.Version++
 
-	filename := fmt.Sprintf("checkpoint_%s_%d.json", cp.CrewID, cp.Timestamp.UnixMilli())
-	path := filepath.Join(cm.BaseDir, filename)
+	path, err := cm.joinBase(fmt.Sprintf("checkpoint_%s_%d.json", cp.CrewID, cp.Timestamp.UnixMilli()))
+	if err != nil {
+		return err
+	}
 
 	data, err := json.MarshalIndent(cp, "", "  ")
 	if err != nil {
@@ -66,7 +111,10 @@ func (cm *CheckpointManager) Save(ctx context.Context, cp *Checkpoint) error {
 	}
 
 	// Also save as "latest" for easy resume
-	latestPath := filepath.Join(cm.BaseDir, fmt.Sprintf("checkpoint_%s_latest.json", cp.CrewID))
+	latestPath, err := cm.joinBase(fmt.Sprintf("checkpoint_%s_latest.json", cp.CrewID))
+	if err != nil {
+		return err
+	}
 	if err := os.WriteFile(latestPath, data, 0644); err != nil {
 		return fmt.Errorf("failed to write latest checkpoint: %w", err)
 	}
@@ -86,21 +134,40 @@ func (cm *CheckpointManager) Close() error {
 func (cm *CheckpointManager) Delete(ctx context.Context, crewID string, timestamp int64) error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
-	return os.Remove(filepath.Join(cm.BaseDir, fmt.Sprintf("checkpoint_%s_%d.json", crewID, timestamp)))
+	if !validCheckpointID(crewID) {
+		return fmt.Errorf("invalid checkpoint crew id")
+	}
+	p, err := cm.joinBase(fmt.Sprintf("checkpoint_%s_%d.json", crewID, timestamp))
+	if err != nil {
+		return err
+	}
+	return os.Remove(p)
 }
 
 // LoadLatest reads the most recent checkpoint for a crew.
 func (cm *CheckpointManager) LoadLatest(ctx context.Context, crewID string) (*Checkpoint, error) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
-	path := filepath.Join(cm.BaseDir, fmt.Sprintf("checkpoint_%s_latest.json", crewID))
+	if !validCheckpointID(crewID) {
+		return nil, fmt.Errorf("invalid checkpoint crew id")
+	}
+	path, err := cm.joinBase(fmt.Sprintf("checkpoint_%s_latest.json", crewID))
+	if err != nil {
+		return nil, err
+	}
 	return cm.loadFromFile(path)
 }
 
 // LoadByID reads a specific checkpoint.
 func (cm *CheckpointManager) LoadByID(ctx context.Context, crewID string, timestamp int64) (*Checkpoint, error) {
-	pattern := filepath.Join(cm.BaseDir, fmt.Sprintf("checkpoint_%s_%d.json", crewID, timestamp))
-	return cm.loadFromFile(pattern)
+	if !validCheckpointID(crewID) {
+		return nil, fmt.Errorf("invalid checkpoint crew id")
+	}
+	p, err := cm.joinBase(fmt.Sprintf("checkpoint_%s_%d.json", crewID, timestamp))
+	if err != nil {
+		return nil, err
+	}
+	return cm.loadFromFile(p)
 }
 
 func (cm *CheckpointManager) loadFromFile(path string) (*Checkpoint, error) {

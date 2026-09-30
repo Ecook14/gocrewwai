@@ -71,6 +71,11 @@ func StartMeshServer(port int, agents []core.Agent, store memory.Store, embedder
 			slog.Int("port", port))
 		gsrv = grpc.NewServer()
 	default:
+		// Fail closed: never drop a requested client-CA policy into an
+		// ephemeral server-only credential.
+		if len(clientCAPEM) > 0 {
+			return fmt.Errorf("mesh: client CA supplied without a server certificate/key pair — refusing ephemeral fallback")
+		}
 		certPEM, keyPEM, fp, err := ephemeralServerCert()
 		if err != nil {
 			return err

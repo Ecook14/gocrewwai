@@ -3,6 +3,8 @@ package tools
 import (
 	"context"
 	"fmt"
+	"mime"
+	"net/mail"
 	"net/smtp"
 	"strings"
 )
@@ -40,6 +42,7 @@ func (t *EmailTool) Execute(ctx context.Context, input map[string]interface{}) (
 	to, _ := input["to"].(string)
 	subject, _ := input["subject"].(string)
 	body, _ := input["body"].(string)
+	cc, _ := input["cc"].(string)
 
 	if to == "" {
 		return "", fmt.Errorf("'to' is required")
@@ -47,12 +50,33 @@ func (t *EmailTool) Execute(ctx context.Context, input map[string]interface{}) (
 	if subject == "" {
 		return "", fmt.Errorf("'subject' is required")
 	}
+	// Header-injection guard (CWE-93): subject/from/to/cc enter raw RFC-5322
+	// headers below. Reject CR/LF so a caller cannot inject Reply-To etc.
+	for _, h := range []string{subject, t.From, to, cc} {
+		if strings.ContainsAny(h, "\r\n") {
+			return "", fmt.Errorf("header value must be single-line")
+		}
+	}
+	if _, err := mail.ParseAddress(to); err != nil {
+		return "", fmt.Errorf("invalid 'to' address: %w", err)
+	}
+	if _, err := mail.ParseAddress(t.From); err != nil {
+		return "", fmt.Errorf("invalid sender address: %w", err)
+	}
 
 	// Build recipients list
 	recipients := []string{to}
-	cc, _ := input["cc"].(string)
 	if cc != "" {
-		recipients = append(recipients, strings.Split(cc, ",")...)
+		for _, c := range strings.Split(cc, ",") {
+			c = strings.TrimSpace(c)
+			if c == "" {
+				continue
+			}
+			if _, err := mail.ParseAddress(c); err != nil {
+				return "", fmt.Errorf("invalid 'cc' address: %w", err)
+			}
+			recipients = append(recipients, c)
+		}
 	}
 
 	// Build email message
@@ -62,7 +86,7 @@ func (t *EmailTool) Execute(ctx context.Context, input map[string]interface{}) (
 	if cc != "" {
 		msg.WriteString(fmt.Sprintf("Cc: %s\r\n", cc))
 	}
-	msg.WriteString(fmt.Sprintf("Subject: %s\r\n", subject))
+	msg.WriteString(fmt.Sprintf("Subject: %s\r\n", mime.QEncoding.Encode("utf-8", subject)))
 	msg.WriteString("MIME-Version: 1.0\r\n")
 	msg.WriteString("Content-Type: text/plain; charset=\"utf-8\"\r\n")
 	msg.WriteString("\r\n")

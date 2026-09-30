@@ -3,7 +3,6 @@ package tools
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/Ecook14/gocrewwai/pkg/utils"
@@ -37,14 +36,9 @@ func (t *HTMLReadTool) Execute(ctx context.Context, input map[string]interface{}
 		return "", fmt.Errorf("'file_path' must be a string")
 	}
 
-	safePath, err := utils.ValidatePath(path, t.Chroot)
+	content, err := utils.ReadFileInRoot(t.Chroot, path)
 	if err != nil {
 		return "", err
-	}
-
-	content, err := os.ReadFile(safePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read file: %w", err)
 	}
 
 	return stripHTMLTagsOnly(string(content)), nil

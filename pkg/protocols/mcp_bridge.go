@@ -13,9 +13,13 @@ import (
 // WrapToolForMCP converts a Crew-GO Tool into an MCP tool definition and handler.
 // This allows any Crew-GO tool to be served via an MCP server.
 func WrapToolForMCP(tool tools.Tool) (MCPToolDefinition, MCPToolHandler) {
+	desc := tool.Description()
+	if tool.RequiresReview() {
+		desc += " [Requires human review: this bridge rejects execution; obtain approval through the agent path.]"
+	}
 	def := MCPToolDefinition{
 		Name:        tool.Name(),
-		Description: tool.Description(),
+		Description: desc,
 		InputSchema: map[string]interface{}{
 			"type": "object",
 			"properties": map[string]interface{}{
@@ -28,6 +32,15 @@ func WrapToolForMCP(tool tools.Tool) (MCPToolDefinition, MCPToolHandler) {
 	}
 
 	handler := func(ctx context.Context, params map[string]interface{}) (*MCPToolResult, error) {
+		// The MCP execution boundary has no human-approval mechanism, so it
+		// must not silently execute tools whose ordinary agent path requires
+		// review. Reject instead of running credentialed side effects.
+		if tool.RequiresReview() {
+			return &MCPToolResult{
+				Content: []MCPContent{{Type: "text", Text: fmt.Sprintf("tool %q requires human review and cannot be executed via MCP", tool.Name())}},
+				IsError: true,
+			}, nil
+		}
 		result, err := tool.Execute(ctx, params)
 		if err != nil {
 			return &MCPToolResult{

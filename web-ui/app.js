@@ -76,21 +76,44 @@ function handleEvent(event) {
 }
 
 function showReviewModal(reviewId, agentRole, toolName, input) {
-    // Generate a modal dynamically for HITL
+    // Text-only rendering: never interpolate review data into innerHTML.
     const modal = document.createElement('div');
     modal.className = 'review-modal';
-    modal.innerHTML = `
-        <div class="review-content glass-card">
-            <h3>Human Review Required</h3>
-            <p><strong>Agent:</strong> ${agentRole}</p>
-            <p><strong>Tool:</strong> ${toolName}</p>
-            <div class="input-preview">${JSON.stringify(input, null, 2)}</div>
-            <div class="review-actions">
-                <button class="btn approve" onclick="submitReview('${reviewId}', true, this)">Approve</button>
-                <button class="btn reject" onclick="submitReview('${reviewId}', false, this)">Reject</button>
-            </div>
-        </div>
-    `;
+    const content = document.createElement('div');
+    content.className = 'review-content glass-card';
+    const h3 = document.createElement('h3');
+    h3.textContent = 'Human Review Required';
+    const pAgent = document.createElement('p');
+    const bAgent = document.createElement('strong');
+    bAgent.textContent = 'Agent: ';
+    pAgent.appendChild(bAgent);
+    pAgent.appendChild(document.createTextNode(String(agentRole)));
+    const pTool = document.createElement('p');
+    const bTool = document.createElement('strong');
+    bTool.textContent = 'Tool: ';
+    pTool.appendChild(bTool);
+    pTool.appendChild(document.createTextNode(String(toolName)));
+    const preview = document.createElement('div');
+    preview.className = 'input-preview';
+    preview.textContent = JSON.stringify(input, null, 2);
+    const actions = document.createElement('div');
+    actions.className = 'review-actions';
+    const approve = document.createElement('button');
+    approve.className = 'btn approve';
+    approve.textContent = 'Approve';
+    approve.addEventListener('click', () => submitReview(reviewId, true, approve));
+    const reject = document.createElement('button');
+    reject.className = 'btn reject';
+    reject.textContent = 'Reject';
+    reject.addEventListener('click', () => submitReview(reviewId, false, reject));
+    actions.appendChild(approve);
+    actions.appendChild(reject);
+    content.appendChild(h3);
+    content.appendChild(pAgent);
+    content.appendChild(pTool);
+    content.appendChild(preview);
+    content.appendChild(actions);
+    modal.appendChild(content);
     document.body.appendChild(modal);
 }
 
@@ -216,25 +239,57 @@ function addEntityItem(type, name, subtext, index, isProcessed = false) {
     el.className = 'agent-item';
     if (!name) name = 'Unnamed';
     if (type === 'Agent') {
-        el.id = `agent-${name.replace(/\s+/g, '-')}`;
+        el.id = `agent-${String(name).replace(/[^A-Za-z0-9_-]/g, '-').slice(0, 64)}`;
     }
 
-    let extraButtons = '';
+    const info = document.createElement('div');
+    info.className = 'agent-info';
+    const h4 = document.createElement('h4');
+    h4.style.fontSize = '0.8rem';
+    const badge = document.createElement('span');
+    badge.style.color = 'var(--accent-color)';
+    badge.style.fontWeight = '800';
+    badge.style.fontSize = '0.65rem';
+    badge.style.marginRight = '0.5rem';
+    badge.textContent = String(type).toUpperCase();
+    h4.appendChild(badge);
+    h4.appendChild(document.createTextNode(' ' + String(name)));
+    const p = document.createElement('p');
+    p.className = 'agent-status';
+    p.textContent = String(subtext ?? '');
+    info.appendChild(h4);
+    info.appendChild(p);
+
+    const btnBox = document.createElement('div');
+    btnBox.style.display = 'flex';
+    btnBox.style.gap = '0.5rem';
+    btnBox.style.alignItems = 'center';
     if (type === 'Task' && isProcessed) {
-        extraButtons = `<button class="btn" style="padding: 0.2rem 0.5rem; font-size: 0.6rem; background: #10b981;" onclick="viewTaskResult(${index})">View Result</button>`;
+        const view = document.createElement('button');
+        view.className = 'btn';
+        view.style.padding = '0.2rem 0.5rem';
+        view.style.fontSize = '0.6rem';
+        view.style.background = '#10b981';
+        view.textContent = 'View Result';
+        view.addEventListener('click', () => viewTaskResult(index));
+        btnBox.appendChild(view);
     }
+    const edit = document.createElement('button');
+    edit.className = 'btn';
+    edit.style.padding = '0.2rem 0.5rem';
+    edit.style.fontSize = '0.6rem';
+    edit.style.background = 'var(--accent-color)';
+    edit.textContent = 'Edit';
+    edit.addEventListener('click', () => editEntity(String(type).toLowerCase(), index));
+    const del = document.createElement('button');
+    del.className = 'delete-btn';
+    del.textContent = 'Delete';
+    del.addEventListener('click', () => deleteEntity(String(type).toLowerCase(), index));
+    btnBox.appendChild(edit);
+    btnBox.appendChild(del);
 
-    el.innerHTML = `
-        <div class="agent-info">
-            <h4 style="font-size: 0.8rem;"><span style="color: var(--accent-color); font-weight: 800; font-size: 0.65rem; margin-right: 0.5rem;">${type.toUpperCase()}</span> ${name}</h4>
-            <p class="agent-status">${subtext}</p>
-        </div>
-        <div style="display: flex; gap: 0.5rem; align-items: center;">
-            ${extraButtons}
-            <button class="btn" style="padding: 0.2rem 0.5rem; font-size: 0.6rem; background: var(--accent-color);" onclick="editEntity('${type.toLowerCase()}', ${index})">Edit</button>
-            <button class="delete-btn" onclick="deleteEntity('${type.toLowerCase()}', ${index})">Delete</button>
-        </div>
-    `;
+    el.appendChild(info);
+    el.appendChild(btnBox);
     agentList.appendChild(el);
 }
 
@@ -400,7 +455,12 @@ function fetchMetadata() {
                 label.style.alignItems = 'center';
                 label.style.gap = '0.5rem';
                 label.style.fontSize = '0.75rem';
-                label.innerHTML = `<input type="checkbox" name="tools" value="${tool}"> ${tool}`;
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.name = 'tools';
+                cb.value = String(tool);
+                label.appendChild(cb);
+                label.appendChild(document.createTextNode(' ' + String(tool)));
                 list.appendChild(label);
             });
         });

@@ -43,11 +43,17 @@ func NewCodeSandboxTool() *CodeSandboxTool {
 // hardening: no network, read-only rootfs, limited tmpfs, dropped
 // capabilities, non-root user, and resource limits.
 func (t *CodeSandboxTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
-	lang, _ := input["language"].(string)
-	code, _ := input["code"].(string)
+	lang, langOK := input["language"].(string)
+	code, codeOK := input["code"].(string)
 
-	if code == "" {
+	if !codeOK || code == "" {
 		return "", fmt.Errorf("missing 'code' parameter")
+	}
+	if _, hasLang := input["language"]; hasLang && !langOK {
+		return "", fmt.Errorf("'language' must be a string")
+	}
+	if len(code) > maxExecOutputBytes/2 {
+		return "", fmt.Errorf("code exceeds input budget")
 	}
 
 	switch lang {
@@ -102,14 +108,14 @@ func (t *CodeSandboxTool) runInSandbox(ctx context.Context, entrypoint, flag, co
 	}
 
 	cmd := exec.CommandContext(timeoutCtx, cli, args...)
-	out, err := cmd.CombinedOutput()
+	out, err := boundedCombinedOutput(cmd, maxExecOutputBytes)
 	if err != nil {
-		return string(out), fmt.Errorf(
+		return out, fmt.Errorf(
 			"code sandbox execution failed: %s",
-			stripDockerErrors(string(out)),
+			stripDockerErrors(out),
 		)
 	}
-	return string(out), nil
+	return out, nil
 }
 
 // shellEscape wraps a string for safe embedding inside a single-quoted

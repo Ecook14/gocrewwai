@@ -54,8 +54,10 @@ func GetClient(modelName string) (llm.Client, error) {
 		llm.WithTimeout(cfg.LLM.Timeout),
 	)
 
-	// If a failover model is configured, wrap with FailoverClient
-	if cfg.LLM.FailoverModel != "" && cfg.LLM.FailoverModel != modelName {
+	// If failover is explicitly enabled and a failover model is configured,
+	// wrap with FailoverClient. A disabled flag must never install a
+	// secondary provider that could receive the original messages.
+	if cfg.LLM.FailoverEnabled && cfg.LLM.FailoverModel != "" && cfg.LLM.FailoverModel != modelName {
 		secondaryCfg, sOk := cfg.Models[cfg.LLM.FailoverModel]
 		if sOk {
 			sClient, sErr := createClientForProvider(secondaryCfg.ProviderID, secondaryCfg.ModelID)

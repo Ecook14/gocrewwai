@@ -57,7 +57,10 @@ func (t *SerperTool) Execute(ctx context.Context, input map[string]interface{}) 
 	payload := map[string]string{"q": query}
 	payloadBytes, _ := json.Marshal(payload)
 
-	req, _ := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(payloadBytes))
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		return "", err
+	}
 	req.Header.Set("X-API-KEY", t.APIKey)
 	req.Header.Set("Content-Type", "application/json")
 

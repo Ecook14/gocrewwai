@@ -66,7 +66,10 @@ func (t *TwilioTool) sendSMS(ctx context.Context, to, body string) (string, erro
 	data := map[string]string{"To": to, "Body": body, "From": os.Getenv("TWILIO_PHONE_NUMBER")}
 	reqBody, _ := json.Marshal(data)
 	url := fmt.Sprintf("https://api.twilio.com/2010-04-01/Accounts/%s/Messages.json", t.accountSID)
-	req, _ := http.NewRequest("POST", url, strings.NewReader(string(reqBody)))
+	req, err := http.NewRequest("POST", url, strings.NewReader(string(reqBody)))
+	if err != nil {
+		return "", err
+	}
 	req.SetBasicAuth(t.accountSID, t.authToken)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := t.client.Do(req.WithContext(ctx))
@@ -84,7 +87,10 @@ func (t *TwilioTool) makeCall(ctx context.Context, to, twimlURL string) (string,
 	data := map[string]string{"To": to, "From": os.Getenv("TWILIO_PHONE_NUMBER"), "Url": twimlURL}
 	reqBody, _ := json.Marshal(data)
 	url := fmt.Sprintf("https://api.twilio.com/2010-04-01/Accounts/%s/Calls.json", t.accountSID)
-	req, _ := http.NewRequest("POST", url, strings.NewReader(string(reqBody)))
+	req, err := http.NewRequest("POST", url, strings.NewReader(string(reqBody)))
+	if err != nil {
+		return "", err
+	}
 	req.SetBasicAuth(t.accountSID, t.authToken)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := t.client.Do(req.WithContext(ctx))
@@ -102,7 +108,10 @@ func (t *TwilioTool) sendWhatsApp(ctx context.Context, to, body string) (string,
 	data := map[string]string{"To": "whatsapp:" + to, "Body": body, "From": os.Getenv("TWILIO_WHATSAPP_NUMBER")}
 	reqBody, _ := json.Marshal(data)
 	url := fmt.Sprintf("https://api.twilio.com/2010-04-01/Accounts/%s/Messages.json", t.accountSID)
-	req, _ := http.NewRequest("POST", url, strings.NewReader(string(reqBody)))
+	req, err := http.NewRequest("POST", url, strings.NewReader(string(reqBody)))
+	if err != nil {
+		return "", err
+	}
 	req.SetBasicAuth(t.accountSID, t.authToken)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := t.client.Do(req.WithContext(ctx))

@@ -86,6 +86,29 @@ func (s *InMemCosineStore) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
+// DeleteScope removes every item in scope or its descendant scopes,
+// returning the deleted count. Segment-boundary matched: "/tenant/a" does
+// not touch "/tenant/ab".
+func (s *InMemCosineStore) DeleteScope(ctx context.Context, scope string) (int64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var kept []*MemoryItem
+	var deleted int64
+	for _, item := range s.items {
+		rec := ""
+		if item.Metadata != nil {
+			rec, _ = item.Metadata["scope"].(string)
+		}
+		if inScope(rec, scope) {
+			deleted++
+			continue
+		}
+		kept = append(kept, item)
+	}
+	s.items = kept
+	return deleted, nil
+}
+
 // Count returns the number of stored items.
 func (s *InMemCosineStore) Count(ctx context.Context) (int, error) {
 	s.mu.RLock()

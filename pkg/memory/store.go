@@ -41,6 +41,14 @@ type Store interface {
 	Reset(ctx context.Context) error
 }
 
+// ScopeDeleter is an optional Store capability: complete deletion of a
+// scope subtree (exact scope or proper descendants) without semantic
+// filtering or candidate caps. Forget prefers it over capped search so
+// erasure is complete and failures propagate.
+type ScopeDeleter interface {
+	DeleteScope(ctx context.Context, scope string) (int64, error)
+}
+
 // KnowledgeSource defines the interface for external knowledge retrieval.
 type KnowledgeSource interface {
 	Query(ctx context.Context, query string) (string, error)

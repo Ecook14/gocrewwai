@@ -66,7 +66,10 @@ func (l *LinearTool) Execute(ctx context.Context, input map[string]interface{}) 
 
 func (l *LinearTool) query(query string, variables map[string]interface{}) (string, error) {
 	reqBody, _ := json.Marshal(map[string]interface{}{"query": query, "variables": variables})
-	req, _ := http.NewRequest("POST", l.baseURL, strings.NewReader(string(reqBody)))
+	req, err := http.NewRequest("POST", l.baseURL, strings.NewReader(string(reqBody)))
+	if err != nil {
+		return "", err
+	}
 	req.Header.Set("Authorization", "Bearer "+l.token)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := l.client.Do(req.WithContext(context.Background()))

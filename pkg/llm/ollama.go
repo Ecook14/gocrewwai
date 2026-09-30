@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -119,7 +120,19 @@ func (c *OllamaClient) Generate(ctx context.Context, messages []Message, options
 	}
 
 	var ollResp ollamaResponse
-	if err := json.NewDecoder(resp.Body).Decode(&ollResp); err != nil {
+	// Bound decompressed bytes before the JSON decoder allocates buffers:
+	// the default transport expands gzip, so a small compressed body could
+	// otherwise induce much larger allocations (CWE-409).
+	const maxOllamaResponseBytes = 16 << 20 // 16MiB
+	lr := io.LimitReader(resp.Body, maxOllamaResponseBytes+1)
+	body, err := io.ReadAll(lr)
+	if err != nil {
+		return "", fmt.Errorf("failed to read ollama response: %w", err)
+	}
+	if int64(len(body)) > maxOllamaResponseBytes {
+		return "", fmt.Errorf("ollama response exceeds %d byte budget", maxOllamaResponseBytes)
+	}
+	if err := json.Unmarshal(body, &ollResp); err != nil {
 		return "", fmt.Errorf("failed to decode ollama response: %w", err)
 	}
 

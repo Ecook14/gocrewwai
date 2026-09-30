@@ -333,7 +333,10 @@ func (t *Task) Execute(ctx context.Context) (interface{}, error) {
 		return nil, err
 	}
 
-	// 4. Apply task-level guardrails with retries
+	// 4. Apply task-level guardrails with retries.
+	// Structured (non-string) results are validated against their canonical
+	// JSON form so selecting structured output cannot silently skip output
+	// policy. Completion, callbacks, and file saving all depend on it.
 	if len(t.Guardrails) > 0 {
 		gRetries := t.GuardrailMaxRetries
 		if gRetries <= 0 {
@@ -341,7 +344,16 @@ func (t *Task) Execute(ctx context.Context) (interface{}, error) {
 		}
 
 		for gr := 0; gr < gRetries; gr++ {
-			if resultStr, ok := result.(string); ok {
+			resultStr, ok := result.(string)
+			if !ok {
+				canonical, merr := json.Marshal(result)
+				if merr != nil {
+					return nil, fmt.Errorf("%w: unserializable result", crewErrors.ErrGuardrailFailed)
+				}
+				resultStr = string(canonical)
+				ok = true
+			}
+			if ok {
 				if gErr := guardrails.RunAll(t.Guardrails, resultStr); gErr != nil {
 					if gr < gRetries-1 {
 						slog.Warn("[⚠️ Guardrail Retry] Guardrail failed, re-executing task", slog.Int("iter", gr+1), slog.Any("error", gErr))

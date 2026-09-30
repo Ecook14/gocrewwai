@@ -92,6 +92,10 @@ func WithStateFile(path string) CrewOption {
 	return func(c *Crew) { c.StateFile = path }
 }
 
+func WithHeadless(v bool) CrewOption {
+	return func(c *Crew) { c.Headless = v }
+}
+
 func NewCrew(agents []core.Agent, tasks []*tasks.Task, opts ...CrewOption) *Crew {
 	c := &Crew{
 		Agents:       agents,
@@ -165,7 +169,12 @@ type Crew struct {
 	OutputLogFile string
 
 	// Features
-	Planning         bool
+	Planning bool
+
+	// Headless marks crews constructed by the REST API: no interactive
+	// approver exists, so automatic MCP capability injection (which bypasses
+	// human review) is disabled. SDK/CLI crews leave this false.
+	Headless         bool
 	PlanningLLM      llm.Client
 	TrainingDir      string
 	TaskCooldown     time.Duration
@@ -321,8 +330,16 @@ func (c *Crew) Train(ctx context.Context, iterations int, inputs map[string]inte
 
 // Kickoff starts the execution process based on the process type.
 func (c *Crew) Kickoff(ctx context.Context) (interface{}, error) {
-	// 🛠️ Phase 15: Automatic MCP Injection from Config
-	c.injectMCPFromConfig(ctx)
+	// Automatic MCP Injection from Config is disabled for headless (REST)
+	// crews: it would add executable integration capabilities after the
+	// headless tool policy passed, and MCP adapters bypass human review.
+	if c.Headless {
+		if c.Verbose {
+			fmt.Println("📦 Crew: skipping MCP injection for headless crew (no approver)")
+		}
+	} else {
+		c.injectMCPFromConfig(ctx)
+	}
 
 	ctx, span := telemetry.Tracer.Start(ctx, "Crew.Kickoff")
 	defer span.End()
@@ -558,8 +575,9 @@ func (c *Crew) executeSequential(ctx context.Context) (interface{}, error) {
 				future: future,
 			})
 		} else {
-			// Instrument Task Execution
-			ctx, taskSpan := telemetry.StartSpan(ctx, "Task.Execute: "+task.Description)
+			// Instrument Task Execution (constant span name: task descriptions
+			// may carry private prompt text and must not enter trace names).
+			ctx, taskSpan := telemetry.StartSpan(ctx, "Task.Execute")
 			result, err := task.Execute(ctx)
 			taskSpan.SetAttributes(attribute.String("crew.task_index", fmt.Sprintf("%d", i+1)))
 			taskSpan.End()
@@ -1432,7 +1450,10 @@ func (c *Crew) InjectDelegationTools() {
 }
 
 func (c *Crew) injectMCPFromConfig(ctx context.Context) {
-	cfg, err := config.LoadConfigFile("")
+	// Discovery-only parse: must not reinstall global spending policy, and
+	// must honor the initialized config identity (CREW_CONFIG_PATH).
+	path := os.Getenv("CREW_CONFIG_PATH")
+	cfg, err := config.ParseConfigFile(path)
 	if err != nil {
 		if c.Verbose {
 			fmt.Printf("📦 Crew: skipping MCP injection — config unavailable: %v\n", err)

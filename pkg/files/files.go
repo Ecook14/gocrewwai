@@ -27,6 +27,17 @@ var defaultHTTPClient = &http.Client{
 		TLSHandshakeTimeout: 5 * time.Second,
 	},
 	Timeout: 30 * time.Second,
+	CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 5 {
+			return fmt.Errorf("too many redirects")
+		}
+		// Re-apply the destination policy on every hop: initial approval
+		// must never authorize a later server-chosen redirect target.
+		if _, err := utils.ValidateURL(req.URL.String()); err != nil {
+			return err
+		}
+		return nil
+	},
 }
 
 // ============================================================

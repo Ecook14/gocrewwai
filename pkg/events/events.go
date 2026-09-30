@@ -156,20 +156,21 @@ func (b *Bus) Publish(e Event) {
 	for i, h := range b.handlers {
 		handlers[i] = h.fn
 	}
-	subs := append([]chan Event(nil), b.subscribers...)
-	b.mu.RUnlock()
-
-	// Notify handlers
-	for _, h := range handlers {
-		go h(e) // Run in goroutine to prevent blocking execution
-	}
-
-	// Notify channel subscribers
-	for _, sub := range subs {
+	// Notify channel subscribers while still holding the read lock:
+	// Unsubscribe takes the write lock before closing a channel, so a
+	// channel cannot be closed while a publisher may still send to it.
+	// Sends stay non-blocking so slow consumers never stall publishers.
+	for _, sub := range b.subscribers {
 		select {
 		case sub <- e:
 		default: // Skip if channel is full
 		}
+	}
+	b.mu.RUnlock()
+
+	// Notify handlers outside the lock.
+	for _, h := range handlers {
+		go h(e) // Run in goroutine to prevent blocking execution
 	}
 }
 

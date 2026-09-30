@@ -83,7 +83,10 @@ func (s *SupabaseTool) urlFor(table string) string {
 
 func (s *SupabaseTool) selectRows(ctx context.Context, table, columns, filter string) (string, error) {
 	url := fmt.Sprintf("%s?select=%s", s.urlFor(table), columns)
-	req, _ := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
 	req.Header.Set("Authorization", "Bearer "+s.apiKey)
 	req.Header.Set("apikey", s.apiKey)
 	resp, err := s.client.Do(req.WithContext(ctx))
@@ -100,7 +103,10 @@ func (s *SupabaseTool) selectRows(ctx context.Context, table, columns, filter st
 func (s *SupabaseTool) insertRow(ctx context.Context, table string, record map[string]interface{}) (string, error) {
 	data, _ := json.Marshal(record)
 	url := s.urlFor(table)
-	req, _ := http.NewRequest("POST", url, strings.NewReader(string(data)))
+	req, err := http.NewRequest("POST", url, strings.NewReader(string(data)))
+	if err != nil {
+		return "", err
+	}
 	req.Header.Set("Authorization", "Bearer "+s.apiKey)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("apikey", s.apiKey)
@@ -118,7 +124,10 @@ func (s *SupabaseTool) insertRow(ctx context.Context, table string, record map[s
 func (s *SupabaseTool) updateRows(ctx context.Context, table, filter string, updates map[string]interface{}) (string, error) {
 	data, _ := json.Marshal(updates)
 	url := fmt.Sprintf("%s?%s", s.urlFor(table), filter)
-	req, _ := http.NewRequest("PATCH", url, strings.NewReader(string(data)))
+	req, err := http.NewRequest("PATCH", url, strings.NewReader(string(data)))
+	if err != nil {
+		return "", err
+	}
 	req.Header.Set("Authorization", "Bearer "+s.apiKey)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := s.client.Do(req.WithContext(ctx))
@@ -131,7 +140,10 @@ func (s *SupabaseTool) updateRows(ctx context.Context, table, filter string, upd
 
 func (s *SupabaseTool) deleteRows(ctx context.Context, table, filter string) (string, error) {
 	url := fmt.Sprintf("%s?%s", s.urlFor(table), filter)
-	req, _ := http.NewRequest("DELETE", url, nil)
+	req, err := http.NewRequest("DELETE", url, nil)
+	if err != nil {
+		return "", err
+	}
 	req.Header.Set("Authorization", "Bearer "+s.apiKey)
 	resp, err := s.client.Do(req.WithContext(ctx))
 	if err != nil {
@@ -144,7 +156,10 @@ func (s *SupabaseTool) deleteRows(ctx context.Context, table, filter string) (st
 func (s *SupabaseTool) rpc(ctx context.Context, fn string, params map[string]interface{}) (string, error) {
 	data, _ := json.Marshal(params)
 	url := fmt.Sprintf("%s/rest/v1/rpc/%s", s.url, fn)
-	req, _ := http.NewRequest("POST", url, strings.NewReader(string(data)))
+	req, err := http.NewRequest("POST", url, strings.NewReader(string(data)))
+	if err != nil {
+		return "", err
+	}
 	req.Header.Set("Authorization", "Bearer "+s.apiKey)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := s.client.Do(req.WithContext(ctx))

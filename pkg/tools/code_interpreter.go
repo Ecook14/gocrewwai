@@ -154,8 +154,8 @@ func (t *CodeInterpreterTool) runCommand(ctx context.Context, name string, args 
 	}
 
 	cmd := exec.CommandContext(ctx, name, args...)
-	out, err := cmd.CombinedOutput()
-	return string(out), err
+	out, err := boundedCombinedOutput(cmd, maxExecOutputBytes)
+	return out, err
 }
 
 func (t *CodeInterpreterTool) runDocker(ctx context.Context, name string, args ...string) (string, error) {
@@ -187,8 +187,8 @@ func (t *CodeInterpreterTool) runDocker(ctx context.Context, name string, args .
 	}
 
 	cmd := exec.CommandContext(ctx, "docker", dockerArgs...)
-	out, err := cmd.CombinedOutput()
-	return string(out), err
+	out, err := boundedCombinedOutput(cmd, maxExecOutputBytes)
+	return out, err
 }
 
 func (t *CodeInterpreterTool) runPython(ctx context.Context, code string) (string, error) {

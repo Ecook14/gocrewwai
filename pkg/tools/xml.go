@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/xml"
 	"fmt"
-	"os"
 
 	"github.com/Ecook14/gocrewwai/pkg/utils"
 )
@@ -36,14 +35,9 @@ func (t *XMLReadTool) Execute(ctx context.Context, input map[string]interface{})
 		return "", fmt.Errorf("'file_path' must be a string")
 	}
 
-	safePath, err := utils.ValidatePath(path, t.Chroot)
+	data, err := utils.ReadFileInRoot(t.Chroot, path)
 	if err != nil {
 		return "", err
-	}
-
-	data, err := os.ReadFile(safePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read file: %w", err)
 	}
 
 	var buf bytes.Buffer

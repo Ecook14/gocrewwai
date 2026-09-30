@@ -3,7 +3,6 @@ package tools
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/Ecook14/gocrewwai/pkg/utils"
@@ -36,16 +35,10 @@ func (t *FileEditTool) Execute(ctx context.Context, input map[string]interface{}
 		return "", fmt.Errorf("file_path and target_text are required")
 	}
 
-	// Security: Validate path against chroot
-	safePath, err := utils.ValidatePath(filePath, t.Chroot)
+	// Security: root-confined read (no symlink-redirect race).
+	data, err := utils.ReadFileInRoot(t.Chroot, filePath)
 	if err != nil {
 		return "", err
-	}
-
-	// 1. Read file
-	data, err := os.ReadFile(safePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read file: %w", err)
 	}
 	content := string(data)
 
@@ -58,13 +51,12 @@ func (t *FileEditTool) Execute(ctx context.Context, input map[string]interface{}
 	// 3. Replace
 	updated := content[:start] + replacementText + content[end:]
 
-	// 4. Write back
-	err = os.WriteFile(safePath, []byte(updated), 0644)
-	if err != nil {
-		return "", fmt.Errorf("failed to write file: %w", err)
+	// 4. Write back through the confined root.
+	if err := utils.WriteFileInRoot(t.Chroot, filePath, []byte(updated), 0644); err != nil {
+		return "", err
 	}
 
-	return fmt.Sprintf("Successfully updated %s. Applied patch to block starting at byte %d.", filepath.Base(safePath), start), nil
+	return fmt.Sprintf("Successfully updated %s. Applied patch to block starting at byte %d.", filepath.Base(filePath), start), nil
 }
 
 // RequiresReview gates file modification — always human-approved.

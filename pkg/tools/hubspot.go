@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -67,7 +68,10 @@ func (h *HubSpotTool) Execute(ctx context.Context, input map[string]interface{})
 
 func (h *HubSpotTool) searchContacts(ctx context.Context, query string) (string, error) {
 	data, _ := json.Marshal(map[string]string{"query": query, "limit": "10"})
-	req, _ := http.NewRequest("POST", "https://api.crm.hubspot.com/crm/v3/objects/contacts/search", strings.NewReader(string(data)))
+	req, err := http.NewRequest("POST", "https://api.crm.hubspot.com/crm/v3/objects/contacts/search", strings.NewReader(string(data)))
+	if err != nil {
+		return "", err
+	}
 	req.Header.Set("Authorization", "Bearer "+h.token)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := h.client.Do(req.WithContext(ctx))
@@ -82,8 +86,14 @@ func (h *HubSpotTool) searchContacts(ctx context.Context, query string) (string,
 }
 
 func (h *HubSpotTool) getDeal(ctx context.Context, dealID string) (string, error) {
-	url := fmt.Sprintf("https://api.crm.hubspot.com/crm/v3/objects/deals/%s", dealID)
-	req, _ := http.NewRequest("GET", url, nil)
+	if !validHubSpotID(dealID) {
+		return "", fmt.Errorf("invalid deal id")
+	}
+	url := fmt.Sprintf("https://api.crm.hubspot.com/crm/v3/objects/deals/%s", url.PathEscape(dealID))
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
 	req.Header.Set("Authorization", "Bearer "+h.token)
 	resp, err := h.client.Do(req.WithContext(ctx))
 	if err != nil {
@@ -98,7 +108,10 @@ func (h *HubSpotTool) getDeal(ctx context.Context, dealID string) (string, error
 
 func (h *HubSpotTool) createDeal(ctx context.Context, name string, amount float64) (string, error) {
 	data, _ := json.Marshal(map[string]interface{}{"properties": map[string]interface{}{"dealname": name, "amount": amount}})
-	req, _ := http.NewRequest("POST", "https://api.crm.hubspot.com/crm/v3/objects/deals", strings.NewReader(string(data)))
+	req, err := http.NewRequest("POST", "https://api.crm.hubspot.com/crm/v3/objects/deals", strings.NewReader(string(data)))
+	if err != nil {
+		return "", err
+	}
 	req.Header.Set("Authorization", "Bearer "+h.token)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := h.client.Do(req.WithContext(ctx))
@@ -118,7 +131,10 @@ func (h *HubSpotTool) createContact(ctx context.Context, email, firstName, lastN
 		{"property": "firstname", "value": firstName},
 		{"property": "lastname", "value": lastName},
 	}})
-	req, _ := http.NewRequest("POST", "https://api.crm.hubspot.com/crm/v3/objects/contacts", strings.NewReader(string(data)))
+	req, err := http.NewRequest("POST", "https://api.crm.hubspot.com/crm/v3/objects/contacts", strings.NewReader(string(data)))
+	if err != nil {
+		return "", err
+	}
 	req.Header.Set("Authorization", "Bearer "+h.token)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := h.client.Do(req.WithContext(ctx))
@@ -133,7 +149,10 @@ func (h *HubSpotTool) createContact(ctx context.Context, email, firstName, lastN
 }
 
 func (h *HubSpotTool) listCompanies(ctx context.Context) (string, error) {
-	req, _ := http.NewRequest("GET", "https://api.crm.hubspot.com/crm/v3/objects/companies?limit=10", nil)
+	req, err := http.NewRequest("GET", "https://api.crm.hubspot.com/crm/v3/objects/companies?limit=10", nil)
+	if err != nil {
+		return "", err
+	}
 	req.Header.Set("Authorization", "Bearer "+h.token)
 	resp, err := h.client.Do(req.WithContext(ctx))
 	if err != nil {
@@ -148,7 +167,10 @@ func (h *HubSpotTool) listCompanies(ctx context.Context) (string, error) {
 
 func (h *HubSpotTool) createCompany(ctx context.Context, name string) (string, error) {
 	data, _ := json.Marshal(map[string]interface{}{"properties": map[string]interface{}{"name": name}})
-	req, _ := http.NewRequest("POST", "https://api.crm.hubspot.com/crm/v3/objects/companies", strings.NewReader(string(data)))
+	req, err := http.NewRequest("POST", "https://api.crm.hubspot.com/crm/v3/objects/companies", strings.NewReader(string(data)))
+	if err != nil {
+		return "", err
+	}
 	req.Header.Set("Authorization", "Bearer "+h.token)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := h.client.Do(req.WithContext(ctx))
@@ -160,6 +182,18 @@ func (h *HubSpotTool) createCompany(ctx context.Context, name string) (string, e
 	json.NewDecoder(resp.Body).Decode(&result)
 	b, _ := json.MarshalIndent(result, "", "  ")
 	return string(b), nil
+}
+
+func validHubSpotID(s string) bool {
+	if s == "" || len(s) > 64 {
+		return false
+	}
+	for _, r := range s {
+		if !(r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-' || r == '_') {
+			return false
+		}
+	}
+	return true
 }
 
 func (h *HubSpotTool) RequiresReview() bool { return true }

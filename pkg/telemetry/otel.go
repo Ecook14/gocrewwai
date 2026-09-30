@@ -27,9 +27,30 @@ type stderrExporter struct{}
 
 func (e *stderrExporter) ExportSpans(ctx context.Context, ss []sdktrace.ReadOnlySpan) error {
 	for _, s := range ss {
-		fmt.Fprintf(os.Stderr, "[trace] %s %s %s\n", s.SpanContext().TraceID(), s.Name(), s.SpanContext().SpanID())
+		// Record-safe encoding: span names may carry request-controlled
+		// text (CWE-117). Strip CR/LF and non-printables so each span
+		// occupies exactly one physical log record.
+		fmt.Fprintf(os.Stderr, "[trace] %s %s %s\n", s.SpanContext().TraceID(), sanitizeSpanName(s.Name()), s.SpanContext().SpanID())
 	}
 	return nil
+}
+
+// sanitizeSpanName keeps printable runes and replaces record-breaking
+// characters so names cannot forge log lines.
+func sanitizeSpanName(name string) string {
+	const maxLen = 256
+	if len(name) > maxLen {
+		name = name[:maxLen]
+	}
+	return strings.Map(func(r rune) rune {
+		if r == '\n' || r == '\r' {
+			return ' '
+		}
+		if r < 0x20 || r == 0x7f {
+			return -1
+		}
+		return r
+	}, name)
 }
 
 func (e *stderrExporter) Shutdown(ctx context.Context) error { return nil }

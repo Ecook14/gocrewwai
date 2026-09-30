@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -172,10 +173,13 @@ func (t *HTTPTransport) Close() error { return nil }
 type StdioTransport struct {
 	Command string
 	Args    []string
-	cmd     *exec.Cmd
-	stdin   io.WriteCloser
-	stdout  io.ReadCloser
-	encoder *json.Encoder
+	// resolvedCommand is the fully resolved executable established by
+	// validateCommand; Initialize executes this target, never the raw input.
+	resolvedCommand string
+	cmd             *exec.Cmd
+	stdin           io.WriteCloser
+	stdout          io.ReadCloser
+	encoder         *json.Encoder
 
 	mu       sync.Mutex
 	pending  map[int64]chan *rpcResponse
@@ -233,19 +237,21 @@ func (t *StdioTransport) validateCommand() error {
 
 	// Verify the resolved path is under an allowed parent directory.
 	// By default, allow /usr/bin, /usr/local/bin, and /opt.
-	allowedPrefixes := []string{
-		"/usr/bin/",
-		"/usr/local/bin/",
-		"/opt/",
+	// The full chain is resolved (fail closed on error) so a
+	// traversal-containing absolute path cannot pass the check while
+	// process creation executes a binary outside those directories.
+	allowedDirs := []string{
+		"/usr/bin",
+		"/usr/local/bin",
+		"/opt",
 	}
-	resolved, err := os.Readlink(t.Command)
+	resolved, err := filepath.EvalSymlinks(filepath.Clean(t.Command))
 	if err != nil {
-		// If Readlink fails (not a symlink), use the command as-is.
-		resolved = t.Command
+		return fmt.Errorf("mcp stdio transport: cannot resolve command %s: %w", t.Command, err)
 	}
 	allowed := false
-	for _, prefix := range allowedPrefixes {
-		if strings.HasPrefix(resolved, prefix) {
+	for _, dir := range allowedDirs {
+		if resolved == dir || strings.HasPrefix(resolved, dir+string(filepath.Separator)) {
 			allowed = true
 			break
 		}
@@ -253,6 +259,7 @@ func (t *StdioTransport) validateCommand() error {
 	if !allowed {
 		return fmt.Errorf("mcp stdio transport: command %s is not in an allowed directory", t.Command)
 	}
+	t.resolvedCommand = resolved
 
 	return nil
 }
@@ -265,7 +272,7 @@ func (t *StdioTransport) Initialize(ctx context.Context) error {
 		return fmt.Errorf("mcp stdio transport blocked: %w", err)
 	}
 
-	t.cmd = exec.CommandContext(ctx, t.Command, t.Args...)
+	t.cmd = exec.CommandContext(ctx, t.resolvedCommand, t.Args...)
 
 	// Better stderr handling: pipe to a logger instead of raw os.Stderr
 	t.cmd.Stderr = os.Stderr

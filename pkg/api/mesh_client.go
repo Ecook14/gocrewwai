@@ -155,6 +155,25 @@ type MeshServer struct {
 	embedder llm.Embedder
 	tlsCfg   *tls.Config
 	gsrv     *grpc.Server
+	// execLocks serializes concurrent DelegateTask executions per role:
+	// registered agents are shared mutable objects (tools, metrics, LLM
+	// handles), so overlapping executions race. Concurrency returns when
+	// agents become stateless or per-request isolated.
+	execLocks map[string]*sync.Mutex
+}
+
+func (s *MeshServer) execLockFor(role string) *sync.Mutex {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.execLocks == nil {
+		s.execLocks = make(map[string]*sync.Mutex)
+	}
+	l, ok := s.execLocks[role]
+	if !ok {
+		l = &sync.Mutex{}
+		s.execLocks[role] = l
+	}
+	return l
 }
 
 func NewMeshServer() *MeshServer {
@@ -240,7 +259,9 @@ func WithMeshServerCredentials(creds MeshServerCredentialConfig) MeshServerOptio
 
 func (s *MeshServer) DelegateTask(ctx context.Context, req *mesh.TaskRequest) (*mesh.TaskResponse, error) {
 	// 1. Find local agent
+	s.mu.Lock()
 	agent, ok := s.agents[req.AgentRole]
+	s.mu.Unlock()
 	if !ok {
 		return &mesh.TaskResponse{
 			Success:      false,
@@ -248,7 +269,10 @@ func (s *MeshServer) DelegateTask(ctx context.Context, req *mesh.TaskRequest) (*
 		}, nil
 	}
 
-	// 2. Execute locally
+	// 2. Execute locally, serialized per role (shared mutable agent).
+	lock := s.execLockFor(req.AgentRole)
+	lock.Lock()
+	defer lock.Unlock()
 	result, err := agent.Execute(ctx, req.TaskDescription, map[string]interface{}{
 		"session_id": req.SessionId,
 	})

@@ -4,8 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"path/filepath"
 	"strings"
 
+	"github.com/Ecook14/gocrewwai/pkg/utils"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -19,11 +21,24 @@ type SQLiteTool struct {
 var _ Tool = (*SQLiteTool)(nil)
 
 // NewSQLiteTool creates a new SQLite tool with the given database path.
+// The path is validated as a literal filename: URI schemes (file:...),
+// query/fragment syntax, and percent-escapes are rejected because the
+// sqlite driver would interpret them after validation (path confusion).
 func NewSQLiteTool(dbPath string) (*SQLiteTool, error) {
 	if dbPath == "" {
 		dbPath = "gocrew.db"
 	}
-	db, err := sql.Open("sqlite3", dbPath)
+	if strings.ContainsAny(dbPath, "?#%") || strings.Contains(dbPath, "file:") {
+		return nil, fmt.Errorf("invalid sqlite path: URI syntax not allowed")
+	}
+	abs, err := filepath.Abs(dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("invalid sqlite path: %w", err)
+	}
+	if _, err := utils.ValidatePathResolved(abs, filepath.Dir(abs)); err != nil {
+		return nil, fmt.Errorf("invalid sqlite path: %w", err)
+	}
+	db, err := sql.Open("sqlite3", abs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open sqlite: %w", err)
 	}

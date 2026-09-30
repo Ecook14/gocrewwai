@@ -50,14 +50,7 @@ func (t *ScraperTool) Execute(ctx context.Context, input map[string]interface{})
 	}
 	req.Header.Set("User-Agent", "Gocrew Agent/1.0 (WebScraper)")
 
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			MaxIdleConns:        5,
-			MaxIdleConnsPerHost: 2,
-			IdleConnTimeout:     30 * time.Second,
-		},
-	}
+	client := newSSRFProtectedClient(t.validateURL, 30*time.Second)
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch URL: %w", err)

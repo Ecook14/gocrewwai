@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"sync"
 
@@ -41,14 +40,9 @@ func (t *JSONParseTool) Execute(ctx context.Context, input map[string]interface{
 		return "", fmt.Errorf("'file_path' must be a string")
 	}
 
-	safePath, err := utils.ValidatePath(path, t.Chroot)
+	data, err := utils.ReadFileInRoot(t.Chroot, path)
 	if err != nil {
 		return "", err
-	}
-
-	data, err := os.ReadFile(safePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read file: %w", err)
 	}
 
 	// Validate JSON

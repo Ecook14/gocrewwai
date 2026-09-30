@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/Ecook14/gocrewwai/pkg/telemetry"
@@ -13,6 +15,53 @@ import (
 	"github.com/docker/docker/pkg/stdcopy"
 	"go.opentelemetry.io/otel/attribute"
 )
+
+const (
+	// maxSandboxOutputBytes caps combined captured stdout+stderr retained in
+	// host memory. Guest memory limits cannot constrain the host buffer that
+	// collects the guest's output, so a small program emitting a large stream
+	// would otherwise exhaust host memory (CWE-400/770).
+	maxSandboxOutputBytes = 2 << 20 // 2MiB
+	maxSandboxCodeBytes   = 256 * 1024
+)
+
+// combinedOutputBudget caps combined writes across stdout and stderr.
+type combinedOutputBudget struct {
+	mu        sync.Mutex
+	remaining int64
+	overflow  bool
+}
+
+func (b *combinedOutputBudget) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.remaining <= 0 {
+		b.overflow = true
+		return 0, fmt.Errorf("sandbox output budget exceeded")
+	}
+	if int64(len(p)) > b.remaining {
+		b.overflow = true
+		n := int(b.remaining)
+		b.remaining = 0
+		return n, fmt.Errorf("sandbox output budget exceeded")
+	}
+	b.remaining -= int64(len(p))
+	return len(p), nil
+}
+
+// sharedCappedBuffer pairs a bytes.Buffer with a shared budget.
+type sharedCappedBuffer struct {
+	buf    bytes.Buffer
+	budget *combinedOutputBudget
+}
+
+func (c *sharedCappedBuffer) Write(p []byte) (int, error) {
+	// Reserve from the shared budget first so combined output is bounded.
+	if _, err := c.budget.Write(p); err != nil {
+		return 0, err
+	}
+	return c.buf.Write(p)
+}
 
 // DockerProvider executes code within a Docker container.
 type DockerProvider struct {
@@ -44,6 +93,9 @@ func (p *DockerProvider) Execute(ctx context.Context, code string, env map[strin
 	if span != nil {
 		span.SetAttributes(attribute.String("sandbox.image", p.image))
 		defer span.End()
+	}
+	if len(code) > maxSandboxCodeBytes {
+		return "", fmt.Errorf("docker: code exceeds %d byte budget", maxSandboxCodeBytes)
 	}
 	// 1. Pull image if needed (simplified: assuming it exists or let container create fail)
 	// In production, we'd check if image exists or Pull it.
@@ -82,7 +134,18 @@ func (p *DockerProvider) Execute(ctx context.Context, code string, env map[strin
 	if err != nil {
 		return "", fmt.Errorf("docker: failed to create container: %w", err)
 	}
-	defer p.cli.ContainerRemove(timeoutCtx, resp.ID, container.RemoveOptions{Force: true})
+	// Cleanup uses a fresh bounded context independent of execution
+	// cancellation: reusing the expired timeoutCtx would leave timed-out
+	// workloads running indefinitely. Failures are reported, not ignored.
+	cleanup := func() {
+		cctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_ = p.cli.ContainerStop(cctx, resp.ID, container.StopOptions{})
+		if err := p.cli.ContainerRemove(cctx, resp.ID, container.RemoveOptions{Force: true}); err != nil {
+			slog.Warn("docker: container cleanup failed", "id", resp.ID, "error", err)
+		}
+	}
+	defer cleanup()
 
 	// 4. Start container
 	if err := p.cli.ContainerStart(timeoutCtx, resp.ID, container.StartOptions{}); err != nil {
@@ -108,17 +171,23 @@ func (p *DockerProvider) Execute(ctx context.Context, code string, env map[strin
 	}
 	defer out.Close()
 
-	var stdout, stderr bytes.Buffer
-	_, err = stdcopy.StdCopy(&stdout, &stderr, out)
-	if err != nil && err != io.EOF {
-		return "", fmt.Errorf("docker: failed to copy logs: %w", err)
+	var stdout, stderr sharedCappedBuffer
+	budget := &combinedOutputBudget{remaining: maxSandboxOutputBytes}
+	stdout.budget = budget
+	stderr.budget = budget
+	_, copyErr := stdcopy.StdCopy(&stdout, &stderr, out)
+	if budget.overflow {
+		return "", fmt.Errorf("docker: output exceeded %d byte budget (truncated)", maxSandboxOutputBytes)
+	}
+	if copyErr != nil && copyErr != io.EOF {
+		return "", fmt.Errorf("docker: failed to copy logs: %w", copyErr)
 	}
 
-	if stderr.Len() > 0 {
-		return stdout.String(), fmt.Errorf("docker: execution error: %s", stderr.String())
+	if stderr.buf.Len() > 0 {
+		return stdout.buf.String(), fmt.Errorf("docker: execution error: %s", stderr.buf.String())
 	}
 
-	return stdout.String(), nil
+	return stdout.buf.String(), nil
 }
 
 func (p *DockerProvider) Close() error {

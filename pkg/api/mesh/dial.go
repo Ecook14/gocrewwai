@@ -1,6 +1,7 @@
 package mesh
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"log/slog"
@@ -59,8 +60,39 @@ func ResolveTransport(address string) (bool, bool, error) {
 		host = address // bare host without port
 	}
 	host = strings.ToLower(strings.Trim(host, "[]"))
-	if host == "localhost" || host == "127.0.0.1" || host == "::1" || strings.HasPrefix(host, "127.") {
+	// Loopback exception requires a literal loopback IP — never a "127."
+	// text prefix, which a remote DNS name can carry.
+	if host == "localhost" {
+		// Best-effort DNS bind: if localhost resolves and none of the
+		// answers is loopback, treat it as remote (fail closed). Lookup
+		// failure keeps the dev exception so offline use still works.
+		if ips, err := net.DefaultResolver.LookupIP(context.Background(), "ip", host); err == nil {
+			loopback := false
+			for _, ip := range ips {
+				if ip.IsLoopback() {
+					loopback = true
+					break
+				}
+			}
+			if !loopback {
+				if os.Getenv("MESH_INSECURE") == "1" {
+					return false, false, nil
+				}
+				return false, false, fmt.Errorf(
+					"mesh: refusing plaintext dial to remote %q: set MESH_TLS_CA or MESH_INSECURE=1", address)
+			}
+		}
 		return true, true, nil
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		if ip.IsLoopback() {
+			return true, true, nil
+		}
+		if os.Getenv("MESH_INSECURE") == "1" {
+			return false, false, nil
+		}
+		return false, false, fmt.Errorf(
+			"mesh: refusing plaintext dial to remote %q: set MESH_TLS_CA or MESH_INSECURE=1", address)
 	}
 	if os.Getenv("MESH_INSECURE") == "1" {
 		return false, false, nil

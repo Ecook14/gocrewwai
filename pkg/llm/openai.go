@@ -156,14 +156,20 @@ func (c *OpenAIClient) Generate(ctx context.Context, messages []Message, options
 	if c.APIKey == "" {
 		return "", fmt.Errorf("OpenAI API Key is required")
 	}
+	// Shared budget admission: ordinary generation must not bypass spend policy.
+	if err := AdmitBudget(); err != nil {
+		return "", err
+	}
 
 	model := options.Model
 	if model == "" {
 		model = c.Model
 	}
 
+	var promptText strings.Builder
 	var oaiMessages []openai.ChatCompletionMessage
 	for _, m := range messages {
+		promptText.WriteString(m.Content)
 		oaiMessages = append(oaiMessages, openai.ChatCompletionMessage{
 			Role:    m.Role,
 			Content: m.Content,
@@ -175,12 +181,20 @@ func (c *OpenAIClient) Generate(ctx context.Context, messages []Message, options
 		Messages: oaiMessages,
 	}
 
+	// Enforce the caller's output allowance provider-side: ignoring it
+	// would let prompts induce paid generation beyond quota.
+	if options.MaxTokens > 0 {
+		req.MaxTokens = options.MaxTokens
+	}
+
 	resp, err := c.client.CreateChatCompletion(ctx, req)
 	if err != nil {
 		return "", fmt.Errorf("ChatCompletion error: %v", err)
 	}
 
-	return resp.Choices[0].Message.Content, nil
+	text := resp.Choices[0].Message.Content
+	TrackHeuristicUsage("openai", model, promptText.String(), text, 0)
+	return text, nil
 }
 
 // GenerateWithUsage implements Client — returns both text and token usage data.
@@ -205,6 +219,10 @@ func (c *OpenAIClient) GenerateWithUsage(ctx context.Context, messages []Message
 	req := openai.ChatCompletionRequest{
 		Model:    model,
 		Messages: oaiMessages,
+	}
+
+	if options.MaxTokens > 0 {
+		req.MaxTokens = options.MaxTokens
 	}
 
 	start := time.Now()
@@ -274,6 +292,9 @@ func (c *OpenAIClient) StreamGenerate(ctx context.Context, messages []Message, o
 	if c.APIKey == "" {
 		return nil, fmt.Errorf("OpenAI API Key is required")
 	}
+	if err := AdmitBudget(); err != nil {
+		return nil, err
+	}
 
 	model := options.Model
 	if model == "" {
@@ -292,6 +313,10 @@ func (c *OpenAIClient) StreamGenerate(ctx context.Context, messages []Message, o
 		Model:    model,
 		Messages: oaiMessages,
 		Stream:   true,
+	}
+
+	if options.MaxTokens > 0 {
+		req.MaxTokens = options.MaxTokens
 	}
 
 	stream, err := c.client.CreateChatCompletionStream(ctx, req)

@@ -37,7 +37,10 @@ func (t *PDFReadTool) Execute(ctx context.Context, input map[string]interface{})
 		return "", fmt.Errorf("'file_path' must be a string")
 	}
 
-	safePath, err := utils.ValidatePath(path, t.Chroot)
+	// Fail-closed symlink resolution: the pdf library opens by path, so
+	// existing-link escapes are rejected before open (no TOCTOU-safe open
+	// exists for path-based library APIs).
+	safePath, err := utils.ValidatePathResolved(path, t.Chroot)
 	if err != nil {
 		return "", err
 	}

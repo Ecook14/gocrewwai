@@ -70,6 +70,7 @@ import (
 	"time"
 
 	"github.com/Ecook14/gocrewwai/gocrew"
+	"github.com/Ecook14/gocrewwai/pkg/agents"
 	"github.com/Ecook14/gocrewwai/pkg/memory"
 )
 
@@ -266,31 +267,41 @@ func (a *ADKAgent) Run(ctx context.Context, userInput string) (*Event, error) {
 }
 
 // RunWithTools executes the agent with access to the given tools.
-// Tools are snapshotted before equip and restored afterwards so concurrent
-// use of the shared agent is not polluted. Input size is bounded.
+// Temporary grants are invocation-scoped: they are equipped before the run
+// and restored afterwards (success, failure, or cancellation) under the
+// adapter lock, so a later invocation can never execute capabilities granted
+// only to an earlier caller.
 func (a *ADKAgent) RunWithTools(ctx context.Context, userInput string, tools []gocrew.Tool) (*Event, error) {
 	if len(userInput) > 20000 {
 		return nil, fmt.Errorf("adk adapter: input exceeds 20000 character limit")
 	}
 	a.mu.Lock()
-	a.mu.Unlock()
-	// Snapshot current tool count via cache; equip is additive on the
-	// underlying agent, so record and re-equip only the delta.
-	before := a.agent.GetToolCount()
-	a.agent.Equip(tools...)
+	defer a.mu.Unlock()
+
+	if len(tools) > 0 {
+		concrete, ok := a.agent.(*agents.Agent)
+		if !ok {
+			return nil, fmt.Errorf("adk adapter: temporary tools require an *agents.Agent core")
+		}
+		before := len(concrete.Tools)
+		concrete.Equip(tools...)
+		defer func() {
+			// Restore the pre-invocation tool set; never leak grants.
+			if len(concrete.Tools) >= before {
+				concrete.Tools = concrete.Tools[:before]
+			}
+		}()
+	}
 
 	event, err := a.Run(ctx, userInput)
 
-	// Best-effort restore note: underlying CoreAgent has no Unequip, so
-	// record the delta for observability instead of mutating shared state.
-	if after := a.agent.GetToolCount(); after != before+len(tools) && a.toolCache != nil {
-		a.mu.Lock()
+	// Refresh the observable tool cache from the supplied grants only.
+	if a.toolCache != nil {
 		for _, t := range tools {
 			if t != nil {
 				a.toolCache[t.Name()] = &toolAdapter{inner: t}
 			}
 		}
-		a.mu.Unlock()
 	}
 
 	return event, err

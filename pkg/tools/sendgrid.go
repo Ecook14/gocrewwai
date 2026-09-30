@@ -70,7 +70,10 @@ func (s *SendGridTool) Execute(ctx context.Context, input map[string]interface{}
 
 	data, _ := json.Marshal(reqBody)
 	url := "https://api.sendgrid.com/v3/mail/send"
-	req, _ := http.NewRequest("POST", url, strings.NewReader(string(data)))
+	req, err := http.NewRequest("POST", url, strings.NewReader(string(data)))
+	if err != nil {
+		return "", err
+	}
 	req.Header.Set("Authorization", "Bearer "+s.apiKey)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := s.client.Do(req.WithContext(ctx))

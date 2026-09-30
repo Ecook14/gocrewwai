@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -507,7 +508,8 @@ func (s *Server) handleKickoff(c *gin.Context) {
 	task.ExpectedOutput = payload.TaskExpectedOutput
 
 	// Build the crew. NewCrew accepts agents first, then tasks.
-	crw := crew.NewCrew([]core.Agent{agent}, []*tasks.Task{task})
+	// Headless: no approver exists, so MCP auto-injection stays disabled.
+	crw := crew.NewCrew([]core.Agent{agent}, []*tasks.Task{task}, crew.WithHeadless(true))
 
 	s.dispatchCrew(c, crw, payload, owner, idemKey)
 }
@@ -614,7 +616,7 @@ func buildMultiCrew(payload kickoffRequest) (*crew.Crew, *apiError) {
 		crewTasks = append(crewTasks, task)
 	}
 
-	opts := []crew.CrewOption{}
+	opts := []crew.CrewOption{crew.WithHeadless(true)}
 	if payload.CrewProcess != "" {
 		// CrewProcess was already validated against the supported names.
 		opts = append(opts, crew.WithProcess(crew.ProcessType(payload.CrewProcess)))
@@ -632,6 +634,12 @@ func (s *Server) dispatchCrew(c *gin.Context, crw *crew.Crew, payload kickoffReq
 		// Release the idempotency reservation so a retry (with the same
 		// key, different session_id) isn't blocked by a zombie entry.
 		s.releaseIdem(idemKey)
+		if errors.Is(err, ErrSessionConflict) {
+			c.JSON(http.StatusConflict, gin.H{
+				"error": "session id already in use",
+			})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": fmt.Sprintf("failed to persist session: %v", err),
 		})
@@ -687,6 +695,23 @@ func (s *Server) persistSessionStart(sessionID, owner string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	// Session IDs become checkpoint CrewIDs (filesystem names): reject
+	// separators/traversal up front, not only at checkpoint write time.
+	if !crew.ValidCheckpointID(sessionID) {
+		return fmt.Errorf("invalid session id")
+	}
+	// Ownership + lifecycle gate (atomic with insertion): a caller-selected
+	// session ID must not replace another tenant's session, nor destroy a
+	// running session's state by reusing its ID.
+	if existing, ok := s.sessions[sessionID]; ok {
+		if existing.Owner != "" && owner != "" && existing.Owner != owner {
+			return ErrSessionConflict
+		}
+		if existing.Status == "running" {
+			return ErrSessionConflict
+		}
+	}
+
 	s.sessions[sessionID] = SessionState{
 		SessionID: sessionID,
 		Status:    "running",
@@ -732,11 +757,15 @@ func (s *Server) persistSessionFailure(sessionID, reason string) error {
 	}
 
 	if s.checkpointStore != nil {
+		owner := ""
+		if st, ok := s.sessions[sessionID]; ok {
+			owner = st.Owner
+		}
 		cp := &crew.Checkpoint{
 			CrewID:  sessionID,
 			Status:  "failed",
 			Error:   reason,
-			State:   map[string]interface{}{"session_id": sessionID},
+			State:   map[string]interface{}{"session_id": sessionID, "owner": owner},
 			Version: 1,
 		}
 		if err := s.checkpointStore.Save(context.Background(), cp); err != nil {
@@ -764,10 +793,14 @@ func (s *Server) persistSessionComplete(sessionID string) error {
 	}
 
 	if s.checkpointStore != nil {
+		owner := ""
+		if st, ok := s.sessions[sessionID]; ok {
+			owner = st.Owner
+		}
 		cp := &crew.Checkpoint{
 			CrewID:  sessionID,
 			Status:  "completed",
-			State:   map[string]interface{}{"session_id": sessionID},
+			State:   map[string]interface{}{"session_id": sessionID, "owner": owner},
 			Version: 1,
 		}
 		if err := s.checkpointStore.Save(context.Background(), cp); err != nil {
@@ -853,7 +886,16 @@ func (s *Server) loadSessionState(sessionID, owner string) (map[string]interface
 			return nil, fmt.Errorf("failed to load session checkpoint: %w", err)
 		}
 		if cp != nil {
-			if storedOwner, _ := cp.State["owner"].(string); owner != "" && storedOwner != "" && storedOwner != owner {
+			storedOwner, _ := cp.State["owner"].(string)
+			// Fail closed: an authenticated fallback read requires a
+			// non-empty matching owner. Legacy ownerless terminal records
+			// are not served to any tenant (see persistSession* above,
+			// which now always writes the owner).
+			if owner != "" {
+				if storedOwner == "" || storedOwner != owner {
+					return nil, ErrSessionNotFound
+				}
+			} else if storedOwner != "" {
 				return nil, ErrSessionNotFound
 			}
 			result := map[string]interface{}{
@@ -872,6 +914,10 @@ func (s *Server) loadSessionState(sessionID, owner string) (map[string]interface
 
 // ErrSessionNotFound is returned when a session ID has no recorded state.
 var ErrSessionNotFound = fmt.Errorf("session not found")
+
+// ErrSessionConflict is returned when a caller-selected session ID cannot be
+// reused (owned by another tenant or still running).
+var ErrSessionConflict = fmt.Errorf("session id conflict")
 
 // handleSSEStream streams events from the GlobalBus to the client.
 // The :id must be a live session owned by the caller (DCR-04): anonymous

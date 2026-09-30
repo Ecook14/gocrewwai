@@ -52,14 +52,7 @@ func (t *ScrapeWebsiteTool) Execute(ctx context.Context, input map[string]interf
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
 
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			MaxIdleConns:        5,
-			MaxIdleConnsPerHost: 2,
-			IdleConnTimeout:     30 * time.Second,
-		},
-	}
+	client := newSSRFProtectedClient(t.validateURL, 30*time.Second)
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("HTTP request failed: %w", err)

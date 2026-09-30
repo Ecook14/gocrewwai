@@ -80,6 +80,11 @@ func serverTLSCreds(certFile, keyFile, clientCAFile string) (*tls.Config, string
 		})
 		return cfg, "file", err
 	}
+	// Fail closed: a configured client-CA policy must never be silently
+	// dropped by falling back to an ephemeral server-only credential.
+	if clientCAFile != "" {
+		return nil, "", fmt.Errorf("mesh: client CA configured but server certificate/key pair is incomplete — refusing ephemeral fallback")
+	}
 	if os.Getenv("MESH_INSECURE") == "1" {
 		return nil, "insecure", nil
 	}

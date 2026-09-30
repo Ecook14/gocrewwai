@@ -302,8 +302,32 @@ func Remember(m *UnifiedMemory, ctx context.Context, text string) {
 }
 
 // Recall retrieves relevant memories by query.
+// Caller-supplied scope/source restrictions are forwarded; multiple option
+// sets are merged with later sets winning per-field. Restrictions are never
+// silently dropped.
 func Recall(m *UnifiedMemory, ctx context.Context, query string, opts ...RecallOptions) []ScoredMemory {
-	scored, _ := m.Recall(ctx, query, nil)
+	var merged *RecallOptions
+	if len(opts) > 0 {
+		merged = &RecallOptions{}
+		for _, o := range opts {
+			if o.Limit > 0 {
+				merged.Limit = o.Limit
+			}
+			if o.Depth != "" {
+				merged.Depth = o.Depth
+			}
+			if o.Scope != "" {
+				merged.Scope = o.Scope
+			}
+			if o.Source != "" {
+				merged.Source = o.Source
+			}
+			if o.IncludePrivate {
+				merged.IncludePrivate = true
+			}
+		}
+	}
+	scored, _ := m.Recall(ctx, query, merged)
 	return scored
 }
 

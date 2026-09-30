@@ -7,8 +7,49 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 )
+
+const (
+	maxJSONInputBytes  = 1 << 20 // 1MiB input cap before parse
+	maxJSONDepth       = 100     // nesting limit before format
+	maxJSONOutputBytes = 1 << 20 // 1MiB generated-output budget
+	maxRegexTextBytes  = 512 * 1024
+	maxRegexReplBytes  = 256 * 1024
+)
+
+func checkJSONDepth(v interface{}, depth int) error {
+	if depth > maxJSONDepth {
+		return fmt.Errorf("JSON nesting exceeds limit of %d", maxJSONDepth)
+	}
+	switch t := v.(type) {
+	case map[string]interface{}:
+		for _, c := range t {
+			if err := checkJSONDepth(c, depth+1); err != nil {
+				return err
+			}
+		}
+	case []interface{}:
+		for _, c := range t {
+			if err := checkJSONDepth(c, depth+1); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func marshalBounded(v interface{}) (string, error) {
+	out, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	if len(out) > maxJSONOutputBytes {
+		return "", fmt.Errorf("generated JSON output exceeds %d byte budget", maxJSONOutputBytes)
+	}
+	return string(out), nil
+}
 
 // ---------------------------------------------------------------------------
 // JSONTool — JSON Processing for Agents
@@ -67,12 +108,17 @@ func (t *JSONTool) parse(input map[string]interface{}) (string, error) {
 	if data == "" {
 		return "", fmt.Errorf("'data' is required")
 	}
+	if len(data) > maxJSONInputBytes {
+		return "", fmt.Errorf("JSON input exceeds %d byte budget", maxJSONInputBytes)
+	}
 	var parsed interface{}
 	if err := json.Unmarshal([]byte(data), &parsed); err != nil {
 		return "", fmt.Errorf("invalid JSON: %w", err)
 	}
-	out, _ := json.MarshalIndent(parsed, "", "  ")
-	return string(out), nil
+	if err := checkJSONDepth(parsed, 0); err != nil {
+		return "", err
+	}
+	return marshalBounded(parsed)
 }
 
 func (t *JSONTool) RequiresReview() bool { return false }
@@ -85,10 +131,16 @@ func (t *JSONTool) query(input map[string]interface{}) (string, error) {
 	if data == "" || path == "" {
 		return "", fmt.Errorf("'data' and 'path' are required")
 	}
+	if len(data) > maxJSONInputBytes {
+		return "", fmt.Errorf("JSON input exceeds %d byte budget", maxJSONInputBytes)
+	}
 
 	var parsed interface{}
 	if err := json.Unmarshal([]byte(data), &parsed); err != nil {
 		return "", fmt.Errorf("invalid JSON: %w", err)
+	}
+	if err := checkJSONDepth(parsed, 0); err != nil {
+		return "", err
 	}
 
 	// Navigate the path
@@ -99,19 +151,20 @@ func (t *JSONTool) query(input map[string]interface{}) (string, error) {
 		case map[string]interface{}:
 			current = v[part]
 		case []interface{}:
-			var idx int
-			if _, err := fmt.Sscanf(part, "%d", &idx); err == nil && idx < len(v) {
-				current = v[idx]
-			} else {
+			idx, err := strconv.Atoi(part)
+			if err != nil || idx < 0 || idx >= len(v) {
 				return "", fmt.Errorf("invalid array index: %s", part)
 			}
+			current = v[idx]
 		default:
 			return "", fmt.Errorf("cannot navigate into %T at '%s'", current, part)
 		}
 	}
 
-	out, _ := json.MarshalIndent(current, "", "  ")
-	return string(out), nil
+	if err := checkJSONDepth(current, 0); err != nil {
+		return "", err
+	}
+	return marshalBounded(current)
 }
 
 func (t *JSONTool) format(input map[string]interface{}) (string, error) {
@@ -119,12 +172,17 @@ func (t *JSONTool) format(input map[string]interface{}) (string, error) {
 	if data == "" {
 		return "", fmt.Errorf("'data' is required")
 	}
+	if len(data) > maxJSONInputBytes {
+		return "", fmt.Errorf("JSON input exceeds %d byte budget", maxJSONInputBytes)
+	}
 	var parsed interface{}
 	if err := json.Unmarshal([]byte(data), &parsed); err != nil {
 		return "", fmt.Errorf("invalid JSON: %w", err)
 	}
-	out, _ := json.MarshalIndent(parsed, "", "  ")
-	return string(out), nil
+	if err := checkJSONDepth(parsed, 0); err != nil {
+		return "", err
+	}
+	return marshalBounded(parsed)
 }
 
 func (t *JSONTool) validate(input map[string]interface{}) (string, error) {
@@ -152,8 +210,10 @@ func (t *JSONTool) merge(input map[string]interface{}) (string, error) {
 	for k, v := range overlay {
 		merged[k] = v
 	}
-	out, _ := json.MarshalIndent(merged, "", "  ")
-	return string(out), nil
+	if err := checkJSONDepth(merged, 0); err != nil {
+		return "", err
+	}
+	return marshalBounded(merged)
 }
 
 func (t *JSONTool) keys(input map[string]interface{}) (string, error) {
@@ -234,7 +294,21 @@ func (t *RegexTool) Execute(ctx context.Context, input map[string]interface{}) (
 
 	case "replace":
 		replacement, _ := input["replacement"].(string)
+		if len(text) > maxRegexTextBytes {
+			return "", fmt.Errorf("regex text exceeds %d byte budget", maxRegexTextBytes)
+		}
+		if len(replacement) > maxRegexReplBytes {
+			return "", fmt.Errorf("regex replacement exceeds %d byte budget", maxRegexReplBytes)
+		}
+		// Bound multiplicative expansion before allocating the full result.
+		n := len(re.FindAllStringIndex(text, -1))
+		if n > 0 && len(text)+n*len(replacement) > maxJSONOutputBytes {
+			return "", fmt.Errorf("regex replacement would exceed %d byte budget (%d matches)", maxJSONOutputBytes, n)
+		}
 		result := re.ReplaceAllString(text, replacement)
+		if len(result) > maxJSONOutputBytes {
+			return "", fmt.Errorf("regex replacement output exceeds %d byte budget", maxJSONOutputBytes)
+		}
 		return result, nil
 
 	case "split":

@@ -3,8 +3,6 @@ package tools
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/Ecook14/gocrewwai/pkg/utils"
 )
@@ -43,23 +41,11 @@ func (t *FileWriteTool) Execute(ctx context.Context, input map[string]interface{
 		return "", fmt.Errorf("'content' must be a string")
 	}
 
-	// Security: Validate path against chroot, then sanitize the cleaned result
-	// so that a Clean'd path that escapes the chroot (e.g. CWD outside root +
-	// "foo/../../../etc/passwd") is still rejected.
-	safePath, err := utils.ValidatePath(path, t.Chroot)
-	if err != nil {
+	// Security: root-confined write — the create/truncate itself is bound
+	// to the chroot, so leaf and ancestor symlinks cannot redirect it
+	// outside (no validate-then-open race).
+	if err := utils.WriteFileInRoot(t.Chroot, path, []byte(content), 0644); err != nil {
 		return "", err
-	}
-	// Re-validate after Clean to catch any escape that Clean introduced.
-	sanitized, err := utils.FileWriteSanitize(filepath.Clean(safePath), t.Chroot)
-	if err != nil {
-		return "", err
-	}
-	safePath = sanitized
-
-	err = os.WriteFile(safePath, []byte(content), 0644)
-	if err != nil {
-		return "", fmt.Errorf("failed to write to file '%s': %w", path, err)
 	}
 
 	return fmt.Sprintf("Successfully wrote to %s", path), nil

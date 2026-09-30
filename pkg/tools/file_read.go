@@ -3,7 +3,6 @@ package tools
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/Ecook14/gocrewwai/pkg/utils"
 )
@@ -35,15 +34,11 @@ func (t *FileReadTool) Execute(ctx context.Context, input map[string]interface{}
 		return "", fmt.Errorf("'file_path' must be a string")
 	}
 
-	// Security: Validate path against chroot
-	safePath, err := utils.ValidatePath(path, t.Chroot)
+	// Security: root-confined open — the open itself is bound to the
+	// chroot, so symlinks cannot redirect it outside (no TOCTOU).
+	data, err := utils.ReadFileInRoot(t.Chroot, path)
 	if err != nil {
 		return "", err
-	}
-
-	data, err := os.ReadFile(safePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read file '%s': %w", path, err)
 	}
 
 	return string(data), nil

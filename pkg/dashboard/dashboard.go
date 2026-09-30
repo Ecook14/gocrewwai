@@ -57,14 +57,20 @@ var upgrader = websocket.Upgrader{
 
 // WSServer manages WebSocket connections and broadcasts telemetry events.
 type WSServer struct {
-	clients   map[*websocket.Conn]bool
+	// metrics receives public telemetry (metrics, status, logs).
+	// review receives everything including private review payloads
+	// (tool arguments, draft output). Split so public subscribers never
+	// see review content even when the socket is shared infrastructure.
+	metrics   map[*websocket.Conn]bool
+	review    map[*websocket.Conn]bool
 	broadcast chan telemetry.Event
 	mu        sync.Mutex
 }
 
 func NewWSServer() *WSServer {
 	return &WSServer{
-		clients:   make(map[*websocket.Conn]bool),
+		metrics:   make(map[*websocket.Conn]bool),
+		review:    make(map[*websocket.Conn]bool),
 		broadcast: make(chan telemetry.Event),
 	}
 }
@@ -132,39 +138,46 @@ func (s *WSServer) Start(port string) {
 
 // dashboardAuth gates all mutating /api/* routes behind a bearer token
 // (DASHBOARD_AUTH_TOKEN, falling back to API_AUTH_TOKEN). The read-only /ws
-// telemetry stream and the static /web-ui/ assets stay public. With no token
-// configured the dashboard is open (dev default) and logs a loud warning.
+// telemetry stream and the static /web-ui/ assets stay public.
+//
+// Every supported credential mechanism enables authentication: static admin
+// token, DASHBOARD_READ_TOKEN (GET-only), or JWT (JWT_SECRET). Only when none
+// is configured is the dashboard open (dev default, loud warning).
 //
 // RBAC-lite: DASHBOARD_READ_TOKEN (optional) grants GET-only access; mutating
 // methods (POST/PUT/PATCH/DELETE) require the admin token and return 403
 // for read-only bearers.
+//
+// CSRF: mutating /api/* requests carrying a browser Origin/Referer must be
+// same-origin; JSON endpoints additionally require application/json so a
+// cross-origin form/text-plain POST cannot drive state changes.
 func dashboardAuth(next http.Handler) http.Handler {
 	token := os.Getenv("DASHBOARD_AUTH_TOKEN")
 	if token == "" {
 		token = os.Getenv("API_AUTH_TOKEN")
 	}
 	readToken := os.Getenv("DASHBOARD_READ_TOKEN")
-	if token == "" {
+	jwtValidator := auth.ValidatorFromEnv()
+	if !dashboardAuthConfigured() {
 		slog.Warn("dashboard: no auth token configured — /api/* routes are unauthenticated (dev only)")
-		return next
+		return csrfGuard(next)
 	}
 	expected := "Bearer " + token
 	readExpected := "Bearer " + readToken
-	jwtValidator := auth.ValidatorFromEnv()
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasPrefix(r.URL.Path, "/api/") {
 			next.ServeHTTP(w, r)
 			return
 		}
 		actual := r.Header.Get("Authorization")
-		if actual != "" && subtle.ConstantTimeCompare([]byte(actual), []byte(expected)) == 1 {
-			next.ServeHTTP(w, r)
+		if token != "" && actual != "" && subtle.ConstantTimeCompare([]byte(actual), []byte(expected)) == 1 {
+			csrfGuard(next).ServeHTTP(w, r)
 			return
 		}
 		// JWT alternative when JWT_SECRET is set (full admin, like the token).
 		if strings.HasPrefix(actual, "Bearer ") && jwtValidator != nil {
 			if _, err := jwtValidator.Validate(strings.TrimPrefix(actual, "Bearer ")); err == nil {
-				next.ServeHTTP(w, r)
+				csrfGuard(next).ServeHTTP(w, r)
 				return
 			}
 		}
@@ -180,7 +193,105 @@ func dashboardAuth(next http.Handler) http.Handler {
 	})
 }
 
+// dashboardAuthConfigured reports whether any dashboard credential mechanism
+// is set (admin token, read token, or JWT).
+func dashboardAuthConfigured() bool {
+	if os.Getenv("DASHBOARD_AUTH_TOKEN") != "" || os.Getenv("API_AUTH_TOKEN") != "" {
+		return true
+	}
+	if os.Getenv("DASHBOARD_READ_TOKEN") != "" {
+		return true
+	}
+	return auth.ValidatorFromEnv() != nil
+}
+
+// wsAuthorized mirrors dashboardAuth for WebSocket upgrades, accepting the
+// credential via Authorization header or ?token= query parameter.
+func wsAuthorized(r *http.Request) bool {
+	token := os.Getenv("DASHBOARD_AUTH_TOKEN")
+	if token == "" {
+		token = os.Getenv("API_AUTH_TOKEN")
+	}
+	readToken := os.Getenv("DASHBOARD_READ_TOKEN")
+	actual := r.Header.Get("Authorization")
+	if actual == "" {
+		if q := r.URL.Query().Get("token"); q != "" {
+			actual = "Bearer " + q
+		}
+	}
+	if token != "" && actual != "" && subtle.ConstantTimeCompare([]byte(actual), []byte("Bearer "+token)) == 1 {
+		return true
+	}
+	if strings.HasPrefix(actual, "Bearer ") && auth.ValidatorFromEnv() != nil {
+		if _, err := auth.ValidatorFromEnv().Validate(strings.TrimPrefix(actual, "Bearer ")); err == nil {
+			return true
+		}
+	}
+	if readToken != "" && actual != "" && subtle.ConstantTimeCompare([]byte(actual), []byte("Bearer "+readToken)) == 1 {
+		return true
+	}
+	return false
+}
+
+// csrfGuard rejects cross-origin browser mutations and non-JSON bodies on
+// JSON endpoints. Non-browser clients (no Origin/Referer) are unaffected.
+func csrfGuard(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.URL.Path, "/api/") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		switch r.Method {
+		case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
+			if !sameOrigin(r) {
+				http.Error(w, `{"error":"forbidden: cross-origin request"}`, http.StatusForbidden)
+				return
+			}
+			if r.ContentLength != 0 {
+				ct := r.Header.Get("Content-Type")
+				if i := strings.Index(ct, ";"); i >= 0 {
+					ct = ct[:i]
+				}
+				if strings.TrimSpace(ct) != "application/json" {
+					http.Error(w, `{"error":"unsupported media type: application/json required"}`, http.StatusUnsupportedMediaType)
+					return
+				}
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// sameOrigin reports whether a browser request's Origin (or Referer fallback)
+// matches the request Host. Absence of both means non-browser: allowed.
+func sameOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		if ref := r.Header.Get("Referer"); ref != "" {
+			if u, err := url.Parse(ref); err == nil {
+				return strings.EqualFold(u.Host, r.Host)
+			}
+			return false
+		}
+		return true
+	}
+	u, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	return strings.EqualFold(u.Host, r.Host)
+}
+
 func (s *WSServer) handleConnections(w http.ResponseWriter, r *http.Request) {
+	// Feed split: authorized subscribers join the review feed (everything);
+	// everyone else joins the metrics-only feed (no tool args/drafts).
+	// When auth is configured, unauthenticated subscribers are rejected
+	// outright; otherwise they get metrics without review payloads.
+	authed := wsAuthorized(r)
+	if dashboardAuthConfigured() && !authed {
+		http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+		return
+	}
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		slog.Error("WebSocket upgrade failed", slog.Any("error", err))
@@ -189,7 +300,13 @@ func (s *WSServer) handleConnections(w http.ResponseWriter, r *http.Request) {
 	defer ws.Close()
 
 	s.mu.Lock()
-	s.clients[ws] = true
+	// In open (dev) dashboards every client gets the review feed, preserving
+	// existing review-modal behavior. Auth-configured dashboards restrict it.
+	if authed || !dashboardAuthConfigured() {
+		s.review[ws] = true
+	} else {
+		s.metrics[ws] = true
+	}
 	s.mu.Unlock()
 
 	slog.Info("New Dashboard client connected")
@@ -199,7 +316,8 @@ func (s *WSServer) handleConnections(w http.ResponseWriter, r *http.Request) {
 		_, _, err := ws.ReadMessage()
 		if err != nil {
 			s.mu.Lock()
-			delete(s.clients, ws)
+			delete(s.review, ws)
+			delete(s.metrics, ws)
 			s.mu.Unlock()
 			slog.Info("Dashboard client disconnected")
 			break
@@ -337,8 +455,11 @@ func (s *WSServer) handleCreateAgent(w http.ResponseWriter, r *http.Request) {
 			dbPath := "memory.db"
 			if connStr != "" {
 				// Constrain SQLite files to the dashboard data dir:
-				// basename only, no traversal, no absolute paths.
-				if len(connStr) == 0 || len(connStr) > 128 || filepath.IsAbs(connStr) || strings.Contains(connStr, "..") || strings.ContainsAny(connStr, `/\`) || filepath.Clean(connStr) != connStr {
+				// literal basename only — no traversal, no absolute paths,
+				// and no URI/connection-string syntax (the sqlite driver
+				// interprets file: URIs and percent-decodes filenames after
+				// this check, which previously allowed escaping the dir).
+				if len(connStr) == 0 || len(connStr) > 128 || filepath.IsAbs(connStr) || strings.Contains(connStr, "..") || strings.ContainsAny(connStr, `/\?#%:`) || filepath.Clean(connStr) != connStr || filepath.Base(connStr) != connStr {
 					http.Error(w, `{"error":"invalid sqlite path: basename only"}`, http.StatusBadRequest)
 					return
 				}
@@ -625,12 +746,22 @@ func (s *WSServer) handleMessages() {
 
 	for event := range eventCh {
 		s.mu.Lock()
-		for client := range s.clients {
-			err := client.WriteJSON(event)
-			if err != nil {
+		for client := range s.review {
+			if err := client.WriteJSON(event); err != nil {
 				slog.Error("WebSocket write error", slog.Any("error", err))
 				client.Close()
-				delete(s.clients, client)
+				delete(s.review, client)
+				delete(s.metrics, client)
+			}
+		}
+		// Metrics-only feed: review payloads (tool args, drafts) never go here.
+		if event.Type != "review_requested" {
+			for client := range s.metrics {
+				if err := client.WriteJSON(event); err != nil {
+					slog.Error("WebSocket write error", slog.Any("error", err))
+					client.Close()
+					delete(s.metrics, client)
+				}
 			}
 		}
 		s.mu.Unlock()
@@ -667,7 +798,11 @@ func (s *WSServer) publishMetrics() {
 		}
 
 		s.mu.Lock()
-		for client := range s.clients {
+		for client := range s.review {
+			client.WriteJSON(event)
+			client.WriteJSON(sandboxEvent)
+		}
+		for client := range s.metrics {
 			client.WriteJSON(event)
 			client.WriteJSON(sandboxEvent)
 		}

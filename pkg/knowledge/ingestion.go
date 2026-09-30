@@ -209,14 +209,25 @@ func (ie *IngestionEngine) IngestDocx(ctx context.Context, filePath string) erro
 	var docXML []byte
 	for _, f := range r.File {
 		if f.Name == "word/document.xml" {
+			// Zip-bomb guard: reject members whose declared expanded size
+			// exceeds budget, then enforce while reading (+1 overflow byte).
+			const maxDocXMLBytes = 32 << 20 // 32MiB expanded XML
+			if f.UncompressedSize64 > maxDocXMLBytes {
+				return fmt.Errorf("docx member exceeds %d byte budget", maxDocXMLBytes)
+			}
 			rc, err := f.Open()
 			if err != nil {
 				return err
 			}
-			buf := new(bytes.Buffer)
-			_, _ = io.Copy(buf, rc)
+			data, err := io.ReadAll(io.LimitReader(rc, maxDocXMLBytes+1))
 			rc.Close()
-			docXML = buf.Bytes()
+			if err != nil {
+				return fmt.Errorf("failed to expand docx member: %w", err)
+			}
+			if int64(len(data)) > maxDocXMLBytes {
+				return fmt.Errorf("docx member exceeds %d byte budget", maxDocXMLBytes)
+			}
+			docXML = data
 			break
 		}
 	}
@@ -255,7 +266,12 @@ func (ie *IngestionEngine) IngestURL(ctx context.Context, url string) error {
 	if _, err := utils.ValidateURL(url); err != nil {
 		return fmt.Errorf("blocked ingestion URL: %w", err)
 	}
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return fmt.Errorf("redirects blocked during ingestion: %s", req.URL.String())
+		},
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)

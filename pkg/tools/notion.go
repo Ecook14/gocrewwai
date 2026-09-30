@@ -64,7 +64,10 @@ func (n *NotionTool) Execute(ctx context.Context, input map[string]interface{}) 
 
 func (n *NotionTool) searchPages(ctx context.Context, query string) (string, error) {
 	reqBody, _ := json.Marshal(map[string]string{"query": query})
-	req, _ := http.NewRequest("POST", "https://api.notion.com/v1/search", strings.NewReader(string(reqBody)))
+	req, err := http.NewRequest("POST", "https://api.notion.com/v1/search", strings.NewReader(string(reqBody)))
+	if err != nil {
+		return "", err
+	}
 	req.Header.Set("Authorization", "Bearer "+n.token)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Notion-Version", notionAPIVersion)
@@ -81,7 +84,10 @@ func (n *NotionTool) searchPages(ctx context.Context, query string) (string, err
 
 func (n *NotionTool) readPage(ctx context.Context, pageID string) (string, error) {
 	url := fmt.Sprintf("https://api.notion.com/v1/blocks/%s", pageID)
-	req, _ := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
 	req.Header.Set("Authorization", "Bearer "+n.token)
 	req.Header.Set("Notion-Version", notionAPIVersion)
 	resp, err := n.client.Do(req.WithContext(ctx))
@@ -119,7 +125,10 @@ func (n *NotionTool) createPage(ctx context.Context, title, content string) (str
 		"parent":   map[string]interface{}{"type": "page_id", "page_id": title},
 		"children": blocks,
 	})
-	req, _ := http.NewRequest("POST", "https://api.notion.com/v1/pages", strings.NewReader(string(reqBody)))
+	req, err := http.NewRequest("POST", "https://api.notion.com/v1/pages", strings.NewReader(string(reqBody)))
+	if err != nil {
+		return "", err
+	}
 	req.Header.Set("Authorization", "Bearer "+n.token)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Notion-Version", notionAPIVersion)
@@ -135,7 +144,10 @@ func (n *NotionTool) createPage(ctx context.Context, title, content string) (str
 }
 
 func (n *NotionTool) listDatabases(ctx context.Context) (string, error) {
-	req, _ := http.NewRequest("GET", "https://api.notion.com/v1/databases", nil)
+	req, err := http.NewRequest("GET", "https://api.notion.com/v1/databases", nil)
+	if err != nil {
+		return "", err
+	}
 	req.Header.Set("Authorization", "Bearer "+n.token)
 	req.Header.Set("Notion-Version", notionAPIVersion)
 	resp, err := n.client.Do(req.WithContext(ctx))
@@ -151,7 +163,10 @@ func (n *NotionTool) listDatabases(ctx context.Context) (string, error) {
 
 func (n *NotionTool) queryDatabase(ctx context.Context, dbID string) (string, error) {
 	url := fmt.Sprintf("https://api.notion.com/v1/databases/%s/query", dbID)
-	req, _ := http.NewRequest("POST", url, nil)
+	req, err := http.NewRequest("POST", url, nil)
+	if err != nil {
+		return "", err
+	}
 	req.Header.Set("Authorization", "Bearer "+n.token)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Notion-Version", notionAPIVersion)

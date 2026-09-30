@@ -106,6 +106,7 @@ func ValidatePathResolved(path, chroot string) (string, error) {
 	absChroot = filepath.Clean(absChroot)
 	// Resolve the longest existing prefix so non-existent leaf files still validate.
 	target := absPath
+	walkedUp := false
 	for {
 		if _, statErr := os.Lstat(target); statErr == nil {
 			break
@@ -115,14 +116,33 @@ func ValidatePathResolved(path, chroot string) (string, error) {
 			break
 		}
 		target = parent
+		walkedUp = true
 		if len(target) < len(absChroot) {
 			break
 		}
 	}
 	resolved, err := filepath.EvalSymlinks(target)
 	if err != nil {
-		// If nothing exists yet, fall back to the lexical check.
+		// Fail closed when the target itself exists but cannot be resolved
+		// (e.g. an existing dangling symlink): approving it would let file
+		// creation follow the link outside the root. Only brand-new paths
+		// beneath an existing safe parent fall back to the lexical check.
+		if !walkedUp {
+			return "", fmt.Errorf("security violation: cannot resolve path %s", path)
+		}
 		return absPath, nil
+	}
+	// Re-anchor any non-existent suffix onto the resolved parent and re-check.
+	rel, err := filepath.Rel(target, absPath)
+	if err != nil {
+		return "", fmt.Errorf("security violation: cannot contain path %s", path)
+	}
+	if rel == "." {
+		resolved = filepath.Clean(resolved)
+	} else {
+		// A symlink component inside the non-existent suffix cannot be
+		// resolved; reject separators that would need resolution beyond leaf.
+		resolved = filepath.Join(resolved, rel)
 	}
 	resolved = filepath.Clean(resolved)
 	if resolved != absChroot && !strings.HasPrefix(resolved, absChroot+string(filepath.Separator)) {

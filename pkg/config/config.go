@@ -208,6 +208,29 @@ func TryGet() (*Config, error) {
 // It returns an error if the file cannot be read or parsed, allowing
 // callers to handle configuration failures gracefully.
 func LoadConfigFile(path string) (*Config, error) {
+	cfg, err := ParseConfigFile(path)
+	if err != nil {
+		return nil, err
+	}
+	// Spending policy is installed only through this explicit entry point —
+	// never as a side effect of config discovery (e.g. per-kickoff MCP
+	// injection), which would otherwise clobber the initialized budget.
+	llm.SetGlobalBudget(cfg.LLM.MaxBudgetUSD)
+	for name, model := range cfg.Models {
+		if model.PromptPrice > 0 || model.CompletionPrice > 0 {
+			llm.SetModelPricing(name, llm.ModelPricing{
+				PromptPricePerToken:     model.PromptPrice,
+				CompletionPricePerToken: model.CompletionPrice,
+			})
+		}
+	}
+	return cfg, nil
+}
+
+// ParseConfigFile reads and parses a config file with no global side effects.
+// Use it for discovery paths (MCP server enumeration) that must not change
+// the active spending policy.
+func ParseConfigFile(path string) (*Config, error) {
 	if path == "" {
 		path = "config.json"
 	}
@@ -242,15 +265,6 @@ func LoadConfigFile(path string) (*Config, error) {
 	cfg.Memory.ChromaTimeout = parseDurationOrDefault(cfg.Memory.ChromaTimeoutStr, "memory.chroma_timeout", 10*time.Second)
 	cfg.Persistence.Sessions.CheckpointInterval = parseDurationOrDefault(cfg.Persistence.Sessions.CheckpointIntervalStr, "persistence.sessions.checkpoint_interval", 30*time.Second)
 	cfg.Persistence.Cache.Redis.TTL = parseDurationOrDefault(cfg.Persistence.Cache.Redis.TTLStr, "persistence.cache.redis.ttl", 24*time.Hour)
-	llm.SetGlobalBudget(cfg.LLM.MaxBudgetUSD)
-	for name, model := range cfg.Models {
-		if model.PromptPrice > 0 || model.CompletionPrice > 0 {
-			llm.SetModelPricing(name, llm.ModelPricing{
-				PromptPricePerToken:     model.PromptPrice,
-				CompletionPricePerToken: model.CompletionPrice,
-			})
-		}
-	}
 	return cfg, nil
 }
 

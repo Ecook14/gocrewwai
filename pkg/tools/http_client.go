@@ -79,36 +79,37 @@ func WithHTTPMaxBytes(n int) func(*HTTPTool) {
 
 func (t *HTTPTool) Execute(ctx context.Context, input map[string]interface{}) (string, error) {
 	method, _ := input["method"].(string)
-	url, _ := input["url"].(string)
+	urlStr, _ := input["url"].(string)
 	if method == "" {
 		method = "GET"
 	}
-	if url == "" {
+	if urlStr == "" {
 		return "", fmt.Errorf("'url' is required")
 	}
 
 	// Prepend base URL if set
-	if t.BaseURL != "" && !strings.HasPrefix(url, "http") {
-		url = t.BaseURL + "/" + strings.TrimLeft(url, "/")
+	if t.BaseURL != "" && !strings.HasPrefix(urlStr, "http") {
+		urlStr = t.BaseURL + "/" + strings.TrimLeft(urlStr, "/")
 	}
 
 	// Validate the URL against SSRF and egress restrictions.
-	if err := t.validateURL(url); err != nil {
+	if err := t.validateURL(urlStr); err != nil {
 		return "", fmt.Errorf("http request blocked: %w", err)
 	}
 
-	// Build query parameters
+	// Build query parameters (URL-encoded so values cannot inject
+	// fragments or extra route syntax).
 	if queryParams, ok := input["query"].(map[string]interface{}); ok {
 		params := make([]string, 0, len(queryParams))
 		for k, v := range queryParams {
-			params = append(params, fmt.Sprintf("%s=%v", k, v))
+			params = append(params, url.QueryEscape(fmt.Sprintf("%v", k))+"="+url.QueryEscape(fmt.Sprintf("%v", v)))
 		}
 		if len(params) > 0 {
 			sep := "?"
-			if strings.Contains(url, "?") {
+			if strings.Contains(urlStr, "?") {
 				sep = "&"
 			}
-			url += sep + strings.Join(params, "&")
+			urlStr += sep + strings.Join(params, "&")
 		}
 	}
 
@@ -122,7 +123,7 @@ func (t *HTTPTool) Execute(ctx context.Context, input map[string]interface{}) (s
 		reqBody = bytes.NewBuffer(data)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, strings.ToUpper(method), url, reqBody)
+	req, err := http.NewRequestWithContext(ctx, strings.ToUpper(method), urlStr, reqBody)
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}

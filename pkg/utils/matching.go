@@ -5,10 +5,22 @@ import (
 	"unicode"
 )
 
+// Match budget: worst-case work is file-lines × target-lines per pass.
+// Normalize once and cap inputs so modest attacker-controlled search text
+// cannot force disproportionate CPU (CWE-407).
+const (
+	maxMatchFileBytes   = 2 << 20 // 2MiB workspace content
+	maxMatchTargetBytes = 256 * 1024
+	maxMatchLines       = 20000
+)
+
 // FindMatchingBlock implements a 4-pass heuristic search for a target block in text.
 // Returns the start and end byte offsets of the match, and true if found.
 func FindMatchingBlock(fullText string, search string) (start int, end int, found bool) {
 	if search == "" {
+		return 0, 0, false
+	}
+	if len(fullText) > maxMatchFileBytes || len(search) > maxMatchTargetBytes {
 		return 0, 0, false
 	}
 
@@ -43,29 +55,25 @@ func matchLines(fullText, search, mode string) (int, int, bool) {
 	if len(searchLines) == 0 {
 		return 0, 0, false
 	}
+	if len(fullLines) > maxMatchLines || len(searchLines) > maxMatchLines {
+		return 0, 0, false
+	}
+
+	// Normalize each line once instead of inside the nested loops.
+	normFull := make([]string, len(fullLines))
+	for i, l := range fullLines {
+		normFull[i] = normLine(l, mode)
+	}
+	normSearch := make([]string, len(searchLines))
+	for j, l := range searchLines {
+		normSearch[j] = normLine(l, mode)
+	}
 
 	for i := 0; i <= len(fullLines)-len(searchLines); i++ {
 		match := true
 		for j := 0; j < len(searchLines); j++ {
-			f := fullLines[i+j]
-			s := searchLines[j]
-
-			switch mode {
-			case "rstrip":
-				if strings.TrimRightFunc(f, unicode.IsSpace) != strings.TrimRightFunc(s, unicode.IsSpace) {
-					match = false
-				}
-			case "trim":
-				if strings.TrimSpace(f) != strings.TrimSpace(s) {
-					match = false
-				}
-			case "normalize":
-				if normalize(f) != normalize(s) {
-					match = false
-				}
-			}
-
-			if !match {
+			if normFull[i+j] != normSearch[j] {
+				match = false
 				break
 			}
 		}
@@ -97,6 +105,17 @@ func matchLines(fullText, search, mode string) (int, int, bool) {
 	}
 
 	return 0, 0, false
+}
+
+func normLine(s, mode string) string {
+	switch mode {
+	case "rstrip":
+		return strings.TrimRightFunc(s, unicode.IsSpace)
+	case "trim":
+		return strings.TrimSpace(s)
+	default:
+		return normalize(s)
+	}
 }
 
 func normalize(s string) string {

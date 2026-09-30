@@ -110,7 +110,11 @@ type ModelPricing struct {
 }
 
 // Prices: USD per token. Initialized from config.json.
+// Guarded by builtinPricingMu: concurrent kickoff workers reinstall pricing
+// while readers iterate it — unsynchronized map access is process-fatal.
 var builtinPricing = make(map[string]ModelPricing)
+
+var builtinPricingMu sync.RWMutex
 
 // ---------------------------------------------------------------------------
 // PriceCache — Simple Lazy-Loading Price Cache (No Background Goroutines)
@@ -164,10 +168,12 @@ func NewPriceCache(cfg PriceCacheConfig) *PriceCache {
 	}
 
 	// Initial set includes builtins + custom overrides
+	builtinPricingMu.RLock()
 	prices := make(map[string]ModelPricing, len(builtinPricing)+len(cfg.CustomPricing))
 	for k, v := range builtinPricing {
 		prices[k] = v
 	}
+	builtinPricingMu.RUnlock()
 	for k, v := range cfg.CustomPricing {
 		prices[k] = v
 	}
@@ -290,10 +296,12 @@ func (pc *PriceCache) fetchPrices() error {
 	}
 
 	// Build new price map: builtins → live → custom (priority order)
+	builtinPricingMu.RLock()
 	newPrices := make(map[string]ModelPricing, len(apiResp.Data)+len(builtinPricing))
 	for k, v := range builtinPricing {
 		newPrices[k] = v
 	}
+	builtinPricingMu.RUnlock()
 	for _, model := range apiResp.Data {
 		promptPrice := parsePrice(model.Pricing.Prompt)
 		completionPrice := parsePrice(model.Pricing.Completion)
@@ -354,7 +362,9 @@ func SetGlobalBudget(budget float64) {
 
 // SetModelPricing allows external configuration (like pkg/config) to inject pricing.
 func SetModelPricing(model string, pricing ModelPricing) {
+	builtinPricingMu.Lock()
 	builtinPricing[model] = pricing
+	builtinPricingMu.Unlock()
 	if globalCache != nil {
 		globalCache.SetPricing(model, pricing)
 	}
@@ -377,6 +387,40 @@ func GlobalTracker() *UsageTracker {
 }
 
 var ErrBudgetExceeded = fmt.Errorf("LLM budget exceeded")
+
+// AdmitBudget enforces the global spend policy before paid generation.
+// Every paid provider entry point (Generate/StreamGenerate, including
+// ordinary clients built for HTTP-created agents) must call it first so
+// concurrent requests cannot independently consume the same budget.
+func AdmitBudget() error {
+	return CheckBudget()
+}
+
+// TrackHeuristicUsage records spend for responses without provider usage
+// data, using the same char/4 token heuristic as agent metrics. Without it,
+// ordinary Generate calls incur charges the tracker never sees and the
+// budget is never exhausted.
+func TrackHeuristicUsage(provider, model, promptText, completionText string, latencyMs int64) {
+	u := Usage{
+		PromptTokens:     len(promptText) / 4,
+		CompletionTokens: len(completionText) / 4,
+		Model:            model,
+		Provider:         provider,
+		LatencyMs:        latencyMs,
+	}
+	u.TotalTokens = u.PromptTokens + u.CompletionTokens
+	u.CostUSD = CalculateCost(u)
+	GlobalTracker().Record(u)
+}
+
+// promptChars totals message content for heuristic accounting.
+func promptChars(messages []Message) int {
+	n := 0
+	for _, m := range messages {
+		n += len(m.Content)
+	}
+	return n
+}
 
 // CheckBudget verifies if the current session has exceeded the max_budget_usd limit.
 func CheckBudget() error {
@@ -401,6 +445,8 @@ func CalculateCost(u Usage) float64 {
 // CalculateCostStatic computes cost using only the hardcoded builtin table.
 // Use this when you explicitly don't want any HTTP calls (e.g., in tests).
 func CalculateCostStatic(u Usage) float64 {
+	builtinPricingMu.RLock()
+	defer builtinPricingMu.RUnlock()
 	if len(builtinPricing) == 0 {
 		return 0
 	}
