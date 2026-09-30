@@ -2,6 +2,73 @@
 
 All notable changes to Gocrewwai will be documented in this file.
 
+## [1.0.0-beta.5] - 2026-09-30
+
+### 🔒 Security hardening (67 agent-findings + 20 review findings, no public API removed)
+
+Fail-closed behavior changes below reject previously-accepted malicious or
+malformed inputs only; legitimate clients are unaffected.
+
+**Crash / DoS closed**
+- `JSONTool`: array indices require `0 <= idx < len` (strict `Atoi`, was `Sscanf`
+  lower-bound-only panic); JSON nesting/input/output budgets; `RegexTool`
+  replacement budget.
+- Nil-request panics fixed across 10 integrations (HubSpot, Discord, Sheets,
+  Jira, +24 sibling sites now check `NewRequest` errors) with identifier
+  validation and `PathEscape` per path segment.
+- Bounded host-side output for Docker sandbox, CLI executors (`docker`,
+  code-interpreter, code-sandbox), arXiv/Ollama decodes, DOCX/xlsx members,
+  JSON formatting, regex replacement, and the file matcher (normalize-once +
+  input caps). Sandbox cleanup uses a fresh context and reports failures.
+- `EventBus`/`Bus.Publish` holds the read lock through non-blocking sends —
+  no more send-on-closed panics on SSE disconnect races.
+
+**SSRF closed**
+- Shared redirect-revalidating + resolving-dial transport for both scrapers;
+  ingestion/files/arXiv reject or re-validate redirects; arXiv moved to HTTPS
+  with same-authority redirects; query params are URL-encoded.
+
+**Traversal closed**
+- Checkpoint `CrewID` allowlist + `BaseDir` containment (`ValidCheckpointID`);
+  symlink validation fails closed on existing dangling links; MCP stdio
+  resolves the full chain and executes the validated target; SQLite tool and
+  dashboard reject `file:` URIs and percent-escapes.
+- File read/write/edit and doc loaders (csv/html/json/xml/yaml/xlsx) open
+  through `os.OpenRoot` confinement — no validate-then-open race.
+- Memory scopes match on segment boundaries (`/tenant/a` ≠ `/tenant/ab`);
+  read-only slices return detached metadata copies.
+
+**Secrets closed**
+- Email header-injection guard (single-line subjects/addresses, `ParseAddress`,
+  MIME-encoded subjects); Gemini credential moved to auth header with error
+  sanitization; audit metadata redacted via JSON-tree normalization;
+  telemetry uses constant span names (no prompt text) with record-safe export.
+- `UnifiedMemory.Forget` uses the new `ScopeDeleter` primitive (in-mem +
+  SQLite) with failure propagation instead of capped-search best-effort.
+
+**AuthZ closed**
+- MCP bridge rejects review-required tools; headless REST crews skip MCP
+  auto-injection (`WithHeadless`); `AskHuman` sampling denies without an
+  approval callback; session IDs get atomic owner/lifecycle gates (409 on
+  conflict), owners persist into terminal checkpoints, fallback reads fail
+  closed; mesh TLS fails closed on client-CA configs; loopback exception
+  requires literal loopback IPs; dashboard honors JWT/read tokens, enforces
+  same-origin + `application/json` CSRF guards, authenticates WS subscribers,
+  and splits public-metrics vs private-review feeds.
+
+**Integrity**
+- Budget admission + heuristic usage accounting on all paid providers;
+  `MaxTokens` enforced on OpenAI paths; failover honors `failover_enabled`;
+  config parsing split from policy install (kickoff discovery can't clobber
+  `CREW_CONFIG_PATH` budgets); mesh delegations serialized per role;
+  agent metrics synchronized with snapshot reads; ADK temp tools restored
+  per-invocation; guardrails enforced on structured results; SQLite expiry
+  compares instants; `gocrew.Recall` forwards scope/source options.
+
+**Dependencies**
+- `go-redis` v9.21.0 → v9.22.0 (v9.21.0 is broken upstream — missing internal
+  package, blocked all builds). `docker +incompatible` verified expected.
+
 ## [1.0.0-beta.4] - 2026-09-29
 
 ### ✨ Multi-agent crews over HTTP
