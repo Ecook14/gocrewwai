@@ -35,7 +35,7 @@
 
 #### 3. Documentation
 - Added `docs/PROGRESS.md` tracking competitive progress
-- Updated Gap.md with accurate counts (57 tools, 7 LLM clients, 12 memory stores)
+- Updated Gap.md with accurate counts (54 tools, 7 LLM clients, 10 memory stores)
 - Added CI/CD pipeline documentation
 
 ### 🟡 Notable Gaps (In Progress)
@@ -62,11 +62,11 @@
 ||| **MCP protocol** | Native Model Context Protocol |
 ||| **WASM sandbox** | Unique to gocrewwai |
 ||| **TypedFlow[T]** | Generic type-safe flows |
-||| **57 built-in tools** | vs. CrewAI ~20 |
+||| **54 built-in tools** | vs. CrewAI ~20 |
 
 ### 📈 Roadmap Progress
 
-#### v0.9.0 → v1.0.0-roadmap Checklist
+#### v1.0.0-beta.5 → v1.0.0-roadmap Checklist
 - [x] Ollama local LLM client
 - [x] 57 tool integrations
 - [x] GitHub Actions CI/CD
@@ -84,7 +84,7 @@
 gocrewwai/
 ├── pkg/
 │   ├── llm/          # 7 LLM clients (OpenAI, Anthropic, Gemini, Groq, OpenRouter, Ollama, Failover)
-│   ├── tools/        # 57 built-in tools including SaaS integrations
+│   ├── tools/        # 54 built-in tools including SaaS integrations
 │   ├── agents/       # Agent builder, cloning, reasoning, delegation
 │   ├── crew/         # 6 process types, async execution, training
 │   ├── memory/       # 12 store types: SQLite, Redis, Chroma, Pinecone, Qdrant, Weaviate, InMemCosine, Conversation, Entity, ShortTerm, LongTerm, Unified
