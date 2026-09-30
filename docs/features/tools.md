@@ -5,7 +5,7 @@ Tools are the interface between your agents and the outside world. Gocrewwai age
 ---
 
 > [!IMPORTANT]
-> **Status: v0.9.0 (Alpha → Beta).** Gocrewwai includes 52 built-in tools (verifiable: `grep -h "^func New.*Tool" pkg/tools/*.go`, minus `NewToolRegistry`) with native support for **Docker Sandbox**, **WASM (wazero)**, and **E2B-compatible** sandboxing for code execution (custom HTTP client against `api.e2b.dev`, not the official E2B SDK), plus **Browser Automation** and **MCP** integration.
+> **Status: v1.0.0-beta.4.** Gocrewwai includes 54 built-in tools (verifiable: `grep -h "^func New.*Tool" pkg/tools/*.go`, minus `NewToolRegistry`) with native support for **Docker Sandbox**, **WASM (wazero)**, and **E2B-compatible** sandboxing for code execution (custom HTTP client against `api.e2b.dev`, not the official E2B SDK), plus **Browser Automation** and **MCP** integration.
 
 ---
 

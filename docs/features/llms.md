@@ -5,7 +5,7 @@ Gocrewwai is model-agnostic, supporting a wide range of LLM providers through a 
 ---
 
 > [!IMPORTANT]
-> **Status: v0.9.0 (Alpha → Beta).** Gocrewwai LLM providers include native connectors for OpenAI, Anthropic, Gemini, Groq, OpenRouter, Ollama, and Failover with built-in retry and failover logic.
+> **Status: v1.0.0-beta.4.** Gocrewwai LLM providers include native connectors for OpenAI, Anthropic, Gemini, Groq, OpenRouter, Ollama, and Failover with built-in retry and failover logic.
 
 ---
 

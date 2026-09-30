@@ -5,7 +5,7 @@ In Gocrewwai, delegation is a core mechanic that allows a lead agent to distribu
 ---
 
 > [!IMPORTANT]
-> **Status: v0.9.0 (Alpha → Beta).** Gocrewwai Agent Delegation supports **Recursive Delegation** with built-in loop protection and task synthesis.
+> **Status: v1.0.0-beta.4.** Gocrewwai Agent Delegation supports **Recursive Delegation** with built-in loop protection and task synthesis.
 
 ---
 

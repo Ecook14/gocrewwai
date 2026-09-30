@@ -5,7 +5,7 @@ Tasks are the specific units of work that your agents must perform. In Gocrewwai
 ---
 
 > [!IMPORTANT]
-> **Status: v0.9.0 (Alpha → Beta).** Gocrewwai Tasks support advanced **Context Chaining** and **Strict JSON Output** validation out-of-the-box.
+> **Status: v1.0.0-beta.4.** Gocrewwai Tasks support advanced **Context Chaining** and **Strict JSON Output** validation out-of-the-box.
 
 ---
 

@@ -43,7 +43,7 @@ advantages:
 1. **Concurrency**: Native goroutines for parallel agent execution — no GIL.
 2. **Type safety**: Every LLM response is unmarshaled into strictly-typed Go structs. No
    runtime `KeyError` surprises.
-3. **Memory & State**: Vector-indexed memory (12 backends) with durable flow checkpoints.
+3. **Memory & State**: Vector-indexed memory (10 backends) with durable flow checkpoints.
 4. **Single binary**: Compile the full orchestrator into a zero-dependency binary.
 
 ---

@@ -5,7 +5,7 @@ Gocrewwai is built on the principle that multi-agent collaboration is superior t
 ---
 
 > [!IMPORTANT]
-> **Status: v0.9.0 (Alpha → Beta).** Gocrewwai Collaboration features include **Autonomous Delegation**, **Peer-Review Loops**, and **Shared Memory State**.
+> **Status: v1.0.0-beta.4.** Gocrewwai Collaboration features include **Autonomous Delegation**, **Peer-Review Loops**, and **Shared Memory State**.
 
 ---
 

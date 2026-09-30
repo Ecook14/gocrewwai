@@ -117,4 +117,4 @@ Want to watch your agents live? Gocrew includes a web UI that runs alongside the
 
 - **[Usage Guide](../USAGE.md)**: Explore advanced sandboxing (Docker/E2B) and configuration.
 - **[Memory Deep Dive](features/memory.md)**: Give your agents persistent long-term memory.
-- **[Tool Alignment](features/tools.md)**: See our full list of 52 built-in tools.
+- **[Tool Alignment](features/tools.md)**: See our full list of 54 built-in tools.

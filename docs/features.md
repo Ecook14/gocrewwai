@@ -11,7 +11,7 @@
 - Human-in-the-Loop (HITL) interrupts
 - Rate limiting (MaxRPM, MaxTokens)
 
-### Tool Ecosystem (52 tools)
+### Tool Ecosystem (54 tools)
 Verifiable: `grep -h "^func New.*Tool" pkg/tools/*.go` (minus `NewToolRegistry`).
 - Search: Tavily, Brave, Exa, Serper, Wikipedia, Arxiv
 - Databases: Supabase, PostgreSQL, MySQL, MongoDB, Elasticsearch, SQLite
